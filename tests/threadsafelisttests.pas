@@ -1,6 +1,6 @@
 unit ThreadSafeListTests;
 
-{$mode objfpc}{$H+}
+{$mode objfpc}{$H+}{$J-}
 
 interface
 
@@ -8,6 +8,7 @@ uses
   Classes, SysUtils, fpcunit, testregistry, ThreadSafeList, DateUtils;
 
 type
+
   // Test thread for stress testing
   TTestThread = class(TThread)
   private
