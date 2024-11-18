@@ -102,40 +102,6 @@ begin
 end;
 ```
 
-2. 🔄 **Iterating While Modifying**
-```pascal
-// ❌ Wrong: List might change during iteration
-for I := 0 to List.Count - 1 do
-begin
-  // Other thread might modify list here!
-  DoSomething(List[I]);
-end;
-
-// ✅ Correct: Use a local copy for iteration
-var
-  LocalCopy: TArray<Integer>;
-begin
-  LocalCopy := List.ToArray;  // Thread-safe copy
-  for I := 0 to High(LocalCopy) do
-    DoSomething(LocalCopy[I]);
-end;
-```
-
-3. 🏃 **Unnecessary Locking**
-```pascal
-// ❌ Wrong: Excessive locking
-for I := 0 to List.Count - 1 do
-  WriteLn(List[I]);  // Each access locks/unlocks
-
-// ✅ Correct: Single lock for bulk operations
-var
-  Values: TArray<Integer>;
-begin
-  Values := List.ToArray;  // Single lock operation
-  for I := 0 to High(Values) do
-    WriteLn(Values[I]);
-end;
-```
 
 ## 📥 Installation
 

@@ -5,23 +5,27 @@
 ```mermaid
 classDiagram
 class TThreadSafeList~T~ {
--FList: array of T
--FCount: Integer
--FCapacity: Integer
--FLock: TCriticalSection
--FComparer: TComparer~T~
--FSorted: Boolean
-+Create(AComparer)
-+Destroy()
-+Add(Item: T)
-+Delete(Index: Integer)
-+Find(Item: T)
-+Sort(Ascending)
-+Replace(Index, Item)
+  -FList: array of T
+  -FCount: Integer
+  -FCapacity: Integer
+  -FLock: TCriticalSection
+  -FComparer: TComparer~T~
+  -FSorted: Boolean
+  +Create(AComparer)
+  +Destroy()
+  +Add(Item: T)
+  +Delete(Index: Integer)
+  +Find(Item: T)
+  +Sort(Ascending)
+  +Replace(Index, Item)
+  +First(): T
+  +Last(): T
+  +IsSorted(): Boolean
+  +Items[Index: Integer]: T
 }
 class TComparer~T~ {
-<<function>>
-+Compare(A: T, B: T): Integer
+  <<function>>
+  +Compare(A: T, B: T): Integer
 }
 TThreadSafeList ..> TComparer : uses
 ```
