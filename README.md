@@ -2,8 +2,8 @@
 
 A high-performance, thread-safe generic collections library for Free Pascal.
 
-> [!Note]
-> This library is still under development. If you are after more mature and production-ready library, consider using:
+> [!Note]This library is still under development. 
+> If you are after more mature and production-ready library, consider using:
 > 
 > 1. [FPC Generics.Collections unit](https://gitlab.com/freepascal.org/fpc/source/-/blob/main/packages/rtl-generics/src/generics.collections.pas)
 > 2. [LGenerics.Collections unit](https://github.com/avk959/LGenerics)
@@ -84,6 +84,10 @@ end;
 ## 📚 Documentation
 
 See [ThreadSafeCollections.List-API.md](docs/ThreadSafeCollections.List-API.md) for more details.   
+
+## 📁 Examples
+
+See [examples](examples) directory for more examples. 
 
 
 ## 🤝 Contributing
