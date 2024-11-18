@@ -42,7 +42,7 @@ Thread-safe generic list implementation with built-in synchronization.
 - `Items[Index: Integer]: T` - Default array property for access
 
 #### Thread Safety Features
-- All public methods are protected by TCriticalSection
+- All public methods are protected by `TCriticalSection`
 - Automatic locking/unlocking for all operations
 - Exception-safe lock management
 

@@ -1,6 +1,6 @@
 # 🔒 ThreadSafeCollections-FP
 
-A high-performance, thread-safe generic collections library for Free Pascal.
+A thread-safe generic collections library for Free Pascal.
 
 > [!Note]This library is still under development. 
 > If you are after more mature and production-ready library, consider using:
@@ -17,36 +17,37 @@ A high-performance, thread-safe generic collections library for Free Pascal.
 - 🧪 Comprehensive test suite
 - ⚡ Exception-safe operations
 
-## 📥 Installation
+## 🎯 Why Use This?
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/ikelaiah/ThreadSafeCollections-FP.git
-   ```
-2. Add the source directory to your project's search path.
+- 🔒 Safe concurrent access to lists from multiple threads
+- 🚀 Fast sorting with custom comparers
+- 💡 Simple to use - just like regular lists, but thread-safe
+- ⚡ Perfect for multi-threaded applications
 
-## 📚 Usage
-
-### 🔰 Basic List Operations
+## 🚀 Quick Start
 
 ```pascal
 uses ThreadSafeCollections.List;
 
+// Create a thread-safe list of integers
 var
-    List: specialize TThreadSafeList<Integer>;
+  Numbers: specialize TThreadSafeList<Integer>;
 begin
-    List := specialize TThreadSafeList<Integer>.Create;
-    try
-        List.Add(42);
-        List.Add(17);
-        List.Sort; // Thread-safe sorting
-    finally
-        List.Free;
-    end;
+  Numbers := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  try
+    // Multiple threads can safely add/remove items
+    Numbers.Add(42);
+    Numbers.Add(17);
+    Numbers.Sort;  // Thread-safe sorting
+    
+    WriteLn(Numbers[0]); // Thread-safe access
+  finally
+    Numbers.Free;
+  end;
 end;
 ```
 
-### 🏗️ Custom Types
+## 🏗️ Quick Start with Custom Types
 
 ```pascal
 uses ThreadSafeCollections.List;
@@ -75,6 +76,76 @@ begin
 end;
 ```
 
+## ⚠️ Common Pitfalls and Best Practices
+
+> [!WARNING]
+> Common mistakes to avoid when using thread-safe lists:
+
+1. 🔓 **Not Using Try-Finally**
+```pascal
+// ❌ Wrong: Resource leak possible
+var
+  List: specialize TThreadSafeList<Integer>;
+begin
+  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  List.Add(42);  // If exception occurs, List won't be freed
+end;
+
+// ✅ Correct: Always use try-finally
+begin
+  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  try
+    List.Add(42);
+  finally
+    List.Free;  // List will always be freed
+  end;
+end;
+```
+
+2. 🔄 **Iterating While Modifying**
+```pascal
+// ❌ Wrong: List might change during iteration
+for I := 0 to List.Count - 1 do
+begin
+  // Other thread might modify list here!
+  DoSomething(List[I]);
+end;
+
+// ✅ Correct: Use a local copy for iteration
+var
+  LocalCopy: TArray<Integer>;
+begin
+  LocalCopy := List.ToArray;  // Thread-safe copy
+  for I := 0 to High(LocalCopy) do
+    DoSomething(LocalCopy[I]);
+end;
+```
+
+3. 🏃 **Unnecessary Locking**
+```pascal
+// ❌ Wrong: Excessive locking
+for I := 0 to List.Count - 1 do
+  WriteLn(List[I]);  // Each access locks/unlocks
+
+// ✅ Correct: Single lock for bulk operations
+var
+  Values: TArray<Integer>;
+begin
+  Values := List.ToArray;  // Single lock operation
+  for I := 0 to High(Values) do
+    WriteLn(Values[I]);
+end;
+```
+
+## 📥 Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/ikelaiah/ThreadSafeCollections-FP.git
+   ```
+2. Add the source directory to your project's search path.
+
+
 ## 🧪 Testing
 
 1. Go to `tests/` directory
@@ -87,8 +158,10 @@ See [ThreadSafeCollections.List-API.md](docs/ThreadSafeCollections.List-API.md) 
 
 ## 📁 Examples
 
-See [examples](examples) directory for more examples. 
-
+- [SimpleNumberList](examples/SimpleNumberList/SimpleNumberList.lpr) - Shows basic operations like Add, Remove, Sort with the built-in integer comparer.
+- [SimpleShoppingCart](examples/SimpleShoppingCart/SimpleShoppingCart.lpr) - Shows how to use TThreadSafeList with a custom type and a custom comparer.
+- [SimpleToDoList](examples/SimpleToDoList/SimpleToDoList.lpr) - Shows how to use TThreadSafeList with the built-in string comparer.   
+- [ChatMessageQueue](examples/ChatMessageQueue/ChatMessageQueue.lpr) - Demonstrates using TThreadSafeList for a multi-threaded chat system.
 
 ## 🤝 Contributing
 
