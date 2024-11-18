@@ -1,6 +1,6 @@
 unit ThreadSafeList;
 
-{$mode objfpc}{$H+}
+{$mode objfpc}{$H+}{$J-}
 {$modeswitch advancedrecords}
 
 interface
