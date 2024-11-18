@@ -1,9 +1,9 @@
 program TestRunner;
 
-{$mode objfpc}{$H+}
+{$mode objfpc}{$H+}{$J-}
 
 uses
-  Classes, consoletestrunner, ThreadSafeListTests;
+  Classes, consoletestrunner, ThreadSafeListTests, ThreadSafeListStudentTests;
 
 type
 
