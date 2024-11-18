@@ -9,6 +9,7 @@ A high-performance, thread-safe generic collections library for Free Pascal.
 - 🔍 Custom comparers for sorting
 - 🔐 Automatic locking mechanism
 - 🧪 Comprehensive test suite
+- ⚡ Exception-safe operations
 
 ## 📥 Installation
 
