@@ -5,7 +5,7 @@ unit ThreadSafeListStudentTests;
 interface
 
 uses
-  Classes, SysUtils, fpcunit, testregistry, ThreadSafeList;
+  Classes, SysUtils, fpcunit, testregistry, ThreadSafeCollections.List;
 
 type
   TStudent = record

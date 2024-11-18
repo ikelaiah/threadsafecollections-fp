@@ -1,4 +1,4 @@
-unit ThreadSafeList;
+unit ThreadSafeCollections.List;
 
 {$mode objfpc}{$H+}{$J-}
 {$modeswitch advancedrecords}

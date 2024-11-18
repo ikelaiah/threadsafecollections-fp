@@ -5,7 +5,7 @@ unit ThreadSafeListTests;
 interface
 
 uses
-  Classes, SysUtils, fpcunit, testregistry, ThreadSafeList, DateUtils;
+  Classes, SysUtils, fpcunit, testregistry, ThreadSafeCollections.List, DateUtils;
 
 type
 
