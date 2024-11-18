@@ -41,6 +41,7 @@ type
     procedure TestFirstLast;
     procedure TestReplace;
     procedure TestSort;
+    procedure TestSortDescending;
     procedure TestIsSorted;
 
     // Edge cases
@@ -554,6 +555,41 @@ begin
 
   FRealList.Free;
   FRealList := specialize TThreadSafeList<Real>.Create(@RealComparer);
+end;
+
+procedure TThreadSafeListTest.TestSortDescending;
+begin
+  // Test Integer descending sort
+  FIntList.Add(1);
+  FIntList.Add(3);
+  FIntList.Add(2);
+
+  FIntList.Sort(False);  // Sort descending
+  AssertEquals('First element after descending sort', 3, FIntList[0]);
+  AssertEquals('Second element after descending sort', 2, FIntList[1]);
+  AssertEquals('Third element after descending sort', 1, FIntList[2]);
+  AssertTrue('List should be sorted', FIntList.IsSorted);
+
+  // Test String descending sort
+  FStrList.Add('Apple');
+  FStrList.Add('Cherry');
+  FStrList.Add('Banana');
+
+  FStrList.Sort(False);  // Sort descending
+  AssertEquals('First string after descending sort', 'Cherry', FStrList[0]);
+  AssertEquals('Second string after descending sort', 'Banana', FStrList[1]);
+  AssertEquals('Third string after descending sort', 'Apple', FStrList[2]);
+  AssertTrue('String list should be sorted', FStrList.IsSorted);
+
+  // Test Real descending sort
+  FRealList.Add(1.1);
+  FRealList.Add(3.3);
+  FRealList.Add(2.2);
+
+  FRealList.Sort(False);  // Sort descending
+  AssertTrue('First element should be largest', FRealList[0] > FRealList[1]);
+  AssertTrue('Last element should be smallest', FRealList[1] > FRealList[2]);
+  AssertTrue('Real list should be sorted', FRealList.IsSorted);
 end;
 
 initialization
