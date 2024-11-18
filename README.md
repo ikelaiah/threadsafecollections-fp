@@ -2,6 +2,12 @@
 
 A high-performance, thread-safe generic collections library for Free Pascal.
 
+> [!Note]
+> This library is still under development. If you are after more mature and production-ready library, consider using:
+> 
+> 1. [FPC Generics.Collections unit](https://www.freepascal.org/docs-html/rtl/generics/generics.collections.html)
+> 2. [LGenerics.Collections unit](https://github.com/avk959/LGenerics)
+
 ## ✨ Features
 
 - 🛡️ Thread-safe List implementation
@@ -74,6 +80,11 @@ end;
 1. Go to `tests/` directory
 2. Open `TestRunner.lpi` in Lazarus IDE and compile
 3. Run `./TestRunner.exe -a -p --format=plain` to see the test results.
+
+## 📚 Documentation
+
+See [ThreadSafeCollections.List-API.md](docs/ThreadSafeCollections.List-API.md) for more details.   
+
 
 ## 🤝 Contributing
 

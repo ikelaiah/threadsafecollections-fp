@@ -23,7 +23,7 @@ type
     FSorted: Boolean;
     
     procedure Grow;
-    procedure QuickSort(Left, Right: Integer);
+    procedure QuickSort(Left, Right: Integer; Ascending: Boolean);
     function GetItem(Index: Integer): T;
     procedure SetItem(Index: Integer; const Value: T);
   public
@@ -35,7 +35,7 @@ type
     function Find(const Item: T): Integer;
     function First: T;
     function Last: T;
-    procedure Sort;
+    procedure Sort(Ascending: Boolean = True);
     function IsSorted: Boolean;
     procedure Replace(Index: Integer; const Item: T);
     
@@ -107,7 +107,7 @@ begin
   SetLength(FList, FCapacity);
 end;
 
-procedure TThreadSafeList.QuickSort(Left, Right: Integer);
+procedure TThreadSafeList.QuickSort(Left, Right: Integer; Ascending: Boolean);
 var
   I, J: Integer;
   P, Temp: T;
@@ -119,8 +119,15 @@ begin
   P := FList[(Left + Right) div 2];
   
   repeat
-    while FComparer(FList[I], P) < 0 do Inc(I);
-    while FComparer(FList[J], P) > 0 do Dec(J);
+    if Ascending then
+    begin
+      while FComparer(FList[I], P) < 0 do Inc(I);
+      while FComparer(FList[J], P) > 0 do Dec(J);
+    end else
+    begin
+      while FComparer(FList[I], P) > 0 do Inc(I);
+      while FComparer(FList[J], P) < 0 do Dec(J);
+    end;
     
     if I <= J then
     begin
@@ -132,8 +139,8 @@ begin
     end;
   until I > J;
   
-  if Left < J then QuickSort(Left, J);
-  if I < Right then QuickSort(I, Right);
+  if Left < J then QuickSort(Left, J, Ascending);
+  if I < Right then QuickSort(I, Right, Ascending);
 end;
 
 function TThreadSafeList.Add(const Item: T): Integer;
@@ -213,12 +220,12 @@ begin
   end;
 end;
 
-procedure TThreadSafeList.Sort;
+procedure TThreadSafeList.Sort(Ascending: Boolean = True);
 begin
   FLock.Acquire;
   try
     if FCount > 1 then
-      QuickSort(0, FCount - 1);
+      QuickSort(0, FCount - 1, Ascending);
     FSorted := True;
   finally
     FLock.Release;
