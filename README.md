@@ -2,7 +2,7 @@
 
 A thread-safe generic collections library for Free Pascal.
 
-> [!Note]This library is still under development. 
+> [!Note] This library is still under development. 
 > If you are after more mature and production-ready library, consider using:
 > 
 > 1. [FPC Generics.Collections unit](https://gitlab.com/freepascal.org/fpc/source/-/blob/main/packages/rtl-generics/src/generics.collections.pas)
