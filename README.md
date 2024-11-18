@@ -12,6 +12,7 @@ A thread-safe generic collections library for Free Pascal.
 
 - 🛡️ Thread-safe List implementation
 - 🚀 Generic type support (Integer, String, Real, Boolean, Records)
+- 📦 Built-in comparers (Integer, String, Real, Boolean)
 - 🔍 Custom comparers for sorting
 - 🔐 Automatic locking mechanism
 - 🧪 Comprehensive test suite
