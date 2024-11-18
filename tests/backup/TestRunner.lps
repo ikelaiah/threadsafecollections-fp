@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectSession>
+    <PathDelim Value="\"/>
+    <Version Value="12"/>
+    <BuildModes Active="Release"/>
+    <Units>
+      <Unit>
+        <Filename Value="TestRunner.lpr"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <WindowIndex Value="-1"/>
+        <TopLine Value="-1"/>
+        <CursorPos X="-1" Y="-1"/>
+        <UsageCount Value="20"/>
+      </Unit>
+      <Unit>
+        <Filename Value="threadsafelisttests.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="ThreadSafeListTests"/>
+        <IsVisibleTab Value="True"/>
+        <TopLine Value="60"/>
+        <CursorPos X="30" Y="67"/>
+        <UsageCount Value="20"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\src\threadsafelist.pas"/>
+        <UnitName Value="ThreadSafeList"/>
+        <EditorIndex Value="1"/>
+        <TopLine Value="251"/>
+        <CursorPos X="26" Y="270"/>
+        <UsageCount Value="10"/>
+        <Loaded Value="True"/>
+      </Unit>
+    </Units>
+    <JumpHistory HistoryIndex="29">
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="244" Column="31" TopLine="237"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="12" Column="31"/>
+      </Position>
+      <Position>
+        <Filename Value="..\src\threadsafelist.pas"/>
+        <Caret Line="13" Column="11"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="7" Column="5"/>
+      </Position>
+      <Position>
+        <Filename Value="..\src\threadsafelist.pas"/>
+        <Caret Line="13" Column="48"/>
+      </Position>
+      <Position>
+        <Filename Value="..\src\threadsafelist.pas"/>
+        <Caret Line="22" Column="11" TopLine="9"/>
+      </Position>
+      <Position>
+        <Filename Value="..\src\threadsafelist.pas"/>
+        <Caret Line="13" Column="44"/>
+      </Position>
+      <Position>
+        <Filename Value="..\src\threadsafelist.pas"/>
+        <Caret Line="11" Column="5" TopLine="16"/>
+      </Position>
+      <Position>
+        <Filename Value="..\src\threadsafelist.pas"/>
+        <Caret Line="23" Column="10" TopLine="9"/>
+      </Position>
+      <Position>
+        <Filename Value="..\src\threadsafelist.pas"/>
+        <Caret Line="22" Column="11" TopLine="9"/>
+      </Position>
+      <Position>
+        <Filename Value="..\src\threadsafelist.pas"/>
+        <Caret Line="23" Column="11" TopLine="10"/>
+      </Position>
+      <Position>
+        <Filename Value="..\src\threadsafelist.pas"/>
+        <Caret Line="14" Column="32"/>
+      </Position>
+      <Position>
+        <Filename Value="..\src\threadsafelist.pas"/>
+        <Caret Line="11" Column="5"/>
+      </Position>
+      <Position>
+        <Filename Value="..\src\threadsafelist.pas"/>
+        <Caret Line="13" Column="3" TopLine="7"/>
+      </Position>
+      <Position>
+        <Filename Value="..\src\threadsafelist.pas"/>
+        <Caret Line="14"/>
+      </Position>
+      <Position>
+        <Filename Value="..\src\threadsafelist.pas"/>
+        <Caret Line="270" Column="26" TopLine="251"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="14" Column="23"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="28" Column="27" TopLine="5"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="70" Column="50" TopLine="57"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="109" Column="5" TopLine="92"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="128" Column="24" TopLine="115"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="131" Column="28" TopLine="118"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="8" Column="70"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="265" Column="35" TopLine="242"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="128" Column="3" TopLine="115"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="265" Column="35" TopLine="242"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="39" Column="15" TopLine="242"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="250" Column="30" TopLine="243"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="256" Column="9" TopLine="243"/>
+      </Position>
+      <Position>
+        <Filename Value="threadsafelisttests.pas"/>
+        <Caret Line="39" Column="15" TopLine="26"/>
+      </Position>
+    </JumpHistory>
+    <RunParams>
+      <FormatVersion Value="2"/>
+      <Modes ActiveMode=""/>
+    </RunParams>
+  </ProjectSession>
+</CONFIG>
