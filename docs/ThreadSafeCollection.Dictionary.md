@@ -11,13 +11,20 @@ classDiagram
         -array of PEntry FBuckets
         -integer FCount
         +Create()
+        +Create(InitialCapacity: integer)
         +Destroy()
         +Add(Key, Value)
         +Find(Key): Value
+        +TryGetValue(Key, out Value): boolean
         +Remove(Key): boolean
         +Replace(Key, Value)
+        +First(out Key, out Value): boolean
+        +Last(out Key, out Value): boolean
         +Clear()
         +Count(): integer
+        +ResizeBuckets(NewSize: integer)
+        +GetBucketCount(): integer
+        +BucketCount: integer
     }
     
     class TDictionaryEntry~TKey,TValue~ {
@@ -27,7 +34,14 @@ classDiagram
         +PEntry Next
     }
 
+    class Constants {
+        +INITIAL_BUCKET_COUNT = 16
+        +LOAD_FACTOR = 0.75
+        +MIN_BUCKET_COUNT = 4
+    }
+
     TThreadSafeDictionary --* TDictionaryEntry : contains
+    TThreadSafeDictionary --> Constants : uses
 ```
 
 ## Collision Resolution Strategies
@@ -106,7 +120,8 @@ Key Differences:
 ## API Reference
 
 ### Constructor/Destructor
-- `Create`: Creates a new dictionary with initial bucket size of 16
+- `Create`: Creates a new dictionary with default bucket size (16)
+- `Create(InitialCapacity: integer)`: Creates dictionary with specified initial capacity (adjusted to power of 2)
 - `Destroy`: Cleans up all entries and frees resources
 
 ### Core Operations
@@ -123,14 +138,15 @@ Key Differences:
 ### Maintenance
 - `Clear`: Removes all entries
 - `Count: integer`: Returns number of items
-
-## Technical Details
+- `ResizeBuckets(NewSize: integer)`: Manually resizes bucket array
+- `BucketCount: integer`: Returns current number of buckets
 
 ### Constants
 ```pascal
 const
-  INITIAL_BUCKET_COUNT = 16;    // Initial hash table size
+  INITIAL_BUCKET_COUNT = 16;    // Default initial size
   LOAD_FACTOR = 0.75;          // Resize threshold
+  MIN_BUCKET_COUNT = 4;        // Minimum bucket count
 ```
 
 ### Thread Safety
@@ -164,22 +180,21 @@ const
 var
   Dict: specialize TThreadSafeDictionary<string, integer>;
 begin
-  Dict := TThreadSafeDictionary.Create;
+  // Create with custom initial capacity (will be adjusted to 1024)
+  Dict := TThreadSafeDictionary.Create(1000);
   try
     // Add items
     Dict.Add('one', 1);
     Dict.Add('two', 2);
 
-    // Find item
+    // Check current bucket count
+    WriteLn(Format('Bucket count: %d', [Dict.BucketCount]));
+
+    // Manually resize if needed (will be adjusted to next power of 2)
+    Dict.ResizeBuckets(2000);
+
+    // Verify items still accessible
     WriteLn(Dict.Find('one'));  // Outputs: 1
-
-    // Try get value
-    var Value: integer;
-    if Dict.TryGetValue('two', Value) then
-      WriteLn(Value);  // Outputs: 2
-
-    // Remove item
-    Dict.Remove('one');
   finally
     Dict.Free;
   end;
@@ -202,6 +217,12 @@ end;
    - Initialize with expected size if known
    - Use TryGetValue instead of Find when appropriate
    - Consider key distribution for hash efficiency
+
+4. Capacity Management
+   - Use custom initial capacity for known data sizes
+   - Consider growth pattern when using manual resize
+   - Remember minimum bucket count constraint
+   - Account for load factor in size calculations
 
 ## Known Limitations
 
