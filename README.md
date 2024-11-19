@@ -11,21 +11,23 @@ A thread-safe generic collections library for Free Pascal.
 ## ✨ Features
 
 - 🛡️ Thread-safe List implementation
+- 📘 Thread-safe Dictionary implementation
 - 🚀 Generic type support (Integer, String, Real, Boolean, Records)
-- 📦 Built-in comparers (Integer, String, Real, Boolean)
-- 🔍 Custom comparers for sorting
+- 📦 Built-in comparers and hash functions
 - 🔐 Automatic locking mechanism
 - 🧪 Comprehensive test suite
 - ⚡ Exception-safe operations
 
 ## 🎯 Why Use This?
 
-- 🔒 Safe concurrent access to lists from multiple threads
-- 🚀 Fast sorting with custom comparers
-- 💡 Simple to use - just like regular lists, but thread-safe
+- 🔒 Safe concurrent access from multiple threads
+- 🚀 Fast operations with optimized implementations
+- 💡 Simple to use - just like regular collections, but thread-safe
 - ⚡ Perfect for multi-threaded applications
 
 ## 🚀 Quick Start
+
+### Using ThreadSafeList
 
 ```pascal
 uses ThreadSafeCollections.List;
@@ -48,34 +50,73 @@ begin
 end;
 ```
 
-## 🏗️ Quick Start with Custom Types
+### ThreadSafeList with Custom Types
 
 ```pascal
 uses ThreadSafeCollections.List;
 
 type
-    TStudent = record
-        Name: string;
-        StudentId: Integer;
+  TStudent = record
+      Name: string;
+      StudentId: Integer;
 end;
 
 // Custom comparer for sorting
 function StudentNameComparer(const A, B: TStudent): Integer;
 begin
-    Result := CompareStr(A.Name, B.Name);
+  Result := CompareStr(A.Name, B.Name);
 end;
 
 var
-    Students: specialize TThreadSafeList<TStudent>;
+  Students: specialize TThreadSafeList<TStudent>;
 begin
-    Students := specialize TThreadSafeList<TStudent>.Create(@StudentNameComparer);
-    try 
-        // ... use the list
-    finally
-        Students.Free;
-    end;
+  Students := specialize TThreadSafeList<TStudent>.Create(@StudentNameComparer);
+  try 
+      // ... use the list
+  finally
+      Students.Free;
+  end;
 end;
 ```
+
+
+### Using ThreadSafeDictionary
+
+```pascal
+uses 
+  ThreadSafeCollection.Dictionary;
+
+var
+  Dict: specialize TThreadSafeDictionary<string, integer>;
+
+begin
+  Dict := specialize TThreadSafeDictionary<string, integer>.Create;
+  try
+    Dict.Add('one', 1);
+    Dict.Add('two', 2);
+    if Dict.TryGetValue('one', Value) then
+        WriteLn(Value); // Outputs: 1
+    Dict.Remove('two');
+  finally
+    Dict.Free;
+  end;
+end;
+```
+
+## 📚 Collection Types
+
+### TThreadSafeList<T>
+- Thread-safe generic list
+- Automatic growth
+- Sorting capability
+- Index-based access
+
+### TThreadSafeDictionary<TKey, TValue>
+- Thread-safe generic dictionary
+- Separate chaining for collision resolution
+- Automatic resizing (load factor: 0.75)
+- Optimized hash functions for common types
+
 
 ## ⚠️ Common Pitfalls and Best Practices
 
