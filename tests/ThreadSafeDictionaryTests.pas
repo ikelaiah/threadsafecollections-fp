@@ -77,6 +77,13 @@ type
     // Performance tests
     procedure TestLargeDataSetPerformance;
     procedure TestHashingPerformance;
+
+    // New tests for initial capacity and resize
+    procedure TestInitialCapacity;
+    procedure TestManualResize;
+    procedure TestResizeWithData;
+    procedure TestResizeUnderflow;
+    procedure TestBucketCount;
   end;
 
 implementation
@@ -670,6 +677,163 @@ begin
   EndTick := GetTickCount64;
 
   WriteLn(Format('Finding %d items took: %d ms', [TEST_SIZE, EndTick - StartTick]));
+end;
+
+procedure TThreadSafeDictionaryTest.TestInitialCapacity;
+var
+  CustomDict: TStringIntDictionary;
+begin
+  WriteLn('Starting TestInitialCapacity');
+  IncrementTestCounter;
+  try
+    // Test with custom initial capacity
+    CustomDict := TStringIntDictionary.Create(100);
+    try
+      // Should be adjusted to next power of 2 (128)
+      AssertEquals('Initial bucket count should be 128', 128, CustomDict.BucketCount);
+      
+      // Verify functionality with custom capacity
+      CustomDict.Add('test1', 1);
+      CustomDict.Add('test2', 2);
+      AssertEquals('Should store values correctly', 1, CustomDict.Find('test1'));
+    finally
+      CustomDict.Free;
+    end;
+    
+    // Test minimum capacity enforcement
+    CustomDict := TStringIntDictionary.Create(2);
+    try
+      AssertEquals('Should enforce minimum bucket count', 4, CustomDict.BucketCount);
+    finally
+      CustomDict.Free;
+    end;
+    
+    WriteLn('Completed TestInitialCapacity');
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestInitialCapacity failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.TestManualResize;
+begin
+  WriteLn('Starting TestManualResize');
+  IncrementTestCounter;
+  try
+    // Start with default size
+    AssertEquals('Initial bucket count should be 16', 16, FStrDict.BucketCount);
+    
+    // Manual resize
+    FStrDict.ResizeBuckets(32);
+    AssertEquals('Bucket count should be updated', 32, FStrDict.BucketCount);
+    
+    // Verify functionality after resize
+    FStrDict.Add('test1', 1);
+    AssertEquals('Should work after resize', 1, FStrDict.Find('test1'));
+    
+    WriteLn('Completed TestManualResize');
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestManualResize failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.TestResizeWithData;
+var
+  I: Integer;
+  Key: string;
+begin
+  WriteLn('Starting TestResizeWithData');
+  IncrementTestCounter;
+  try
+    // Add some data
+    for I := 1 to 10 do
+    begin
+      Key := 'Key' + IntToStr(I);
+      FStrDict.Add(Key, I);
+    end;
+    
+    // Resize larger
+    FStrDict.ResizeBuckets(64);
+    AssertEquals('Bucket count should be updated', 64, FStrDict.BucketCount);
+    
+    // Verify all data still accessible
+    for I := 1 to 10 do
+    begin
+      Key := 'Key' + IntToStr(I);
+      AssertEquals('Data should be preserved after resize', I, FStrDict.Find(Key));
+    end;
+    
+    WriteLn('Completed TestResizeWithData');
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestResizeWithData failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.TestResizeUnderflow;
+var
+  I: Integer;
+begin
+  WriteLn('Starting TestResizeUnderflow');
+  IncrementTestCounter;
+  try
+    // Add enough items to prevent small resize
+    for I := 1 to 100 do
+      FStrDict.Add('Key' + IntToStr(I), I);
+      
+    // Attempt resize too small for current items
+    try
+      FStrDict.ResizeBuckets(4);
+      Fail('Should raise exception when resize too small for current items');
+    except
+      on E: Exception do
+        AssertTrue('Correct exception raised', True);
+    end;
+    
+    WriteLn('Completed TestResizeUnderflow');
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestResizeUnderflow failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.TestBucketCount;
+var
+  I: Integer;
+begin
+  WriteLn('Starting TestBucketCount');
+  IncrementTestCounter;
+  try
+    AssertEquals('Initial bucket count should be 16', 16, FStrDict.BucketCount);
+    
+    // Add items to trigger automatic resize
+    for I := 1 to 20 do
+      FStrDict.Add('Key' + IntToStr(I), I);
+      
+    AssertTrue('Bucket count should increase automatically', 
+      FStrDict.BucketCount > 16);
+    
+    WriteLn('Completed TestBucketCount');
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestBucketCount failed: ', E.Message);
+      raise;
+    end;
+  end;
 end;
 
 initialization

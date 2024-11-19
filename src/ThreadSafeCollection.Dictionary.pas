@@ -44,8 +44,9 @@ type
     PEntry = ^TEntry;
   private
   const
-    INITIAL_BUCKET_COUNT = 16;    // Initial size of hash table
+    INITIAL_BUCKET_COUNT = 16;   // Initial size of hash table
     LOAD_FACTOR = 0.75;          // Threshold for resizing (75% full)
+    MIN_BUCKET_COUNT = 4;        // Minimum number of buckets
 
   private
     FLock: TCriticalSection;     // Thread synchronization
@@ -58,8 +59,10 @@ type
     procedure Resize(NewSize: integer);
     procedure CheckLoadFactor;
     function FindEntry(const Key: TKey; Hash: cardinal; BucketIdx: integer): PEntry;
+    function GetNextPowerOfTwo(Value: integer): integer;
   public
     constructor Create;
+    constructor Create(InitialCapacity: integer); overload;
     destructor Destroy; override;
 
     procedure Add(const Key: TKey; const Value: TValue);
@@ -72,8 +75,10 @@ type
     function Find(const Key: TKey): TValue;
 
     procedure Clear;
-    function Count: integer;
-
+    function Count: integer; 
+    procedure ResizeBuckets(NewSize: integer);
+    function GetBucketCount: integer; 
+    property BucketCount: integer read GetBucketCount; 
     property Items[const Key: TKey]: TValue read Find write Replace; default;
   end;
 
@@ -82,28 +87,116 @@ implementation
 { TThreadSafeDictionary implementation }
 
 {
-  TThreadSafeDictionary implementation
-  
-  Design Notes:
-  - Thread safety achieved through TCriticalSection
-  - Collision resolution using separate chaining
-  - Dynamic resizing when load factor exceeds 0.75
-  - Hash values cached to optimize resize operations
+  GetNextPowerOfTwo: Returns the next power of 2 >= Value
+  - Ensures bucket count is always a power of 2
+  - Required for efficient hash distribution
 }
+function TThreadSafeDictionary.GetNextPowerOfTwo(Value: integer): integer;
+begin
+  Result := MIN_BUCKET_COUNT;
+  while Result < Value do
+    Result := Result * 2;
+end;
 
+
+{
+  Create: Default constructor
+  - Initializes with DEFAULT_BUCKET_COUNT buckets
+}
 constructor TThreadSafeDictionary.Create;
+begin
+  Create(INITIAL_BUCKET_COUNT);
+end;
+
+{
+  Create: Constructor with initial capacity
+  - Adjusts capacity to next power of 2
+  - Ensures minimum bucket count
+  
+  Parameters:
+  - InitialCapacity: Desired initial bucket count
+}
+constructor TThreadSafeDictionary.Create(InitialCapacity: integer);
+var
+  AdjustedSize: integer;
 begin
   inherited Create;
   FLock := TCriticalSection.Create;
-  SetLength(FBuckets, INITIAL_BUCKET_COUNT);  // Start with 16 buckets
+  
+  // Ensure power of 2 and minimum size
+  AdjustedSize := GetNextPowerOfTwo(InitialCapacity);
+  if DEBUG_LOGGING then
+    WriteLn(Format('Create: Adjusted initial capacity from %d to %d',
+        [InitialCapacity, AdjustedSize]));
+        
+  SetLength(FBuckets, AdjustedSize);
   FCount := 0;
 end;
+
 
 destructor TThreadSafeDictionary.Destroy;
 begin
   Clear;  // Clean up all entries before destroying
   FLock.Free;
   inherited Destroy;
+end;
+
+{
+  GetBucketCount: Returns the current number of buckets (not key-value pairs)
+  - Thread-safe operation
+  - Accesses FBuckets directly
+}
+function TThreadSafeDictionary.GetBucketCount: integer;
+begin
+  FLock.Enter;
+  try
+    Result := Length(FBuckets);
+  finally
+    FLock.Leave;
+  end;
+end;
+
+{
+  ResizeBuckets: Public method to manually resize bucket array
+  - Thread-safe operation
+  - Adjusts size to next power of 2
+  - Won't resize smaller than minimum bucket count
+  - Won't resize smaller than needed for current items
+  
+  Parameters:
+  - NewSize: Desired new bucket count
+  
+  Raises:
+  - Exception if new size too small for current items
+}
+procedure TThreadSafeDictionary.ResizeBuckets(NewSize: integer);
+var
+  MinRequired: integer;
+  AdjustedSize: integer;
+begin
+  FLock.Enter;
+  try
+    // Calculate minimum size needed for current items
+    MinRequired := Trunc(FCount / LOAD_FACTOR) + 1;
+    
+    // Ensure new size is adequate
+    if NewSize < MinRequired then
+      raise Exception.CreateFmt(
+        'New size (%d) too small for current item count. Minimum required: %d',
+        [NewSize, MinRequired]);
+    
+    // Adjust to next power of 2 and ensure minimum
+    AdjustedSize := GetNextPowerOfTwo(NewSize);
+    
+    if DEBUG_LOGGING then
+      WriteLn(Format('ResizeBuckets: Adjusting requested size %d to %d',
+          [NewSize, AdjustedSize]));
+    
+    // Perform the resize
+    Resize(AdjustedSize);
+  finally
+    FLock.Leave;
+  end;
 end;
 
 {
