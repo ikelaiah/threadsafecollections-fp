@@ -30,6 +30,79 @@ classDiagram
     TThreadSafeDictionary --* TDictionaryEntry : contains
 ```
 
+## Collision Resolution Strategies
+
+### Separate Chaining (What We Use)
+
+```
+┌─────────────┐
+│ Bucket[0]   │──► [Key:A, Value:1] ──► [Key:E, Value:5] ──► null
+├─────────────┤
+│ Bucket[1]   │──► [Key:B, Value:2] ──► null
+├─────────────┤
+│ Bucket[2]   │──► null
+├─────────────┤
+│ Bucket[3]   │──► [Key:C, Value:3] ──► [Key:F, Value:6] ──► null
+├─────────────┤
+│ Bucket[4]   │──► [Key:D, Value:4] ──► null
+└─────────────┘
+```
+- Each bucket is a linked list
+- Multiple items can exist in same bucket
+- No need to find another slot
+- Memory usage grows with collisions
+- Our implementation uses this approach
+
+### Double Hashing (Alternative)
+
+```
+┌─────────────┐
+│ Bucket[0]   │  A
+├─────────────┤
+│ Bucket[1]   │  B
+├─────────────┤
+│ Bucket[2]   │  empty
+├─────────────┤
+│ Bucket[3]   │  C
+├─────────────┤
+│ Bucket[4]   │  D
+└─────────────┘
+
+When collision occurs at index i:
+Next = (i + step * h2(key)) % tableSize
+where h2(key) is a second hash function
+```
+- Uses two hash functions
+- On collision, calculates new positions
+- All items stored in main array
+- Can lead to clustering
+- More complex to implement
+
+Key Differences:
+1. **Storage Structure**
+   - Separate Chaining: Uses linked lists
+   - Double Hashing: Uses only the main array
+
+2. **Collision Handling**
+   - Separate Chaining: Simply adds to list
+   - Double Hashing: Probes for next empty slot
+
+3. **Memory Usage**
+   - Separate Chaining: Can grow beyond array size
+   - Double Hashing: Limited to array size
+
+4. **Performance**
+   - Separate Chaining: Consistent but may need list traversal
+   - Double Hashing: Fast when load factor is low, degrades with more collisions
+
+5. **Implementation Complexity**
+   - Separate Chaining: Simpler to implement
+   - Double Hashing: More complex, needs careful second hash function selection
+
+6. **Load Factor Impact**
+   - Separate Chaining: Can handle load factor > 1
+   - Double Hashing: Must keep load factor < 1
+
 ## API Reference
 
 ### Constructor/Destructor
