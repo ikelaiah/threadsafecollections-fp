@@ -85,7 +85,7 @@ end;
 
 ```pascal
 uses 
-  ThreadSafeCollection.Dictionary;
+  ThreadSafeCollections.Dictionary;
 
 var
   Dict: specialize TThreadSafeDictionary<string, integer>;

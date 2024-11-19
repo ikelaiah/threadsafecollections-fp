@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, fpcunit, testregistry,
-  ThreadSafeCollection.Dictionary;
+  ThreadSafeCollections.Dictionary;
 
 type
   TIntStringDictionary = specialize TThreadSafeDictionary<integer, string>;
