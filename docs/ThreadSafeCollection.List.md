@@ -193,3 +193,10 @@ end;
 - O(1) for Add (amortized)
 - O(n) for Find
 - O(n log n) for Sort
+
+
+## Version History
+
+- 0.1.0: Initial implementation
+  - Basic thread-safe operations
+  - Dynamic resizing

@@ -85,7 +85,7 @@ At the end, both versions worked.
 
 ## The Irony
 
-The `try..finally` block was perfectly fine all along. I was debugging phantom issues from stale compiled code!
+The `try..finally` block was perfectly fine all along. We were debugging phantom issues from stale compiled code!
 
 ## Best Practices Reminder
 
@@ -96,7 +96,7 @@ The `try..finally` block was perfectly fine all along. I was debugging phantom i
 2. Don't trust incremental builds during deep debugging sessions
 3. Add "Clean and Build" to your initial debugging checklist
 
-My personal "Hall of Fame" of debugging stories! 😄
+My personal "Hall of Fame" of debugging story! 😄
 
 
 ---
@@ -106,7 +106,7 @@ My personal "Hall of Fame" of debugging stories! 😄
 - Initially saw very slow performance
 - Discovered excessive logging was the culprit
 - Removed/reduced logging for performance tests
-- Final performance for 100,000 items:
+- Performance for 100,000 items:
   - Add: 31ms (0.31 microseconds per item)
   - Find: 78ms (0.78 microseconds per item)
 
