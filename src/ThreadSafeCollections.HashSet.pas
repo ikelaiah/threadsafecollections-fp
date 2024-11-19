@@ -6,7 +6,7 @@ unit ThreadSafeCollections.HashSet;
 interface
 
 uses
-  Classes, SysUtils, SyncObjs;
+  Classes, SysUtils, SyncObjs, HashFunctions;
 
 type
   // Generic equality comparer type
@@ -92,32 +92,30 @@ begin
   Result := A = B;
 end;
 
-// Basic hash functions implementation
 function IntegerHash(const Value: Integer): Cardinal;
 begin
-  Result := Cardinal(Value) * 2654435761;  // Knuth's multiplicative hash
+  Result := MultiplicativeHash(Cardinal(Value));
 end;
 
 function StringHash(const Value: string): Cardinal;
-var
-  I: Integer;
 begin
-  Result := 0;
-  for I := 1 to Length(Value) do
-    Result := ((Result shl 5) + Result) + Ord(Value[I]);  // djb2 hash
+  // Use XXHash32 for better performance on longer strings
+  Result := XXHash32(Value);
 end;
 
 function BooleanHash(const Value: Boolean): Cardinal;
 begin
-  Result := Cardinal(Value);
+  // Use MultiplicativeHash since it's just a small integer
+  Result := MultiplicativeHash(Cardinal(Value));
 end;
 
 function RealHash(const Value: Real): Cardinal;
 var
   IntValue: Int64;
 begin
-  IntValue := Int64(Trunc(Value * 1000000));  // Convert to fixed-point with 6 decimal places
-  Result := Cardinal(IntValue) * 2654435761;
+  // Convert to fixed-point and use DefaultHash
+  IntValue := Int64(Trunc(Value * 1000000));
+  Result := DefaultHash(IntValue);
 end;
 
 { TThreadSafeHashSet }
