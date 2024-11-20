@@ -6,7 +6,7 @@ unit ThreadSafeCollections.HashSet;
 interface
 
 uses
-  Classes, SysUtils, SyncObjs, HashFunctions;
+  Classes, SysUtils, SyncObjs, HashFunctions, TypInfo;
 
 type
   // Generic equality comparer type
@@ -45,8 +45,11 @@ type
     function GetNextPowerOfTwo(Value: Integer): Integer;
 
   public
+   // Single, safe constructor with optional initial capacity
     constructor Create(AEqualityComparer: specialize TEqualityComparer<T>;
-                      AHashFunction: specialize THashFunction<T>);
+                      AHashFunction: specialize THashFunction<T>;
+                      AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); 
+
     destructor Destroy; override;
 
     function Add(const Item: T): Boolean;  // Returns true if item was added (not already present)
@@ -55,6 +58,27 @@ type
     procedure Clear;
     
     property Count: Integer read FCount;
+  end;
+
+  // Specialized types with their own constructors
+  TThreadSafeHashSetInteger = class(specialize TThreadSafeHashSet<Integer>)
+  public
+    constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
+  end;
+
+  TThreadSafeHashSetString = class(specialize TThreadSafeHashSet<string>)
+  public
+    constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
+  end;
+
+  TThreadSafeHashSetBoolean = class(specialize TThreadSafeHashSet<Boolean>)
+  public
+    constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
+  end;
+
+  TThreadSafeHashSetReal = class(specialize TThreadSafeHashSet<Real>)
+  public
+    constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
   end;
 
 // Basic equality comparers
@@ -68,6 +92,7 @@ function IntegerHash(const Value: Integer): Cardinal;
 function StringHash(const Value: string): Cardinal;
 function BooleanHash(const Value: Boolean): Cardinal;
 function RealHash(const Value: Real): Cardinal;
+
 
 implementation
 
@@ -121,20 +146,17 @@ end;
 { TThreadSafeHashSet }
 
 constructor TThreadSafeHashSet.Create(AEqualityComparer: specialize TEqualityComparer<T>;
-                                      AHashFunction: specialize THashFunction<T>);
+                                      AHashFunction: specialize THashFunction<T>;
+                                      AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
 begin
-  inherited Create;
-  if not Assigned(AEqualityComparer) then
-    raise Exception.Create('Equality comparer must be provided');
-  if not Assigned(AHashFunction) then
-    raise Exception.Create('Hash function must be provided');
-
   FLock := TCriticalSection.Create;
   FEqualityComparer := AEqualityComparer;
   FHashFunction := AHashFunction;
   FCount := 0;
-  SetLength(FBuckets, INITIAL_BUCKET_COUNT);
+  SetLength(FBuckets, GetNextPowerOfTwo(INITIAL_BUCKET_COUNT));
 end;
+
+
 
 destructor TThreadSafeHashSet.Destroy;
 begin
@@ -308,6 +330,47 @@ begin
       Current := Next;
     end;
   end;
+end;
+
+// Specialized types with their own constructors
+constructor TThreadSafeHashSetInteger.Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
+var
+  EqualityComparer: specialize TEqualityComparer<Integer>;
+  HashFunc: specialize THashFunction<Integer>;
+begin
+  EqualityComparer := @IntegerEquals;
+  HashFunc := @IntegerHash;
+   inherited Create(EqualityComparer, HashFunc, AInitialCapacity);
+end;
+
+constructor TThreadSafeHashSetString.Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
+var
+  EqualityComparer: specialize TEqualityComparer<string>;
+  HashFunc: specialize THashFunction<string>;
+begin
+  EqualityComparer := @StringEquals;
+  HashFunc := @StringHash;
+  inherited Create(EqualityComparer, HashFunc, AInitialCapacity);
+end;
+
+constructor TThreadSafeHashSetBoolean.Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
+var
+  EqualityComparer: specialize TEqualityComparer<Boolean>;
+  HashFunc: specialize THashFunction<Boolean>;
+begin
+  EqualityComparer := @BooleanEquals;
+  HashFunc := @BooleanHash;
+   inherited Create(EqualityComparer, HashFunc, AInitialCapacity);
+end;
+
+constructor TThreadSafeHashSetReal.Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
+var
+  EqualityComparer: specialize TEqualityComparer<Real>;
+  HashFunc: specialize THashFunction<Real>;
+begin
+  EqualityComparer := @RealEquals;
+  HashFunc := @RealHash;
+   inherited Create(EqualityComparer, HashFunc, AInitialCapacity);
 end;
 
 end.
