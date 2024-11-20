@@ -318,6 +318,9 @@ begin
   OldBuckets := FBuckets;
   SetLength(FBuckets, NewSize);
   
+  for I := 0 to Length(FBuckets) - 1 do
+    FBuckets[I] := nil;
+    
   for I := 0 to Length(OldBuckets) - 1 do
   begin
     Current := OldBuckets[I];

@@ -4,10 +4,11 @@ program TestRunner;
 
 uses
   Classes
-  , consoletestrunner
-  , ThreadSafeListTests
-  , ThreadSafeListStudentTests
-  , ThreadSafeDictionaryTests;
+  , consoletestrunner, testutils, DateUtils, SysUtils
+  //, ThreadSafeListTests
+  //, ThreadSafeListStudentTests
+  //, ThreadSafeDictionaryTests
+  , ThreadSafeHashSetTests, testregistry;
 
 type
 
@@ -15,16 +16,36 @@ type
 
   TMyTestRunner = class(TTestRunner)
   protected
-  // override the protected methods of TTestRunner to customize its behavior
+  procedure WriteCustomHelp; override;
   end;
+
+procedure TMyTestRunner.WriteCustomHelp;
+begin
+  writeln('Usage: ');
+  writeln('-l or --list to show all available tests');
+  writeln('-a or --all to run all tests');
+  writeln('-t TestName to run a specific test');
+end;
+
 
 var
   Application: TMyTestRunner;
-
+  i:integer;
 begin
-  Application := TMyTestRunner.Create(nil);
-  Application.Initialize;
-  Application.Title := 'FPCUnit Console test runner';
-  Application.Run;
-  Application.Free;
+  try
+    WriteLn('Starting test runner...');
+        WriteLn('Time: ' + FormatDateTime('hh:nn:ss.zzz', Now));
+
+        Application := TMyTestRunner.Create(nil);
+        Application.Initialize;
+
+        WriteLn('Running tests...');
+        Application.Run;
+
+        WriteLn('Tests completed.');
+        WriteLn('Time: ' + FormatDateTime('hh:nn:ss.zzz', Now));
+
+  finally
+    Application.Free;
+  end;
 end.
