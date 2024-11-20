@@ -1,4 +1,4 @@
-unit ThreadSafeCollection.Dictionary;
+unit ThreadSafeCollections.Dictionary;
 
 {$mode objfpc}{$H+}
 {$modeswitch advancedrecords}
