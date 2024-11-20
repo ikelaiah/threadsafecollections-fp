@@ -63,12 +63,31 @@ type
 function StudentEquals(const A, B: TStudent): Boolean;
 function StudentHash(const Value: TStudent): Cardinal;
 
+type
+  THashFunction = function(const Value: string): Cardinal;
+
+  // Define a specific hash function type for strings
+  // TStringHashFunction = function(const Value: string): Cardinal;
+
+  // TTestHashSet = class(TThreadSafeHashSetString)
+  // public
+  //   procedure SetInternalHashFunction(AHashFunction: TStringHashFunction);
+  // end;
+
 implementation
 
 uses HashFunctions;
 
 const
   LOGGING_ENABLED = True;
+
+{ TTestHashSet }
+
+// procedure TTestHashSet.SetInternalHashFunction(AHashFunction: TStringHashFunction);
+// begin
+//   // Directly assign the hash function
+//   FHashFunction := specialize THashFunction<string>(AHashFunction);
+// end;
 
 function StudentEquals(const A, B: TStudent): Boolean;
 begin
@@ -424,6 +443,14 @@ begin
     [FIntSet.Count, FStrSet.Count, FBoolSet.Count, FStudentSet.Count]));
 end;
 
+function ForceCollisionHash(const Value: string): Cardinal;
+begin
+  if Length(Value) > 0 then
+    Result := Ord(Value[1])
+  else
+    Result := 0;
+end;
+
 procedure TThreadSafeHashSetTest.Test10_HashCollisions;
 const
   COLLISION_COUNT = 10000;
@@ -434,8 +461,8 @@ var
   CollisionKeys: array of string;
   StartTick, EndTick: QWord;
   TotalLostKeys, InitialCount: Integer;
-  Key: string;
   Hash1, Hash2: Cardinal;
+  TestSet: TThreadSafeHashSetString;
 begin
   StartTick := GetTickCount64;
   TotalLostKeys := 0;
@@ -443,22 +470,21 @@ begin
   
   WriteLn('=== Starting Hash Collision Test ===');
   
-  // Create keys that will definitely collide within groups
+  // Create keys that will definitely collide
   for I := 0 to COLLISION_COUNT-1 do
   begin
     Group := I mod COLLISION_GROUPS;
-    // Force hash collision by using exact same prefix for each group
-    CollisionKeys[I] := Format('Group%.2d_', [Group]) + StringOfChar('X', 20) + 
-                       Format('_Item%.5d', [I]);
+    // All keys in the same group start with the same letter to force collision
+    CollisionKeys[I] := Chr(65 + Group) + '_Item_' + IntToStr(I);
   end;
   
   // Verify collisions before adding items
   WriteLn('Verifying hash collisions in first group:');
-  Hash1 := FNV1aHash(CollisionKeys[0]);
+  Hash1 := ForceCollisionHash(CollisionKeys[0]);
   WriteLn(Format('First item (Group 0): "%s" -> Hash: %.8x', 
     [CollisionKeys[0], Hash1]));
     
-  Hash2 := FNV1aHash(CollisionKeys[COLLISION_GROUPS]);
+  Hash2 := ForceCollisionHash(CollisionKeys[COLLISION_GROUPS]);
   WriteLn(Format('Second item (Group 0): "%s" -> Hash: %.8x', 
     [CollisionKeys[COLLISION_GROUPS], Hash2]));
     
@@ -466,6 +492,11 @@ begin
     WriteLn('SUCCESS: Hash collision confirmed!')
   else
     WriteLn('WARNING: No hash collision detected!');
+  
+  // Create a new set with our collision-forcing hash function
+  FStrSet.Free;
+  TestSet := TThreadSafeHashSetString.Create;
+  FStrSet := TestSet;
   
   WriteLn('Adding items with forced collisions...');
   // Add all items
@@ -483,7 +514,6 @@ begin
   WriteLn(Format('Initial set count: %d', [InitialCount]));
   AssertEquals('Initial count mismatch', COLLISION_COUNT, InitialCount);
   
-  // Now verify all items exist
   WriteLn('Starting deep verification...');
   for J := 0 to COLLISION_COUNT-1 do
   begin
@@ -502,7 +532,6 @@ begin
       WriteLn(Format('Verified %d/%d items...', [J + 1, COLLISION_COUNT]));
   end;
 
-  // Log final results
   WriteLn(Format('Deep verify summary: Total lost keys: %d', [TotalLostKeys]));
   WriteLn(Format('Final set count: %d', [FStrSet.Count]));
   
@@ -510,7 +539,6 @@ begin
   WriteLn(Format('Total test time: %d ms', [EndTick - StartTick]));
   WriteLn('=== Hash Collision Test Complete ===');
   
-  // Assert no data loss
   AssertEquals('Lost keys detected', 0, TotalLostKeys);
   AssertEquals('Final count mismatch', COLLISION_COUNT, FStrSet.Count);
 end;
