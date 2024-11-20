@@ -7,6 +7,9 @@ interface
 uses
   Classes, SysUtils, fpcunit, testregistry, ThreadSafeCollections.HashSet, Math;
 
+const
+  INITIAL_BUCKET_COUNT = 16;
+
 type
   TStudent = record
     Name: string;
@@ -59,12 +62,20 @@ type
     procedure Test10_HashCollisions;
   end;
 
+
+
 // Student record comparers and hash functions
 function StudentEquals(const A, B: TStudent): Boolean;
 function StudentHash(const Value: TStudent): Cardinal;
 
 type
   THashFunction = function(const Value: string): Cardinal;
+
+type
+  TCollisionHashSet = class(TThreadSafeHashSetString)
+  public
+    constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); reintroduce;
+  end;
 
   // Define a specific hash function type for strings
   // TStringHashFunction = function(const Value: string): Cardinal;
@@ -80,6 +91,22 @@ uses HashFunctions;
 
 const
   LOGGING_ENABLED = True;
+
+function ForceCollisionHash(const Value: string): Cardinal;
+begin
+  if Length(Value) > 0 then
+    Result := Ord(Value[1])
+  else
+    Result := 0;
+end;
+
+constructor TCollisionHashSet.Create(AInitialCapacity: Integer);
+var
+  EqualityComparer: specialize TEqualityComparer<string>;
+begin
+  EqualityComparer := @StringEquals;
+  inherited Create(@ForceCollisionHash, AInitialCapacity);
+end;
 
 { TTestHashSet }
 
@@ -443,18 +470,12 @@ begin
     [FIntSet.Count, FStrSet.Count, FBoolSet.Count, FStudentSet.Count]));
 end;
 
-function ForceCollisionHash(const Value: string): Cardinal;
-begin
-  if Length(Value) > 0 then
-    Result := Ord(Value[1])
-  else
-    Result := 0;
-end;
+
 
 procedure TThreadSafeHashSetTest.Test10_HashCollisions;
 const
   COLLISION_COUNT = 10000;
-  COLLISION_GROUPS = 16;
+  COLLISION_GROUPS = 4;
   MAX_DETAILED_LOGS = 10;
 var
   I, J, Group: Integer;
@@ -462,7 +483,7 @@ var
   StartTick, EndTick: QWord;
   TotalLostKeys, InitialCount: Integer;
   Hash1, Hash2: Cardinal;
-  TestSet: TThreadSafeHashSetString;
+  TestSet: TCollisionHashSet;
 begin
   StartTick := GetTickCount64;
   TotalLostKeys := 0;
@@ -474,8 +495,8 @@ begin
   for I := 0 to COLLISION_COUNT-1 do
   begin
     Group := I mod COLLISION_GROUPS;
-    // All keys in the same group start with the same letter to force collision
-    CollisionKeys[I] := Chr(65 + Group) + '_Item_' + IntToStr(I);
+    // Now we'll create more collisions by using just a few starting letters
+    CollisionKeys[I] := Chr(65 + (Group mod 4)) + '_Item_' + IntToStr(I);
   end;
   
   // Verify collisions before adding items
@@ -495,7 +516,7 @@ begin
   
   // Create a new set with our collision-forcing hash function
   FStrSet.Free;
-  TestSet := TThreadSafeHashSetString.Create;
+  TestSet := TCollisionHashSet.Create;
   FStrSet := TestSet;
   
   WriteLn('Adding items with forced collisions...');

@@ -69,6 +69,8 @@ type
   TThreadSafeHashSetString = class(specialize TThreadSafeHashSet<string>)
   public
     constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
+    constructor Create(AHashFunction: specialize THashFunction<string>; 
+                       AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
   end;
 
   TThreadSafeHashSetBoolean = class(specialize TThreadSafeHashSet<Boolean>)
@@ -354,6 +356,15 @@ begin
   EqualityComparer := @StringEquals;
   HashFunc := @StringHash;
   inherited Create(EqualityComparer, HashFunc, AInitialCapacity);
+end;
+
+constructor TThreadSafeHashSetString.Create(AHashFunction: specialize THashFunction<string>; 
+                                          AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
+var
+  EqualityComparer: specialize TEqualityComparer<string>;
+begin
+  EqualityComparer := @StringEquals;
+  inherited Create(EqualityComparer, AHashFunction, AInitialCapacity);
 end;
 
 constructor TThreadSafeHashSetBoolean.Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
