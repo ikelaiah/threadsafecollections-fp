@@ -153,7 +153,7 @@ begin
   FEqualityComparer := AEqualityComparer;
   FHashFunction := AHashFunction;
   FCount := 0;
-  SetLength(FBuckets, GetNextPowerOfTwo(INITIAL_BUCKET_COUNT));
+  SetLength(FBuckets, GetNextPowerOfTwo(AInitialCapacity));
 end;
 
 
