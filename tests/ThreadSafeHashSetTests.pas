@@ -28,13 +28,15 @@ type
 
   TCollisionThread = class(TThread)
   private
+    const
+      COLLISION_GROUPS = 2;  // Same as in the test
+  private
     FSet: TThreadSafeHashSetString;
-    FKeys: array of string;
     FStartIndex: Integer;
     FCount: Integer;
   public
     constructor Create(ASet: TThreadSafeHashSetString; 
-      const AKeys: array of string; AStartIndex, ACount: Integer);
+      AStartIndex, ACount: Integer);
     procedure Execute; override;
   end;
 
@@ -60,6 +62,7 @@ type
     procedure Test8_ConcurrentAccess;
     procedure Test9_StressTest;
     procedure Test10_HashCollisions;
+    procedure Test11_AggressiveCollisions;
   end;
 
 
@@ -94,10 +97,8 @@ const
 
 function ForceCollisionHash(const Value: string): Cardinal;
 begin
-  if Length(Value) > 0 then
-    Result := Ord(Value[1])
-  else
-    Result := 0;
+  // Always return the same hash value to force maximum collisions
+  Result := $DEADBEEF;  // Any constant value will do
 end;
 
 constructor TCollisionHashSet.Create(AInitialCapacity: Integer);
@@ -160,13 +161,11 @@ end;
 
 { TCollisionThread }
 
-constructor TCollisionThread.Create(ASet: TThreadSafeHashSetString; 
-  const AKeys: array of string; AStartIndex, ACount: Integer);
+constructor TCollisionThread.Create(ASet: TThreadSafeHashSetString;
+  AStartIndex, ACount: Integer);
 begin
   inherited Create(True);
   FSet := ASet;
-  SetLength(FKeys, Length(AKeys));
-  Move(AKeys[0], FKeys[0], Length(AKeys) * SizeOf(string));
   FStartIndex := AStartIndex;
   FCount := ACount;
   FreeOnTerminate := False;
@@ -175,9 +174,36 @@ end;
 procedure TCollisionThread.Execute;
 var
   I: Integer;
+  AddedCount: Integer;
+  Key: string;
 begin
-  for I := FStartIndex to FStartIndex + FCount - 1 do
-    FSet.Add(FKeys[I]);
+  try
+    AddedCount := 0;
+    WriteLn(Format('Thread %d starting, range %d to %d', 
+      [ThreadID, FStartIndex, FStartIndex + FCount - 1]));
+      
+    for I := FStartIndex to FStartIndex + FCount - 1 do
+    begin
+      // Generate the key using the same pattern as the main test
+      Key := Chr(65 + (I mod COLLISION_GROUPS)) + '_Item_' + IntToStr(I);
+      
+      if FSet.Add(Key) then
+        Inc(AddedCount)
+      else
+        WriteLn(Format('Thread %d failed to add item %d: %s', 
+          [ThreadID, I, Key]));
+        
+      if (I - FStartIndex + 1) mod 1000 = 0 then
+        WriteLn(Format('Thread %d processed %d/%d items, successfully added: %d', 
+          [ThreadID, I - FStartIndex + 1, FCount, AddedCount]));
+    end;
+    
+    WriteLn(Format('Thread %d completed. Added %d/%d items successfully', 
+      [ThreadID, AddedCount, FCount]));
+  except
+    on E: Exception do
+      WriteLn(Format('Thread %d error: %s at item %d', [ThreadID, E.Message, I]));
+  end;
 end;
 
 { TThreadSafeHashSetTest }
@@ -559,6 +585,119 @@ begin
   EndTick := GetTickCount64;
   WriteLn(Format('Total test time: %d ms', [EndTick - StartTick]));
   WriteLn('=== Hash Collision Test Complete ===');
+  
+  AssertEquals('Lost keys detected', 0, TotalLostKeys);
+  AssertEquals('Final count mismatch', COLLISION_COUNT, FStrSet.Count);
+end;
+
+procedure TThreadSafeHashSetTest.Test11_AggressiveCollisions;
+const
+  COLLISION_COUNT = 100000;
+  COLLISION_GROUPS = 2;
+  MAX_DETAILED_LOGS = 10;
+  THREAD_COUNT = 4;
+  BATCH_SIZE = 1000;
+var
+  I, J, Group: Integer;
+  CollisionKeys: array of string;
+  StartTick, EndTick, BatchStart: QWord;
+  TotalLostKeys, InitialCount: Integer;
+  Hash1, Hash2: Cardinal;
+  TestSet: TCollisionHashSet;
+  Threads: array[0..THREAD_COUNT-1] of TCollisionThread;
+  ItemsPerThread: Integer;
+begin
+  StartTick := GetTickCount64;
+  TotalLostKeys := 0;
+  SetLength(CollisionKeys, COLLISION_COUNT);
+  
+  WriteLn('=== Starting Aggressive Collision Test ===');
+  WriteLn(Format('Creating %d items with %d threads', [COLLISION_COUNT, THREAD_COUNT]));
+  
+  // Create keys that will definitely collide
+  for I := 0 to COLLISION_COUNT-1 do
+  begin
+    Group := I mod COLLISION_GROUPS;
+    CollisionKeys[I] := Chr(65 + Group) + '_Item_' + IntToStr(I);
+  end;
+  
+  // Verify collisions
+  WriteLn('Verifying hash collisions:');
+  Hash1 := ForceCollisionHash(CollisionKeys[0]);
+  Hash2 := ForceCollisionHash(CollisionKeys[1]);
+  WriteLn(Format('Group A hash: %.8x, Group B hash: %.8x', [Hash1, Hash2]));
+  AssertEquals('Hashes should be equal for collision test', Hash1, Hash2);
+  
+  // Create a new set with our collision-forcing hash function
+  FStrSet.Free;
+  TestSet := TCollisionHashSet.Create;
+  FStrSet := TestSet;
+  
+  WriteLn('Adding items with forced collisions using multiple threads...');
+  
+  ItemsPerThread := COLLISION_COUNT div THREAD_COUNT;
+  
+  // Create and start threads
+  try
+    BatchStart := GetTickCount64;
+    
+    // Create threads
+    for I := 0 to THREAD_COUNT-1 do
+    begin
+      WriteLn(Format('Creating thread %d for range %d to %d', 
+        [I, I * ItemsPerThread, (I + 1) * ItemsPerThread - 1]));
+        
+      Threads[I] := TCollisionThread.Create(FStrSet,
+        I * ItemsPerThread, ItemsPerThread);
+    end;
+    
+    // Start all threads
+    WriteLn('Starting all threads...');
+    for I := 0 to THREAD_COUNT-1 do
+      Threads[I].Start;
+      
+    // Wait for all threads
+    WriteLn('Waiting for threads to complete...');
+    for I := 0 to THREAD_COUNT-1 do
+      Threads[I].WaitFor;
+      
+    EndTick := GetTickCount64;
+    WriteLn(Format('Parallel insertion took: %d ms', [EndTick - BatchStart]));
+  finally
+    WriteLn('Cleaning up threads...');
+    for I := 0 to THREAD_COUNT-1 do
+      Threads[I].Free;
+  end;
+  
+  // Verify results
+  InitialCount := FStrSet.Count;
+  WriteLn(Format('Initial set count: %d', [InitialCount]));
+  AssertEquals('Initial count mismatch', COLLISION_COUNT, InitialCount);
+  
+  WriteLn('Starting deep verification...');
+  for J := 0 to COLLISION_COUNT-1 do
+  begin
+    if not FStrSet.Contains(CollisionKeys[J]) then
+    begin
+      if TotalLostKeys < MAX_DETAILED_LOGS then
+        WriteLn(Format('Deep verify: Lost key from group %d: %s', 
+          [J mod COLLISION_GROUPS, CollisionKeys[J]]))
+      else if TotalLostKeys = MAX_DETAILED_LOGS then
+        WriteLn('... additional lost keys omitted ... please wait ...');
+        
+      Inc(TotalLostKeys);
+    end;
+    
+    if (J + 1) mod BATCH_SIZE = 0 then
+      WriteLn(Format('Verified %d/%d items...', [J + 1, COLLISION_COUNT]));
+  end;
+
+  WriteLn(Format('Deep verify summary: Total lost keys: %d', [TotalLostKeys]));
+  WriteLn(Format('Final set count: %d', [FStrSet.Count]));
+  
+  EndTick := GetTickCount64;
+  WriteLn(Format('Total test time: %d ms', [EndTick - StartTick]));
+  WriteLn('=== Aggressive Collision Test Complete ===');
   
   AssertEquals('Lost keys detected', 0, TotalLostKeys);
   AssertEquals('Final count mismatch', COLLISION_COUNT, FStrSet.Count);
