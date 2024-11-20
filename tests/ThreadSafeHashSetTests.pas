@@ -590,6 +590,41 @@ begin
   AssertEquals('Final count mismatch', COLLISION_COUNT, FStrSet.Count);
 end;
 
+
+{
+  Test11_AggressiveCollisions is designed to test the absolute worst-case 
+  scenario for a hash set using a large dataset. 
+  1. Forces max Hash Collisions 
+
+        ```
+        function ForceCollisionHash(const Value: string): Cardinal;
+        begin
+          Result := $DEADBEEF;  // Every single item hashes to the same value
+        end;
+        ```
+
+  2. Concurrent access under collisions
+
+      ```
+      // Creates 4 threads, each adding 25,000 items
+      for I := 0 to THREAD_COUNT-1 do
+      begin
+          Threads[I] := TCollisionThread.Create(FStrSet,
+            I * ItemsPerThread, ItemsPerThread);
+      end;
+      ```
+
+  3. Verifies data integrity
+
+      ```
+      // Checks that all 100,000 items were actually added
+      for J := 0 to COLLISION_COUNT-1 do
+      begin
+        if not FStrSet.Contains(CollisionKeys[J]) then
+          Inc(TotalLostKeys);
+      end;
+      ``` 
+}
 procedure TThreadSafeHashSetTest.Test11_AggressiveCollisions;
 const
   COLLISION_COUNT = 100000;
