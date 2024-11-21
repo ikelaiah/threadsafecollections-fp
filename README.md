@@ -40,21 +40,48 @@ This library provides three main collection types:
 
 1. **ThreadSafeList**: Like an array that can grow
    ```pascal
-   var List := TThreadSafeList<Integer>.Create(@IntegerComparer);
-   List.Add(42);  // That's it!
+   var
+     List: specialize TThreadSafeList<Integer>;
+   begin
+     List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+     try
+       List.Add(42);  // That's it!
+     finally
+       List.Free;
+     end;
+   end;
    ```
 
 2. **ThreadSafeDictionary**: Store key-value pairs
    ```pascal
-   var Dict := TThreadSafeDictionary<string,integer>.Create;
-   Dict.Add('one', 1);  // Simple!
+   var
+     Dict: specialize TThreadSafeDictionary<string, integer>;
+   begin
+     Dict := specialize TThreadSafeDictionary<string, integer>.Create;
+     try
+       Dict.Add('one', 1);  // Simple!
+     finally
+       Dict.Free;
+     end;
+   end;
    ```
 
 3. **ThreadSafeHashSet**: Store unique values
    ```pascal
-   var Set := TThreadSafeHashSetString.Create;
-   Set.Add('unique');  // Duplicates handled automatically
+   var
+     UniqueNames: TThreadSafeHashSetString;
+   begin
+     UniqueNames := TThreadSafeHashSetString.Create;
+     try
+       UniqueNames.Add('unique');  // Duplicates handled automatically
+     finally
+       UniqueNames.Free;
+     end;
+   end;
    ```
+
+> [!TIP]
+> Always use try-finally blocks in Free Pascal to ensure proper cleanup!
 
 > [!TIP]
 > Always use try-finally blocks to ensure proper cleanup:
