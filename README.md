@@ -81,9 +81,6 @@ This library provides three main collection types:
    ```
 
 > [!TIP]
-> Always use try-finally blocks in Free Pascal to ensure proper cleanup!
-
-> [!TIP]
 > Always use try-finally blocks to ensure proper cleanup:
 > ```pascal
 > try
