@@ -25,6 +25,7 @@ classDiagram
         +ResizeBuckets(NewSize: integer)
         +GetBucketCount(): integer
         +BucketCount: integer
+        +Items[Key]: Value
     }
     
     class TDictionaryEntry~TKey,TValue~ {
@@ -93,6 +94,7 @@ where h2(key) is a second hash function
 - More complex to implement
 
 Key Differences:
+
 1. **Storage Structure**
    - Separate Chaining: Uses linked lists
    - Double Hashing: Uses only the main array
@@ -125,56 +127,86 @@ Key Differences:
 - `Destroy`: Cleans up all entries and frees resources
 
 ### Core Operations
-- `Add(const Key: TKey; const Value: TValue)`: Adds new key-value pair
-- `Find(const Key: TKey): TValue`: Retrieves value for key
-- `Remove(const Key: TKey): boolean`: Removes entry with given key
-- `Replace(const Key: TKey; const Value: TValue)`: Updates value for existing key
-- `TryGetValue(const Key: TKey; out Value: TValue): boolean`: Safe value retrieval
+| Method | Description | Return Type | Thread-Safe |
+|--------|-------------|-------------|-------------|
+| `Add(const Key: TKey; const Value: TValue)` | Adds new key-value pair | void | Yes |
+| `Find(const Key: TKey)` | Retrieves value for key (raises exception if not found) | TValue | Yes |
+| `TryGetValue(const Key: TKey; out Value: TValue)` | Safe value retrieval | Boolean | Yes |
+| `Remove(const Key: TKey)` | Removes entry with given key | Boolean | Yes |
+| `Replace(const Key: TKey; const Value: TValue)` | Updates value for existing key (raises exception if not found) | void | Yes |
 
 ### Navigation
-- `First(out Key: TKey; out Value: TValue): boolean`: Gets first entry
-- `Last(out Key: TKey; out Value: TValue): boolean`: Gets last entry
+| Method | Description | Return Type | Thread-Safe |
+|--------|-------------|-------------|-------------|
+| `First(out Key: TKey; out Value: TValue)` | Gets first entry in first non-empty bucket | Boolean | Yes |
+| `Last(out Key: TKey; out Value: TValue)` | Gets first entry in last non-empty bucket | Boolean | Yes |
 
 ### Maintenance
-- `Clear`: Removes all entries
-- `Count: integer`: Returns number of items
-- `ResizeBuckets(NewSize: integer)`: Manually resizes bucket array
-- `BucketCount: integer`: Returns current number of buckets
+| Method/Property | Description | Type | Thread-Safe |
+|----------------|-------------|------|-------------|
+| `Clear` | Removes all entries | void | Yes |
+| `Count` | Returns number of items | Integer | Yes |
+| `ResizeBuckets(NewSize: integer)` | Manually resizes bucket array | void | Yes |
+| `BucketCount` | Returns current number of buckets | Integer | Yes |
+| `Items[Key: TKey]` | Default array property for access/update | TValue | Yes |
 
 ### Constants
 ```pascal
 const
-  INITIAL_BUCKET_COUNT = 16;    // Default initial size
-  LOAD_FACTOR = 0.75;          // Resize threshold
-  MIN_BUCKET_COUNT = 4;        // Minimum bucket count
+  DEBUG_LOGGING = False;         // Enable/disable debug output
+  INITIAL_BUCKET_COUNT = 16;     // Default initial size
+  LOAD_FACTOR = 0.75;           // Resize threshold
+  MIN_BUCKET_COUNT = 4;         // Minimum bucket count
 ```
 
-### Thread Safety
-- All public methods are thread-safe
-- Uses `TCriticalSection` for synchronization
-- Lock granularity: method-level
-
-### Hash Table Implementation
+### Implementation Details
+- Uses `TCriticalSection` for thread synchronization
 - Separate chaining for collision resolution
-- Dynamic resizing when load factor exceeds 0.75
+- Automatic resizing when load factor exceeds 0.75
 - Bucket count always power of 2 for efficient indexing
 - Hash values cached in entries for efficient resizing
 
 ### Performance Characteristics
 - Average case complexity:
   - Add: O(1)
-  - Find: O(1)
+  - Find/TryGetValue: O(1)
   - Remove: O(1)
+  - Replace: O(1)
+  - First/Last: O(n) worst case
+  - Clear: O(n)
   - Resize: O(n)
-- Space complexity: O(n)
 
-### Type Support
-- String keys: Uses XXHash32
-- Integer keys: Uses MultiplicativeHash
-- Other types: Uses DefaultHash
-- All hash values masked to positive numbers
+### Usage Example
 
-## Usage Example
+```pascal
+var
+  Dict: specialize TThreadSafeDictionary<string, integer>;
+begin
+  Dict := TThreadSafeDictionary.Create;
+  try
+    // Add items
+    Dict.Add('one', 1);
+    
+    // Access via default property
+    Dict['two'] := 2;
+    
+    // Safe value retrieval
+    var Value: Integer;
+    if Dict.TryGetValue('one', Value) then
+      WriteLn(Value);
+      
+    // Replace existing value
+    Dict.Replace('one', 100);
+    
+    // Access via default property
+    WriteLn(Dict['one']); // Outputs: 100
+  finally
+    Dict.Free;
+  end;
+end;
+```
+
+### Usage Example with Initial Capacity
 
 ```pascal
 var

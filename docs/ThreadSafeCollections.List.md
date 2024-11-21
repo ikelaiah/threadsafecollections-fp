@@ -195,6 +195,56 @@ end;
 - O(n log n) for Sort
 
 
+## Known Limitations
+
+1. **No Iterator Support**
+   - No built-in mechanism for safe iteration
+   - No foreach-style enumeration
+   - Must access items individually via index
+
+2. **No Bulk Operations**
+   - No batch Add/Delete operations
+   - Each operation requires separate lock acquisition
+   - Performance impact when modifying multiple items
+
+3. **Sorting Limitations**
+   - Sort operation blocks all other access
+   - No parallel sorting implementation
+   - FSorted flag may cause unnecessary sorts
+
+4. **Memory Management**
+   - Only grows, never shrinks
+   - No manual capacity reduction
+   - May hold excess memory after many deletions
+
+5. **Concurrent Access Characteristics**
+   - Uses TCriticalSection for guaranteed thread safety
+   - Single lock strategy (simple but potentially less concurrent)
+   - All operations are mutually exclusive
+   
+   Performance Considerations:
+   - Multiple threads may wait when concurrent access occurs
+   - Best performance when contention is low
+   - Consider alternative collections if you need:
+     * Reader/writer separation
+     * Lock-free operations
+     * Higher concurrent throughput
+
+6. **Find Operation Performance**
+   - Linear search O(n) even when sorted
+   - No binary search implementation
+   - Consider alternative if frequent searches needed
+
+7. **Exception Handling**
+   - Throws exceptions for invalid indices
+   - No try-get pattern for safe access
+   - Must handle exceptions in client code
+
+8. **Capacity Management**
+   - Initial capacity starts at 0
+   - Grows by doubling (4, 8, 16, etc.)
+   - No way to preset optimal capacity
+
 ## Version History
 
 - 0.1.0: Initial implementation

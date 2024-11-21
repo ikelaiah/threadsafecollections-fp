@@ -9,96 +9,120 @@ uses
   Classes, SysUtils, SyncObjs, HashFunctions, TypInfo;
 
 type
-  // Generic equality comparer type
+  // Function type for comparing two values of type T for equality
   generic TEqualityComparer<T> = function(const A, B: T): Boolean;
   
-  // Generic hash function type
+  // Function type for generating hash codes for values of type T
   generic THashFunction<T> = function(const Value: T): Cardinal;
 
-  // Generic ThreadSafe HashSet
+  { TThreadSafeHashSet<T>: A generic thread-safe hash set implementation
+    - Uses separate chaining for collision resolution
+    - Automatically resizes when load factor exceeds threshold
+    - Thread-safe for all operations }
   generic TThreadSafeHashSet<T> = class
   private
   type
+    // Entry structure for hash set elements
     PEntry = ^TEntry;
     TEntry = record
-      Value: T;
-      Hash: Cardinal;
-      Next: PEntry;
+      Value: T;        // The actual stored value
+      Hash: Cardinal;  // Cached hash code for better performance
+      Next: PEntry;    // Pointer to next entry in chain (for collision handling)
     end;
 
   const
-    INITIAL_BUCKET_COUNT = 16;
-    LOAD_FACTOR = 0.75;
-    MIN_BUCKET_COUNT = 4;
+    INITIAL_BUCKET_COUNT = 16;   // Default number of buckets
+    LOAD_FACTOR = 0.75;          // Threshold for resizing (75% full)
+    MIN_BUCKET_COUNT = 4;        // Minimum number of buckets
 
   private
-    FBuckets: array of PEntry;
-    FCount: Integer;
-    FLock: TCriticalSection;
-    FEqualityComparer: specialize TEqualityComparer<T>;
-    FHashFunction: specialize THashFunction<T>;
+    FBuckets: array of PEntry;   // Array of bucket heads
+    FCount: Integer;             // Number of items in the set
+    FLock: TCriticalSection;     // Thread synchronization
+    FEqualityComparer: specialize TEqualityComparer<T>;  // Equality comparison function
+    FHashFunction: specialize THashFunction<T>;          // Hash function
 
+    // Maps a hash code to a bucket index using bitwise AND
     function GetBucketIndex(Hash: Cardinal): Integer; inline;
+    
+    // Grows the hash table when load factor is exceeded
     procedure Resize(NewSize: Integer);
+    
+    // Checks if resizing is needed after an addition
     procedure CheckLoadFactor;
+    
+    // Finds an entry in a specific bucket chain
     function FindEntry(const Item: T; Hash: Cardinal; BucketIdx: Integer): PEntry;
+    
+    // Calculates next power of 2 for bucket count
     function GetNextPowerOfTwo(Value: Integer): Integer;
 
   public
-   // Single, safe constructor with optional initial capacity
+    // Creates a new hash set with specified equality and hash functions
     constructor Create(AEqualityComparer: specialize TEqualityComparer<T>;
                       AHashFunction: specialize THashFunction<T>;
                       AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); 
 
     destructor Destroy; override;
 
-    function Add(const Item: T): Boolean;  // Returns true if item was added (not already present)
-    function Remove(const Item: T): Boolean;
-    function Contains(const Item: T): Boolean;
-    procedure Clear;
+    // Core operations
+    function Add(const Item: T): Boolean;      // Returns true if item was newly added
+    function Remove(const Item: T): Boolean;   // Returns true if item was found and removed
+    function Contains(const Item: T): Boolean; // Returns true if item exists
+    procedure Clear;                           // Removes all items
     
-    property Count: Integer read FCount;
+    property Count: Integer read FCount;       // Number of items in set
   end;
 
-  // Specialized types with their own constructors
+  { Specialized hash set types with predefined hash and equality functions }
+  
+  // Integer hash set
   TThreadSafeHashSetInteger = class(specialize TThreadSafeHashSet<Integer>)
   public
     constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
   end;
 
+  // String hash set with optional custom hash function
   TThreadSafeHashSetString = class(specialize TThreadSafeHashSet<string>)
   public
+    { Default constructor using standard string hash function (XXHash32) }
     constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
+    
+    { Special constructor that allows injection of custom hash function.
+      Primary use: Testing hash collision scenarios
+      Example: ForceCollisionHash function that returns constant value ($DEADBEEF)
+               to force all items into same bucket }
     constructor Create(AHashFunction: specialize THashFunction<string>; 
-                       AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
+                      AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
   end;
 
+  // Boolean hash set
   TThreadSafeHashSetBoolean = class(specialize TThreadSafeHashSet<Boolean>)
   public
     constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
   end;
 
+  // Real number hash set
   TThreadSafeHashSetReal = class(specialize TThreadSafeHashSet<Real>)
   public
     constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
   end;
 
-// Basic equality comparers
+// Basic equality comparers for primitive types
 function IntegerEquals(const A, B: Integer): Boolean;
 function StringEquals(const A, B: string): Boolean;
 function BooleanEquals(const A, B: Boolean): Boolean;
 function RealEquals(const A, B: Real): Boolean;
 
-// Basic hash functions
+// Hash functions for primitive types
 function IntegerHash(const Value: Integer): Cardinal;
 function StringHash(const Value: string): Cardinal;
 function BooleanHash(const Value: Boolean): Cardinal;
 function RealHash(const Value: Real): Cardinal;
 
-
 implementation
 
-// Basic equality comparers implementation
+{ Basic equality comparers - straightforward comparisons }
 function IntegerEquals(const A, B: Integer): Boolean;
 begin
   Result := A = B;
@@ -119,20 +143,22 @@ begin
   Result := A = B;
 end;
 
+{ Hash functions for different types }
 function IntegerHash(const Value: Integer): Cardinal;
 begin
+  // Use multiplicative hash for integers (good distribution for sequential values)
   Result := MultiplicativeHash(Cardinal(Value));
 end;
 
 function StringHash(const Value: string): Cardinal;
 begin
-  // Use XXHash32 for better performance on longer strings
+  // XXHash32 provides good distribution and performance for strings
   Result := XXHash32(Value);
 end;
 
 function BooleanHash(const Value: Boolean): Cardinal;
 begin
-  // Use MultiplicativeHash since it's just a small integer
+  // Simple hash for boolean - just convert to number
   Result := MultiplicativeHash(Cardinal(Value));
 end;
 
@@ -140,25 +166,24 @@ function RealHash(const Value: Real): Cardinal;
 var
   IntValue: Int64;
 begin
-  // Convert to fixed-point and use DefaultHash
+  // Convert to fixed-point (6 decimal places) then hash
   IntValue := Int64(Trunc(Value * 1000000));
   Result := DefaultHash(IntValue);
 end;
 
-{ TThreadSafeHashSet }
+{ TThreadSafeHashSet implementation }
 
 constructor TThreadSafeHashSet.Create(AEqualityComparer: specialize TEqualityComparer<T>;
-                                      AHashFunction: specialize THashFunction<T>;
-                                      AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
+                                    AHashFunction: specialize THashFunction<T>;
+                                    AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
 begin
+  // Initialize with thread safety and hash functions
   FLock := TCriticalSection.Create;
   FEqualityComparer := AEqualityComparer;
   FHashFunction := AHashFunction;
   FCount := 0;
   SetLength(FBuckets, GetNextPowerOfTwo(AInitialCapacity));
 end;
-
-
 
 destructor TThreadSafeHashSet.Destroy;
 begin

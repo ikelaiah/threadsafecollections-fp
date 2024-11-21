@@ -1,23 +1,81 @@
 # 🔒 ThreadSafeCollections-FP
 
-A thread-safe generic collections library for Free Pascal.
+A thread-safe generic collections library for Free Pascal, designed for learning and experimentation.
 
-> [!IMPORTANT] This library is still under development. 
-> If you are after more mature and production-ready library, consider using:
+> [!IMPORTANT] 
+> 🚧 **Development Status**: This library is a learning/experimental project and not yet production-ready.
 > 
-> 1. [FPC Generics.Collections unit](https://gitlab.com/freepascal.org/fpc/source/-/blob/main/packages/rtl-generics/src/generics.collections.pas)
-> 2. [FCL-STL - Generics-Based Template Library](https://gitlab.com/freepascal.org/fpc/source/-/tree/main/packages/fcl-stl)
-> 3. [LGenerics unit](https://github.com/avk959/LGenerics)
+> For production use, please consider these mature alternatives:
+> 
+> 1. [FPC Generics.Collections](https://gitlab.com/freepascal.org/fpc/source/-/blob/main/packages/rtl-generics/src/generics.collections.pas) - Official FPC generic collections
+> 2. [FCL-STL](https://gitlab.com/freepascal.org/fpc/source/-/tree/main/packages/fcl-stl) - FPC's template library
+> 3. [LGenerics](https://github.com/avk959/LGenerics) - Comprehensive generics library
+
+## 🚧 Development Status
+
+Current State:
+- ✅ Basic operations working (Add, Remove, Find)
+- ✅ Thread safety verified through testing
+- ✅ Memory management stable
+- ❌ No iterator support yet
+- ❌ Limited bulk operations
+- ❌ Performance not yet optimized
+
+Planned Features:
+- 🔄 Iterator support
+- 🔄 Bulk operations
+- 🔄 Performance optimizations
+- 🔄 More specialized types
+
+## 🎯 Why Use This?
+
+- 💡 **Learning Tool**: Perfect for understanding thread-safe collections
+- 🔒 **Simple Thread Safety**: Just like regular collections, but thread-safe
+- 🚀 **Easy to Use**: Specialized types for common data (Integer, String, Boolean, Real)
+- ⚡ **Good for Prototypes**: Ideal for quick multi-threaded demos
+
+## 🎓 Getting Started
+
+This library provides three main collection types:
+
+1. **ThreadSafeList**: Like an array that can grow
+   ```pascal
+   var List := TThreadSafeList<Integer>.Create(@IntegerComparer);
+   List.Add(42);  // That's it!
+   ```
+
+2. **ThreadSafeDictionary**: Store key-value pairs
+   ```pascal
+   var Dict := TThreadSafeDictionary<string,integer>.Create;
+   Dict.Add('one', 1);  // Simple!
+   ```
+
+3. **ThreadSafeHashSet**: Store unique values
+   ```pascal
+   var Set := TThreadSafeHashSetString.Create;
+   Set.Add('unique');  // Duplicates handled automatically
+   ```
+
+> [!TIP]
+> Always use try-finally blocks to ensure proper cleanup:
+> ```pascal
+> try
+>   // Your code here
+> finally
+>   Collection.Free;
+> end;
+> ```
 
 ## ✨ Features
 
-- 🛡️ Thread-safe List implementation
-- 📘 Thread-safe Dictionary implementation
+- 🛡️ Thread-safe List, Dictionary, and HashSet implementations
 - 🚀 Generic type support (Integer, String, Real, Boolean, Records)
 - 📦 Built-in comparers and hash functions
-- 🔐 Automatic locking mechanism
-- 🧪 Comprehensive test suite
-- ⚡ Exception-safe operations
+- 🔐 Automatic locking mechanism with TCriticalSection
+- 🎯 Exception-safe resource management
+- 🧪 Comprehensive test suite with collision testing
+- ⚡ Optimized performance for common operations
+- 📊 Load factor based automatic resizing
 
 ## 🎯 Why Use This?
 
@@ -79,8 +137,6 @@ begin
   end;
 end;
 ```
-
-
 ### Using ThreadSafeDictionary
 
 ```pascal
@@ -104,20 +160,101 @@ begin
 end;
 ```
 
+
+### Using ThreadSafeHashSet
+
+#### 1. Basic String Set (Using Built-in Type)
+```pascal
+uses 
+  ThreadSafeCollections.HashSet;
+
+var
+  UniqueNames: TThreadSafeHashSetString;
+begin
+  UniqueNames := TThreadSafeHashSetString.Create;
+  try
+    // Add items (duplicates are ignored)
+    UniqueNames.Add('Alice');    // Returns True (added)
+    UniqueNames.Add('Bob');      // Returns True (added)
+    UniqueNames.Add('Alice');    // Returns False (already exists)
+    
+    // Check existence
+    if UniqueNames.Contains('Alice') then
+      WriteLn('Alice is in the set');
+      
+    // Remove items
+    UniqueNames.Remove('Bob');   // Returns True (was removed)
+    
+    WriteLn('Count: ', UniqueNames.Count); // Outputs: 1
+  finally
+    UniqueNames.Free;
+  end;
+end;
+```
+
+#### 2. Custom Type Set (Advanced Usage)
+```pascal
+uses 
+  ThreadSafeCollections.HashSet;
+
+type
+  TPoint = record
+    X, Y: Integer;
+  end;
+
+// Compare two points for equality
+function PointEquals(const A, B: TPoint): Boolean;
+begin
+  Result := (A.X = B.X) and (A.Y = B.Y);
+end;
+
+// Generate hash code for a point
+function PointHash(const Value: TPoint): Cardinal;
+begin
+  Result := Cardinal(Value.X xor Value.Y);
+end;
+
+var
+  UniquePoints: specialize TThreadSafeHashSet<TPoint>;
+begin
+  UniquePoints := specialize TThreadSafeHashSet<TPoint>.Create(@PointEquals, @PointHash);
+  try
+    // Add unique points
+    UniquePoints.Add(TPoint.Create(1, 1));
+    UniquePoints.Add(TPoint.Create(2, 2));
+    
+    // Check for existence
+    var Point := TPoint.Create(1, 1);
+    if UniquePoints.Contains(Point) then
+      WriteLn('Point (1,1) exists');
+  finally
+    UniquePoints.Free;
+  end;
+end;
+```
+
 ## 📚 Collection Types
 
 ### TThreadSafeList<T>
 - Thread-safe generic list
-- Automatic growth
-- Sorting capability
+- Automatic growth and sorting capability
+- Built-in comparers for Integer, String, Boolean, Real
+- Exception-safe operations
 - Index-based access
 
 ### TThreadSafeDictionary<TKey, TValue>
 - Thread-safe generic dictionary
 - Separate chaining for collision resolution
 - Automatic resizing (load factor: 0.75)
-- Optimized hash functions for common types
+- First/Last key-value pair access
+- Manual bucket count control
 
+### TThreadSafeHashSet<T>
+- Thread-safe generic hash set
+- Specialized versions for common types (Integer, String, Boolean, Real)
+- Custom hash function support for testing
+- Automatic resizing at 75% load factor
+- Separate chaining for collisions
 
 ## ⚠️ Common Pitfalls and Best Practices
 
@@ -145,6 +282,27 @@ begin
 end;
 ```
 
+## ⚠️ Known Limitations
+
+1. **No Iterator Support**
+   - No built-in mechanism for safe iteration
+   - No foreach-style enumeration
+   - Must access items individually
+
+2. **Concurrent Access Pattern**
+   - Uses single-lock strategy with TCriticalSection
+   - All operations are mutually exclusive
+   - May have contention under heavy load
+
+3. **Memory Management**
+   - Collections only grow, never shrink
+   - No manual capacity reduction
+   - May hold excess memory after many removals
+
+4. **Bulk Operations**
+   - No batch Add/Remove operations
+   - Each operation requires separate lock acquisition
+   - Consider alternative if bulk operations are critical
 
 ## 📥 Installation
 
@@ -154,7 +312,6 @@ end;
    ```
 2. Add the source directory to your project's search path.
 
-
 ## 🧪 Testing
 
 1. Go to `tests/` directory
@@ -163,7 +320,9 @@ end;
 
 ## 📚 Documentation
 
-See [ThreadSafeCollections.List-API.md](docs/ThreadSafeCollections.List-API.md) for more details.   
+- [ThreadSafeCollections.List.md](docs/ThreadSafeCollections.List.md)
+- [ThreadSafeCollections.Dictionary.md](docs/ThreadSafeCollections.Dictionary.md)
+- [ThreadSafeCollections.HashSet.md](docs/ThreadSafeCollections.HashSet.md)
 
 ## 📁 Examples
 
@@ -188,3 +347,4 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 - 🎯 Free Pascal and Lazarus community
 - 🧪 FPCUnit testing framework
+

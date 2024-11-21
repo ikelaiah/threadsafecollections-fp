@@ -5,9 +5,9 @@ program TestRunner;
 uses
   Classes
   , consoletestrunner, testutils, DateUtils, SysUtils
-  //, ThreadSafeListTests
-  //, ThreadSafeListStudentTests
-  //, ThreadSafeDictionaryTests
+  , ThreadSafeListTests
+  , ThreadSafeListStudentTests
+  , ThreadSafeDictionaryTests
   , ThreadSafeHashSetTests, testregistry;
 
 type
@@ -34,16 +34,16 @@ var
 begin
   try
     WriteLn('Starting test runner...');
-        WriteLn('Time: ' + FormatDateTime('hh:nn:ss.zzz', Now));
+    WriteLn('Time: ' + FormatDateTime('hh:nn:ss.zzz', Now));
 
-        Application := TMyTestRunner.Create(nil);
-        Application.Initialize;
+    Application := TMyTestRunner.Create(nil);
+    Application.Initialize;
 
-        WriteLn('Running tests...');
-        Application.Run;
+    WriteLn('Running tests...');
+    Application.Run;
 
-        WriteLn('Tests completed.');
-        WriteLn('Time: ' + FormatDateTime('hh:nn:ss.zzz', Now));
+    WriteLn('Tests completed.');
+    WriteLn('Time: ' + FormatDateTime('hh:nn:ss.zzz', Now));
 
   finally
     Application.Free;

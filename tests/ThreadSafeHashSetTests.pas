@@ -5,67 +5,78 @@ unit ThreadSafeHashSetTests;
 interface
 
 uses
-  Classes, SysUtils, fpcunit, testregistry, ThreadSafeCollections.HashSet, Math;
+  Classes, SysUtils, fpcunit, testregistry, ThreadSafeCollections.HashSet, Math, HashFunctions;
 
 const
-  INITIAL_BUCKET_COUNT = 16;
+  INITIAL_BUCKET_COUNT = 16;  // Default size of hash table
 
 type
+  { Record for testing complex type handling }
   TStudent = record
     Name: string;
     Age: Integer;
   end;
 
+  { Thread class for general stress testing }
   TStressTestThread = class(TThread)
   private
     FSet: TThreadSafeHashSetInteger;
-    FStartValue: Integer;
-    FOperations: Integer;
+    FStartValue: Integer;     // Starting value for this thread's range
+    FOperations: Integer;     // Number of operations to perform
   public
     constructor Create(ASet: TThreadSafeHashSetInteger; AStartValue, AOperations: Integer);
     procedure Execute; override;
   end;
 
+  { Thread class specifically for collision testing }
   TCollisionThread = class(TThread)
   private
     const
-      COLLISION_GROUPS = 2;  // Same as in the test
+      COLLISION_GROUPS = 2;   // Number of different key prefixes (A_ or B_)
   private
     FSet: TThreadSafeHashSetString;
-    FStartIndex: Integer;
-    FCount: Integer;
+    FStartIndex: Integer;     // Starting index for this thread's range
+    FCount: Integer;          // Number of items this thread should process
   public
     constructor Create(ASet: TThreadSafeHashSetString; 
       AStartIndex, ACount: Integer);
     procedure Execute; override;
   end;
 
+  { Main test case class containing all test scenarios }
   TThreadSafeHashSetTest = class(TTestCase)
   private
-    FIntSet: TThreadSafeHashSetInteger;
-    FStrSet: TThreadSafeHashSetString;
-    FBoolSet: TThreadSafeHashSetBoolean;
-    FRealSet: TThreadSafeHashSetReal;
-    FStudentSet: specialize TThreadSafeHashSet<TStudent>;
+    // Different set types to test various data type handling
+    FIntSet: TThreadSafeHashSetInteger;    // Integer set
+    FStrSet: TThreadSafeHashSetString;     // String set
+    FBoolSet: TThreadSafeHashSetBoolean;   // Boolean set
+    FRealSet: TThreadSafeHashSetReal;      // Real number set
+    FStudentSet: specialize TThreadSafeHashSet<TStudent>;  // Complex type set
     procedure Log(const Msg: string);
   protected
-    procedure SetUp; override;
-    procedure TearDown; override;
+    procedure SetUp; override;    // Called before each test
+    procedure TearDown; override; // Called after each test
   published
-    procedure Test1_BasicOperations;
-    procedure Test2_SimpleAdd;
-    procedure Test3_SimpleRemove;
-    procedure Test4_Duplicates;
-    procedure Test5_Clear;
-    procedure Test6_StudentBasic;
-    procedure Test7_LargeDataSet;
-    procedure Test8_ConcurrentAccess;
-    procedure Test9_StressTest;
-    procedure Test10_HashCollisions;
-    procedure Test11_AggressiveCollisions;
+    // Test cases in order of complexity
+    procedure Test1_BasicOperations;        // Basic functionality
+    procedure Test2_SimpleAdd;              // Add operation
+    procedure Test3_SimpleRemove;           // Remove operation
+    procedure Test4_Duplicates;             // Duplicate handling
+    procedure Test5_Clear;                  // Clear operation
+    procedure Test6_StudentBasic;           // Complex type handling
+    procedure Test7_LargeDataSet;           // Performance with large data
+    procedure Test8_ConcurrentAccess;       // Basic thread safety
+    procedure Test9_StressTest;             // Intensive thread safety
+    procedure Test10_HashCollisions;        // Single-threaded collision handling
+    procedure Test11_AggressiveCollisions;  // Multi-threaded collision stress test
   end;
 
-
+{ Special hash set class that forces collisions for testing }
+type
+  TCollisionHashSet = class(TThreadSafeHashSetString)
+  public
+    constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); reintroduce;
+  end;
 
 // Student record comparers and hash functions
 function StudentEquals(const A, B: TStudent): Boolean;
@@ -74,51 +85,35 @@ function StudentHash(const Value: TStudent): Cardinal;
 type
   THashFunction = function(const Value: string): Cardinal;
 
-type
-  TCollisionHashSet = class(TThreadSafeHashSetString)
-  public
-    constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); reintroduce;
-  end;
-
-  // Define a specific hash function type for strings
-  // TStringHashFunction = function(const Value: string): Cardinal;
-
-  // TTestHashSet = class(TThreadSafeHashSetString)
-  // public
-  //   procedure SetInternalHashFunction(AHashFunction: TStringHashFunction);
-  // end;
-
 implementation
 
-uses HashFunctions;
+
 
 const
   LOGGING_ENABLED = True;
 
+{ Hash function that forces collisions for testing }
 function ForceCollisionHash(const Value: string): Cardinal;
 begin
-  // Always return the same hash value to force maximum collisions
-  Result := $DEADBEEF;  // Any constant value will do
+  // Always return the same hash value ($DEADBEEF) to force maximum collisions
+  // This means all items will be stored in the same bucket, creating worst-case scenario
+  Result := $DEADBEEF;
 end;
 
+{ TCollisionHashSet - Special hash set that forces all items into single bucket }
 constructor TCollisionHashSet.Create(AInitialCapacity: Integer);
 var
   EqualityComparer: specialize TEqualityComparer<string>;
 begin
   EqualityComparer := @StringEquals;
+  // Use ForceCollisionHash to make all items collide
   inherited Create(@ForceCollisionHash, AInitialCapacity);
 end;
 
-{ TTestHashSet }
-
-// procedure TTestHashSet.SetInternalHashFunction(AHashFunction: TStringHashFunction);
-// begin
-//   // Directly assign the hash function
-//   FHashFunction := specialize THashFunction<string>(AHashFunction);
-// end;
-
+{ Student record comparison and hashing }
 function StudentEquals(const A, B: TStudent): Boolean;
 begin
+  // Compare both name and age for equality
   Result := (A.Name = B.Name) and (A.Age = B.Age);
 end;
 
@@ -126,21 +121,21 @@ function StudentHash(const Value: TStudent): Cardinal;
 var
   NameHash, AgeHash: Cardinal;
 begin
-  NameHash := XXHash32(Value.Name);
-  AgeHash := MultiplicativeHash(Cardinal(Value.Age));
-  Result := NameHash xor AgeHash;
+  // Create composite hash from both name and age
+  NameHash := XXHash32(Value.Name);        // Hash the name
+  AgeHash := MultiplicativeHash(Cardinal(Value.Age));  // Hash the age
+  Result := NameHash xor AgeHash;          // Combine hashes using XOR
 end;
 
-{ TStressTestThread }
-
+{ TStressTestThread - Thread for general stress testing }
 constructor TStressTestThread.Create(ASet: TThreadSafeHashSetInteger; 
   AStartValue, AOperations: Integer);
 begin
-  inherited Create(True);
+  inherited Create(True);  // Create suspended
   FSet := ASet;
-  FStartValue := AStartValue;
-  FOperations := AOperations;
-  FreeOnTerminate := False;
+  FStartValue := AStartValue;    // Starting point for this thread's range
+  FOperations := AOperations;    // Number of operations to perform
+  FreeOnTerminate := False;      // Manual cleanup required
 end;
 
 procedure TStressTestThread.Execute;
@@ -150,11 +145,12 @@ var
 begin
   for I := 0 to FOperations - 1 do
   begin
-    Operation := Random(3); // 0=Add, 1=Remove, 2=Contains
+    // Randomly choose between Add(0), Remove(1), or Contains(2)
+    Operation := Random(3);
     case Operation of
-      0: FSet.Add(FStartValue + I);
-      1: FSet.Remove(FStartValue + Random(I + 1));
-      2: FSet.Contains(FStartValue + Random(I + 1));
+      0: FSet.Add(FStartValue + I);                    // Add new item
+      1: FSet.Remove(FStartValue + Random(I + 1));     // Remove random existing item
+      2: FSet.Contains(FStartValue + Random(I + 1));   // Check for random item
     end;
   end;
 end;
