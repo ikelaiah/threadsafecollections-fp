@@ -30,6 +30,21 @@ type
       Next: PEntry;    // Pointer to next entry in chain (for collision handling)
     end;
 
+    { TEnumerator - Iterator for the hash set }
+    TEnumerator = class
+    private
+      FSet: TThreadSafeHashSet;
+      FCurrentBucket: Integer;
+      FCurrentEntry: PEntry;
+      FLockHeld: Boolean;
+    public
+      constructor Create(ASet: TThreadSafeHashSet);
+      destructor Destroy; override;
+      function GetCurrent: T;
+      function MoveNext: Boolean;
+      property Current: T read GetCurrent;
+    end;
+
   const
     INITIAL_BUCKET_COUNT = 16;   // Default number of buckets
     LOAD_FACTOR = 0.75;          // Threshold for resizing (75% full)
@@ -72,6 +87,9 @@ type
     procedure Clear;                           // Removes all items
     
     property Count: Integer read FCount;       // Number of items in set
+    
+    { Iterator support }
+    function GetEnumerator: TEnumerator;
   end;
 
   { Specialized hash set types with predefined hash and equality functions }
@@ -360,6 +378,56 @@ begin
       Current := Next;
     end;
   end;
+end;
+
+{ TThreadSafeHashSet.TEnumerator }
+
+constructor TThreadSafeHashSet.TEnumerator.Create(ASet: TThreadSafeHashSet);
+begin
+  inherited Create;
+  FSet := ASet;
+  FCurrentBucket := -1;
+  FCurrentEntry := nil;
+  FLockHeld := False;
+  FSet.FLock.Acquire;
+  FLockHeld := True;
+end;
+
+destructor TThreadSafeHashSet.TEnumerator.Destroy;
+begin
+  if FLockHeld then
+    FSet.FLock.Release;
+  inherited;
+end;
+
+function TThreadSafeHashSet.TEnumerator.GetCurrent: T;
+begin
+  if FCurrentEntry = nil then
+    raise EInvalidOperation.Create('Invalid enumerator position');
+  Result := FCurrentEntry^.Value;
+end;
+
+function TThreadSafeHashSet.TEnumerator.MoveNext: Boolean;
+begin
+  Result := False;
+  
+  // If we have a current entry, try its next entry first
+  if FCurrentEntry <> nil then
+    FCurrentEntry := FCurrentEntry^.Next;
+    
+  // If we need a new entry, search through buckets
+  while (FCurrentEntry = nil) and (FCurrentBucket < Length(FSet.FBuckets) - 1) do
+  begin
+    Inc(FCurrentBucket);
+    FCurrentEntry := FSet.FBuckets[FCurrentBucket];
+  end;
+  
+  Result := FCurrentEntry <> nil;
+end;
+
+function TThreadSafeHashSet.GetEnumerator: TEnumerator;
+begin
+  Result := TEnumerator.Create(Self);
 end;
 
 // Specialized types with their own constructors
