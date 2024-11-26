@@ -31,6 +31,13 @@ type
     Next: ^TDictionaryEntry;
   end;
 
+
+  generic TPair<TKey, TValue> = record
+    Key: TKey;
+    Value: TValue;
+  end;
+
+
   {
     TThreadSafeDictionary: Thread-safe generic dictionary implementation
     - Uses critical section for thread safety
@@ -42,6 +49,28 @@ type
   type
     TEntry = specialize TDictionaryEntry<TKey, TValue>;
     PEntry = ^TEntry;
+    TDictionaryIterator = class
+    private
+      FDictionary: TThreadSafeDictionary;
+      FCurrentBucket: integer;
+      FCurrentEntry: PEntry;
+      function GetCurrent: TValue;
+    public
+      constructor Create(ADictionary: TThreadSafeDictionary);
+      function MoveNext: boolean;
+      property Current: TValue read GetCurrent;
+    end;
+    TDictionaryEnumerator = class
+    private
+      FDictionary: TThreadSafeDictionary;
+      FCurrentBucket: integer;
+      FCurrentEntry: PEntry;
+      function GetCurrent: specialize TPair<TKey, TValue>;
+    public
+      constructor Create(ADictionary: TThreadSafeDictionary);
+      function MoveNext: Boolean;
+      property Current: specialize TPair<TKey, TValue> read GetCurrent;
+    end;
   private
   const
     INITIAL_BUCKET_COUNT = 16;   // Initial size of hash table
@@ -80,7 +109,10 @@ type
     function GetBucketCount: integer; 
     property BucketCount: integer read GetBucketCount; 
     property Items[const Key: TKey]: TValue read Find write Replace; default;
+    function GetIterator: TDictionaryIterator;
+    function GetEnumerator: TDictionaryEnumerator;
   end;
+
 
 implementation
 
@@ -671,6 +703,109 @@ begin
   finally
     FLock.Leave;
   end;
+end;
+
+{ TThreadSafeDictionary.TDictionaryIterator }
+
+constructor TThreadSafeDictionary.TDictionaryIterator.Create(ADictionary: TThreadSafeDictionary);
+begin
+  inherited Create;
+  FDictionary := ADictionary;
+  FCurrentBucket := -1;  // Start before first bucket
+  FCurrentEntry := nil;
+end;
+
+function TThreadSafeDictionary.TDictionaryIterator.GetCurrent: TValue;
+begin
+  if FCurrentEntry = nil then
+    raise Exception.Create('Invalid iterator position');
+  Result := FCurrentEntry^.Value;
+end;
+
+function TThreadSafeDictionary.TDictionaryIterator.MoveNext: boolean;
+begin
+  Result := False;
+  FDictionary.FLock.Enter;
+  try
+    // If we have more entries in current bucket
+    if (FCurrentEntry <> nil) and (FCurrentEntry^.Next <> nil) then
+    begin
+      FCurrentEntry := FCurrentEntry^.Next;
+      Result := True;
+      Exit;
+    end;
+
+    // Find next non-empty bucket
+    while FCurrentBucket < Length(FDictionary.FBuckets) - 1 do
+    begin
+      Inc(FCurrentBucket);
+      if FDictionary.FBuckets[FCurrentBucket] <> nil then
+      begin
+        FCurrentEntry := FDictionary.FBuckets[FCurrentBucket];
+        Result := True;
+        Exit;
+      end;
+    end;
+  finally
+    FDictionary.FLock.Leave;
+  end;
+end;
+
+function TThreadSafeDictionary.GetIterator: TDictionaryIterator;
+begin
+  Result := TDictionaryIterator.Create(Self);
+end;
+
+{ TThreadSafeDictionary.TDictionaryEnumerator }
+
+constructor TThreadSafeDictionary.TDictionaryEnumerator.Create(ADictionary: TThreadSafeDictionary);
+begin
+  inherited Create;
+  FDictionary := ADictionary;
+  FCurrentBucket := -1;  // Start before first bucket
+  FCurrentEntry := nil;
+end;
+
+function TThreadSafeDictionary.TDictionaryEnumerator.GetCurrent: specialize TPair<TKey, TValue>;
+begin
+  if FCurrentEntry = nil then
+    raise Exception.Create('Invalid enumerator position');
+  Result.Key := FCurrentEntry^.Key;
+  Result.Value := FCurrentEntry^.Value;
+end;
+
+function TThreadSafeDictionary.TDictionaryEnumerator.MoveNext: Boolean;
+begin
+  Result := False;
+  FDictionary.FLock.Enter;
+  try
+    // If we have more entries in current bucket
+    if (FCurrentEntry <> nil) and (FCurrentEntry^.Next <> nil) then
+    begin
+      FCurrentEntry := FCurrentEntry^.Next;
+      Result := True;
+      Exit;
+    end;
+
+    // Find next non-empty bucket
+    while FCurrentBucket < Length(FDictionary.FBuckets) - 1 do
+    begin
+      Inc(FCurrentBucket);
+      if FDictionary.FBuckets[FCurrentBucket] <> nil then
+      begin
+        FCurrentEntry := FDictionary.FBuckets[FCurrentBucket];
+        Result := True;
+        Exit;
+      end;
+    end;
+  finally
+    FDictionary.FLock.Leave;
+  end;
+end;
+
+function TThreadSafeDictionary.GetEnumerator: TDictionaryEnumerator;
+begin
+  Result := TDictionaryEnumerator.Create(Self);
 end;
 
 end.
