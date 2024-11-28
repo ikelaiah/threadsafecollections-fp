@@ -43,6 +43,8 @@ type
     procedure Execute; override;
   end;
 
+  TStringIntPair = specialize TPair<string, Integer>;
+
   TThreadSafeDictionaryTest = class(TTestCase)
   private
     FIntDict: TIntStringDictionary;
@@ -84,6 +86,13 @@ type
     procedure TestResizeWithData;
     procedure TestResizeUnderflow;
     procedure TestBucketCount;
+
+    // New iterator tests
+    procedure TestIteratorBasic;
+    procedure TestIteratorEmpty;
+    procedure TestIteratorModification;
+    procedure TestMultipleIterators;
+    procedure TestIteratorReset;
   end;
 
 implementation
@@ -831,6 +840,190 @@ begin
     on E: Exception do
     begin
       WriteLn('TestBucketCount failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.TestIteratorBasic;
+var
+  Iterator: TStringIntDictionary.TDictionaryEnumerator;
+  ExpectedCount: Integer;
+  Pair: specialize TPair<string, Integer>;
+begin
+  WriteLn('Starting TestIteratorBasic');
+  IncrementTestCounter;
+  try
+    // Add test data
+    FStrDict.Add('one', 1);
+    FStrDict.Add('two', 2);
+    FStrDict.Add('three', 3);
+    
+    ExpectedCount := 0;
+    Iterator := FStrDict.GetEnumerator;
+    try
+      while Iterator.MoveNext do
+      begin
+        Inc(ExpectedCount);
+        Pair := Iterator.Current;
+        AssertTrue('Key should not be empty', Pair.Key <> '');
+        AssertTrue('Value should be between 1 and 3', (Pair.Value >= 1) and (Pair.Value <= 3));
+      end;
+      
+      AssertEquals('Iterator should visit all items', 3, ExpectedCount);
+    finally
+      Iterator.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestIteratorBasic failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.TestIteratorEmpty;
+var
+  Iterator: TStringIntDictionary.TDictionaryEnumerator;
+begin
+  WriteLn('Starting TestIteratorEmpty');
+  IncrementTestCounter;
+  try
+    Iterator := FStrDict.GetEnumerator;
+    try
+      AssertFalse('Empty dictionary should return false on MoveNext',
+        Iterator.MoveNext);
+    finally
+      Iterator.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestIteratorEmpty failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.TestIteratorModification;
+var
+  Iterator: TStringIntDictionary.TDictionaryEnumerator;
+  Pair: specialize TPair<string, Integer>;
+begin
+  WriteLn('Starting TestIteratorModification');
+  IncrementTestCounter;
+  try
+    FStrDict.Add('one', 1);
+    FStrDict.Add('two', 2);
+    
+    Iterator := FStrDict.GetEnumerator;
+    try
+      AssertTrue('Should get first item', Iterator.MoveNext);
+      
+      // Modify dictionary during iteration
+      FStrDict.Add('three', 3);
+      FStrDict.Remove('two');
+      
+      while Iterator.MoveNext do
+      begin
+        Pair := Iterator.Current;
+        AssertTrue('Key should not be empty', Pair.Key <> '');
+        AssertTrue('Value should be valid', Pair.Value > 0);
+      end;
+    finally
+      Iterator.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestIteratorModification failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.TestMultipleIterators;
+var
+  Iterator1, Iterator2: TStringIntDictionary.TDictionaryEnumerator;
+  Pair1, Pair2: specialize TPair<string, Integer>;
+  Count1, Count2: Integer;
+begin
+  WriteLn('Starting TestMultipleIterators');
+  IncrementTestCounter;
+  try
+    FStrDict.Add('one', 1);
+    FStrDict.Add('two', 2);
+    FStrDict.Add('three', 3);
+    
+    Iterator1 := FStrDict.GetEnumerator;
+    Iterator2 := FStrDict.GetEnumerator;
+    try
+      Count1 := 0;
+      Count2 := 0;
+      
+      while Iterator1.MoveNext do
+      begin
+        Inc(Count1);
+        Pair1 := Iterator1.Current;
+        if Iterator2.MoveNext then
+        begin
+          Inc(Count2);
+          Pair2 := Iterator2.Current;
+        end;
+      end;
+      
+      AssertEquals('Both iterators should visit same number of items', Count1, Count2);
+      AssertEquals('Iterators should visit all items', 3, Count1);
+    finally
+      Iterator1.Free;
+      Iterator2.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestMultipleIterators failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.TestIteratorReset;
+var
+  Iterator: TStringIntDictionary.TDictionaryEnumerator;
+  FirstPair, CurrentPair: specialize TPair<string, Integer>;
+begin
+  WriteLn('Starting TestIteratorReset');
+  IncrementTestCounter;
+  try
+    FStrDict.Add('one', 1);
+    FStrDict.Add('two', 2);
+    
+    // Get first item with first iterator
+    Iterator := FStrDict.GetEnumerator;
+    try
+      AssertTrue('Should get first item', Iterator.MoveNext);
+      FirstPair := Iterator.Current;
+      
+      // Move to next item
+      AssertTrue('Should get second item', Iterator.MoveNext);
+      
+      // Get new iterator to start over
+      Iterator.Free;
+      Iterator := FStrDict.GetEnumerator;
+      
+      // First item with new iterator should match original first item
+      AssertTrue('Should get first item with new iterator', Iterator.MoveNext);
+      CurrentPair := Iterator.Current;
+      AssertEquals('Key should match after reset', FirstPair.Key, CurrentPair.Key);
+      AssertEquals('Value should match after reset', FirstPair.Value, CurrentPair.Value);
+    finally
+      Iterator.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestIteratorReset failed: ', E.Message);
       raise;
     end;
   end;

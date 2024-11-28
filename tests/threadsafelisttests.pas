@@ -59,6 +59,11 @@ type
     procedure TestLargeDataSet;
     procedure TestRandomOperations;
     procedure TestLargeDataSetSortingPerformance;
+
+    // Iterator tests
+    procedure TestIterator;
+    procedure TestIteratorThreadSafety;
+    procedure TestIteratorExceptionSafety;
   end;
 
 implementation
@@ -590,6 +595,139 @@ begin
   AssertTrue('First element should be largest', FRealList[0] > FRealList[1]);
   AssertTrue('Last element should be smallest', FRealList[1] > FRealList[2]);
   AssertTrue('Real list should be sorted', FRealList.IsSorted);
+end;
+
+procedure TThreadSafeListTest.TestIterator;
+var
+  ExpectedSum, ActualSum: Integer;
+  Value: Integer;
+  I: Integer;
+begin
+  // Add some test data
+  for I := 1 to 5 do
+    FIntList.Add(I);
+
+  // Calculate expected sum
+  ExpectedSum := 15; // 1 + 2 + 3 + 4 + 5
+
+  // Test iteration using for-in loop
+  ActualSum := 0;
+  for Value in FIntList do
+    ActualSum := ActualSum + Value;
+
+  AssertEquals('Sum through iterator should match expected', ExpectedSum, ActualSum);
+
+  // Test iterator with empty list
+  FIntList.Free;
+  FIntList := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  
+  ActualSum := 0;
+  for Value in FIntList do
+    ActualSum := ActualSum + Value;
+  
+  AssertEquals('Empty list iteration should result in zero sum', 0, ActualSum);
+
+  // Test iterator with single element
+  FIntList.Add(42);
+  ActualSum := 0;
+  for Value in FIntList do
+    ActualSum := ActualSum + Value;
+    
+  AssertEquals('Single element iteration should work', 42, ActualSum);
+
+  // Test iterator after modifications
+  FIntList.Add(10);
+  FIntList.Add(20);
+  FIntList.Delete(0); // Remove 42
+  
+  ExpectedSum := 30; // 10 + 20
+  ActualSum := 0;
+  for Value in FIntList do
+    ActualSum := ActualSum + Value;
+    
+  AssertEquals('Iterator should work after modifications', ExpectedSum, ActualSum);
+end;
+
+procedure TThreadSafeListTest.TestIteratorThreadSafety;
+var
+  SecondList: specialize TThreadSafeList<Integer>;
+  Value: Integer;
+  I: Integer;
+begin
+  SecondList := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  try
+    // Add test data to both lists
+    for I := 1 to 1000 do
+    begin
+      FIntList.Add(I);
+      SecondList.Add(I * 2);
+    end;
+
+    // Test nested iteration (should work because each gets its own lock)
+    try
+      for Value in FIntList do
+        for I in SecondList do
+          if I mod 100 = 0 then
+            AssertTrue('Nested iteration should work', True);
+            
+      AssertTrue('Nested iteration completed successfully', True);
+    except
+      on E: Exception do
+        Fail('Nested iteration should not raise exception: ' + E.Message);
+    end;
+
+    // Test iteration with concurrent modifications
+    try
+      for Value in FIntList do
+      begin
+        if Value mod 100 = 0 then
+        begin
+          SecondList.Add(Value * 10);
+          SecondList.Delete(0);
+        end;
+      end;
+      AssertTrue('Iteration with concurrent modifications succeeded', True);
+    except
+      on E: Exception do
+        Fail('Iteration with concurrent modifications failed: ' + E.Message);
+    end;
+  finally
+    SecondList.Free;
+  end;
+end;
+
+procedure TThreadSafeListTest.TestIteratorExceptionSafety;
+var
+  Value: Integer;
+  ExceptionRaised: Boolean;
+begin
+  // Add some test data
+  for Value := 1 to 5 do
+    FIntList.Add(Value);
+
+  // Test that iterator properly releases lock even if loop breaks
+  ExceptionRaised := False;
+  try
+    for Value in FIntList do
+    begin
+      if Value = 3 then
+        raise Exception.Create('Test exception');
+    end;
+  except
+    on E: Exception do
+      ExceptionRaised := True;
+  end;
+
+  AssertTrue('Exception should have been raised', ExceptionRaised);
+  
+  // Verify list is still accessible after exception
+  try
+    FIntList.Add(6);
+    AssertEquals('Should be able to add after iterator exception', 6, FIntList.Count);
+  except
+    on E: Exception do
+      Fail('List should be accessible after iterator exception: ' + E.Message);
+  end;
 end;
 
 initialization

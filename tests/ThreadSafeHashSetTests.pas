@@ -9,6 +9,9 @@ uses
 
 const
   INITIAL_BUCKET_COUNT = 16;  // Default size of hash table
+  THREAD_COUNT = 4;
+  ITEMS_PER_THREAD = 1000;
+  MAX_DETAILED_LOGS = 10;
 
 type
   { Record for testing complex type handling }
@@ -69,6 +72,8 @@ type
     procedure Test9_StressTest;             // Intensive thread safety
     procedure Test10_HashCollisions;        // Single-threaded collision handling
     procedure Test11_AggressiveCollisions;  // Multi-threaded collision stress test
+    procedure Test12_Iterator;           // Basic iterator functionality
+    procedure Test13_IteratorStress;     // Concurrent iterator stress test
   end;
 
 { Special hash set class that forces collisions for testing }
@@ -732,6 +737,133 @@ begin
   
   AssertEquals('Lost keys detected', 0, TotalLostKeys);
   AssertEquals('Final count mismatch', COLLISION_COUNT, FStrSet.Count);
+end;
+
+procedure TThreadSafeHashSetTest.Test12_Iterator;
+var
+  Value: Integer;
+  ExpectedSum, ActualSum: Int64;
+  Count, I: Integer;
+  Values: array of Integer;
+begin
+  Log('Test12_Iterator starting...');
+  
+  // Add test data
+  Count := 1000;
+  SetLength(Values, Count);
+  ExpectedSum := 0;
+  
+  for I := 0 to Count - 1 do
+  begin
+    Values[I] := I * 2;  // Use even numbers
+    ExpectedSum := ExpectedSum + Values[I];
+    AssertTrue(Format('Failed to add value %d', [Values[I]]), 
+      FIntSet.Add(Values[I]));
+  end;
+  
+  // Test basic iteration using for-in loop
+  ActualSum := 0;
+  for Value in FIntSet do
+    ActualSum := ActualSum + Value;
+    
+  AssertEquals('Iterator sum mismatch', ExpectedSum, ActualSum);
+  
+  // Test iteration again
+  ActualSum := 0;
+  for Value in FIntSet do
+    ActualSum := ActualSum + Value;
+    
+  AssertEquals('Iterator sum after reset mismatch', ExpectedSum, ActualSum);
+  
+  Log('Test12_Iterator completed');
+end;
+
+type
+  // Move thread class definition to type section
+  TModifierThread = class(TThread)
+  private
+    FSet: TThreadSafeHashSetInteger;
+    FStartValue: Integer;
+  public
+    constructor Create(ASet: TThreadSafeHashSetInteger; AStartValue: Integer);
+    procedure Execute; override;
+  end;
+
+procedure TThreadSafeHashSetTest.Test13_IteratorStress;
+var
+  Threads: array[0..THREAD_COUNT-1] of TModifierThread;
+  Value, I, ItemCount, IterationCount: Integer;
+  StartTick: QWord;
+begin
+  Log('Test13_IteratorStress starting...');
+  StartTick := GetTickCount64;
+  
+  // Create and start threads that will modify the set
+  for I := 0 to THREAD_COUNT-1 do
+  begin
+    Threads[I] := TModifierThread.Create(FIntSet, I * ITEMS_PER_THREAD);
+    Threads[I].Start;
+  end;
+  
+  // Simultaneously iterate while threads are modifying
+  IterationCount := 0;
+  while IterationCount < 10 do
+  begin
+    Inc(IterationCount);
+    ItemCount := 0;
+    
+    for Value in FIntSet do
+    begin
+      Inc(ItemCount);
+      if ItemCount mod 100 = 0 then
+        Sleep(1);  // Give other threads a chance
+    end;
+    
+    Log(Format('Iteration %d found %d items after %d ms', 
+      [IterationCount, ItemCount, GetTickCount64 - StartTick]));
+  end;
+  
+  // Wait for threads to complete
+  for I := 0 to THREAD_COUNT-1 do
+  begin
+    Threads[I].WaitFor;
+    Threads[I].Free;
+  end;
+  
+  // Final verification
+  ItemCount := 0;
+  for Value in FIntSet do
+    Inc(ItemCount);
+    
+  Log(Format('Final iteration found %d items', [ItemCount]));
+  AssertTrue('Final count should be greater than zero', ItemCount > 0);
+  
+  Log(Format('Test13_IteratorStress completed after %d ms', 
+    [GetTickCount64 - StartTick]));
+end;
+
+{ TModifierThread }
+
+constructor TModifierThread.Create(ASet: TThreadSafeHashSetInteger; 
+  AStartValue: Integer);
+begin
+  inherited Create(False);
+  FSet := ASet;
+  FStartValue := AStartValue;
+  FreeOnTerminate := False;
+end;
+
+procedure TModifierThread.Execute;
+var
+  I: Integer;
+begin
+  for I := 0 to ITEMS_PER_THREAD - 1 do
+  begin
+    FSet.Add(FStartValue + I);
+    if I mod 2 = 0 then
+      FSet.Remove(FStartValue + I div 2);
+    Sleep(Random(2));  // Small random delay
+  end;
 end;
 
 initialization
