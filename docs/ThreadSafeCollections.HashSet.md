@@ -48,6 +48,48 @@ TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetReal
 - Generic implementation with specialized versions for common types
 - Custom hash function support (especially for testing)
 
+### Iterator Support
+
+```pascal
+type
+  TIterator = class(TObject)
+  public
+    function MoveNext: Boolean;
+    function GetCurrent: T;
+    property Current: T read GetCurrent;
+  end;
+
+function GetEnumerator: TIterator;
+```
+
+#### Usage Example
+```pascal
+var
+  Set: TThreadSafeHashSetString;
+  Item: string;
+begin
+  Set := TThreadSafeHashSetString.Create;
+  try
+    Set.Add('one');
+    Set.Add('two');
+    
+    // Using iterator
+    for Item in Set do
+      WriteLn(Item);
+  finally
+    Set.Free;
+  end;
+end;
+```
+
+#### Iterator Characteristics
+- Thread-safe within single thread context
+- Uses read locks during iteration
+- Forward-only iteration
+- Protected from modifications during iteration (via read locks)
+- Other threads must wait for iteration to complete before modifying
+- No guaranteed iteration order (due to hash table structure)
+
 ## API Reference
 
 ### Generic TThreadSafeHashSet<T>
