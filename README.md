@@ -17,12 +17,12 @@ Current State:
 - ✅ Basic operations working (Add, Remove, Find)
 - ✅ Thread safety verified through testing
 - ✅ Memory management stable
-- ❌ No iterator support yet
+- ✅ Basic iterator support implemented for List, Dictionary, and HashSet
 - ❌ Limited bulk operations
 - ❌ Performance not yet optimized
 
 Planned Features:
-- 🔄 Iterator support
+- 🔄 Advanced iterator features
 - 🔄 Bulk operations
 - 🔄 Performance optimizations
 - 🔄 More specialized types
@@ -261,6 +261,7 @@ end;
 
 ### TThreadSafeList<T>
 - Thread-safe generic list
+- Basic iterator support for single-threaded scenarios
 - Automatic growth and sorting capability
 - Built-in comparers for Integer, String, Boolean, Real
 - Exception-safe operations
@@ -268,6 +269,7 @@ end;
 
 ### TThreadSafeDictionary<TKey, TValue>
 - Thread-safe generic dictionary
+- Basic iterator support for single-threaded scenarios
 - Separate chaining for collision resolution
 - Automatic resizing (load factor: 0.75)
 - First/Last key-value pair access
@@ -275,6 +277,7 @@ end;
 
 ### TThreadSafeHashSet<T>
 - Thread-safe generic hash set
+- Basic iterator support for single-threaded scenarios
 - Specialized versions for common types (Integer, String, Boolean, Real)
 - Custom hash function support for testing
 - Automatic resizing at 75% load factor
@@ -308,10 +311,16 @@ end;
 
 ## ⚠️ Known Limitations
 
-1. **No Iterator Support**
-   - No built-in mechanism for safe iteration
-   - No foreach-style enumeration
-   - Must access items individually
+1. **Basic Iterator Support**
+   - Iterators available for all collection types (List, Dictionary, HashSet)
+   - Iterators are not thread-safe (use in single-threaded context only)
+   - No concurrent modification detection
+   - Basic forward-only iteration
+   - Dictionary iterator provides key-value pair enumeration
+   - Each collection's iterator maintains its own position and:
+     * Uses read locks to prevent concurrent modifications
+     * Provides thread-safe iteration within a single thread
+     * Other threads must wait for iteration to complete before modifying
 
 2. **Concurrent Access Pattern**
    - Uses single-lock strategy with TCriticalSection
