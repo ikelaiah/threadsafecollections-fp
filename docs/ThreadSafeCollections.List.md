@@ -129,6 +129,48 @@ begin
 end;
 ```
 
+### Iterator Support
+
+```pascal
+type
+  TIterator = class(TObject)
+  public
+    function MoveNext: Boolean;
+    function GetCurrent: T;
+    property Current: T read GetCurrent;
+  end;
+
+function GetEnumerator: TIterator;
+```
+
+#### Usage Example
+```pascal
+var
+  List: specialize TThreadSafeList<Integer>;
+  Item: Integer;
+begin
+  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  try
+    List.Add(1);
+    List.Add(2);
+    List.Add(3);
+    
+    // Using iterator
+    for Item in List do
+      WriteLn(Item);
+  finally
+    List.Free;
+  end;
+end;
+```
+
+#### Iterator Characteristics
+- Thread-safe within single thread context
+- Uses read locks during iteration
+- Forward-only iteration
+- Protected from modifications during iteration (via read locks)
+- Other threads must wait for iteration to complete before modifying
+
 ## Built-in Comparers
 
 ```pascal

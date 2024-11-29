@@ -41,6 +41,23 @@ type
     
     property Items[Index: Integer]: T read GetItem write SetItem; default;
     property Count: Integer read FCount;
+
+    // Enumerator Class
+    type
+      TEnumerator = class
+      private
+        FList: specialize TThreadSafeList<T>;
+        FIndex: Integer;
+        FCurrent: T;
+      public
+        constructor Create(AList: specialize TThreadSafeList<T>);
+        destructor Destroy; override;
+        function MoveNext: Boolean;
+        property Current: T read FCurrent;
+      end;
+
+    // GetEnumerator method for for-in loops
+    function GetEnumerator: TEnumerator;
   end;
 
 // Basic comparers declarations
@@ -220,7 +237,7 @@ begin
   end;
 end;
 
-procedure TThreadSafeList.Sort(Ascending: Boolean = True);
+procedure TThreadSafeList.Sort(Ascending: Boolean);
 begin
   FLock.Acquire;
   try
@@ -277,6 +294,39 @@ end;
 procedure TThreadSafeList.SetItem(Index: Integer; const Value: T);
 begin
   Replace(Index, Value);
+end;
+
+{ TThreadSafeList.TEnumerator }
+
+constructor TThreadSafeList.TEnumerator.Create(AList: specialize TThreadSafeList<T>);
+begin
+  inherited Create;
+  FList := AList;
+  FList.FLock.Acquire; // Acquire lock for safe iteration
+  FIndex := -1;
+end;
+
+destructor TThreadSafeList.TEnumerator.Destroy;
+begin
+  FList.FLock.Release; // Release lock when done
+  inherited Destroy;
+end;
+
+function TThreadSafeList.TEnumerator.MoveNext: Boolean;
+begin
+  Inc(FIndex);
+  if FIndex < FList.FCount then
+  begin
+    FCurrent := FList.FList[FIndex];
+    Result := True;
+  end
+  else
+    Result := False;
+end;
+
+function TThreadSafeList.GetEnumerator: TEnumerator;
+begin
+  Result := TEnumerator.Create(Self);
 end;
 
 end.

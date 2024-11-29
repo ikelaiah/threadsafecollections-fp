@@ -135,6 +135,53 @@ Key Differences:
 | `Remove(const Key: TKey)` | Removes entry with given key | Boolean | Yes |
 | `Replace(const Key: TKey; const Value: TValue)` | Updates value for existing key (raises exception if not found) | void | Yes |
 
+### Iterator Support
+
+```pascal
+type
+  TPair = record
+    Key: TKey;
+    Value: TValue;
+  end;
+  
+  TIterator = class(TObject)
+  public
+    function MoveNext: Boolean;
+    function GetCurrent: TPair;
+    property Current: TPair read GetCurrent;
+  end;
+
+function GetEnumerator: TIterator;
+```
+
+#### Usage Example
+```pascal
+var
+  Dict: specialize TThreadSafeDictionary<string, integer>;
+  Pair: TPair;
+begin
+  Dict := specialize TThreadSafeDictionary<string, integer>.Create;
+  try
+    Dict.Add('one', 1);
+    Dict.Add('two', 2);
+    
+    // Using iterator
+    for Pair in Dict do
+      WriteLn(Format('%s: %d', [Pair.Key, Pair.Value]));
+  finally
+    Dict.Free;
+  end;
+end;
+```
+
+#### Iterator Characteristics
+- Returns key-value pairs during iteration
+- Thread-safe within single thread context
+- Uses read locks during iteration
+- Forward-only iteration
+- Protected from modifications during iteration (via read locks)
+- Other threads must wait for iteration to complete before modifying
+
 ### Navigation
 | Method | Description | Return Type | Thread-Safe |
 |--------|-------------|-------------|-------------|
