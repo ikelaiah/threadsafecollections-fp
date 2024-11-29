@@ -862,7 +862,7 @@ end;
 
 procedure TThreadSafeDictionaryTest.TestIteratorBasic;
 var
-  Iterator: TStringIntDictionary.TDictionaryEnumerator;
+  Iterator: TStringIntDictionary.TEnumerator;
   ExpectedCount: Integer;
   Pair: specialize TPair<string, Integer>;
 begin
@@ -900,7 +900,7 @@ end;
 
 procedure TThreadSafeDictionaryTest.TestIteratorEmpty;
 var
-  Iterator: TStringIntDictionary.TDictionaryEnumerator;
+  Iterator: TStringIntDictionary.TEnumerator;
 begin
   WriteLn('Starting TestIteratorEmpty');
   IncrementTestCounter;
@@ -923,7 +923,7 @@ end;
 
 procedure TThreadSafeDictionaryTest.TestIteratorModification;
 var
-  Iterator: TStringIntDictionary.TDictionaryEnumerator;
+  Iterator: TStringIntDictionary.TEnumerator;
   Pair: specialize TPair<string, Integer>;
 begin
   WriteLn('Starting TestIteratorModification');
@@ -960,7 +960,7 @@ end;
 
 procedure TThreadSafeDictionaryTest.TestMultipleIterators;
 var
-  Iterator1, Iterator2: TStringIntDictionary.TDictionaryEnumerator;
+  Iterator1, Iterator2: TStringIntDictionary.TEnumerator;
   Pair1, Pair2: specialize TPair<string, Integer>;
   Count1, Count2: Integer;
 begin
@@ -1005,7 +1005,7 @@ end;
 
 procedure TThreadSafeDictionaryTest.TestIteratorReset;
 var
-  Iterator: TStringIntDictionary.TDictionaryEnumerator;
+  Iterator: TStringIntDictionary.TEnumerator;
   FirstPair, CurrentPair: specialize TPair<string, Integer>;
 begin
   WriteLn('Starting TestIteratorReset');

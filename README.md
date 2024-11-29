@@ -211,15 +211,17 @@ uses
 
 var
   Dict: specialize TThreadSafeDictionary<string, integer>;
+  Pair: TPair<string, integer>;
 
 begin
   Dict := specialize TThreadSafeDictionary<string, integer>.Create;
   try
     Dict.Add('one', 1);
     Dict.Add('two', 2);
-    if Dict.TryGetValue('one', Value) then
-        WriteLn(Value); // Outputs: 1
-    Dict.Remove('two');
+    // Thread-safe iteration with RAII locking
+    for Pair in Dict do  // Lock automatically acquired
+      WriteLn(Pair.Key, ': ', Pair.Value);
+    // Lock automatically released
   finally
     Dict.Free;
   end;
@@ -447,6 +449,7 @@ end;
 | Thread-Safe Operations    |  ✅  |  ✅   |    ✅      |   ✅    |
 | RAII Iterator Locking     |  ✅  |  ✅   |    ✅      |   ✅    |
 | Automatic Resizing        |  ✅  |  ✅   |    ✅      |   ✅    |
+| Collision Resolution      |  N/A |  N/A  |    ✅      |   ✅    |
 | Specialized Types         |  ✅  |  ❌   |    ❌      |   ✅    |
 | Custom Comparers          |  ✅  |  ❌   |    ❌      |   ✅    |
 | Bulk Operations           |  ❌  |  ✅   |    ❌      |   ❌    |
