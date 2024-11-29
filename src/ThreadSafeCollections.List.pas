@@ -6,7 +6,7 @@ unit ThreadSafeCollections.List;
 interface
 
 uses
-  Classes, SysUtils, SyncObjs;
+  Classes, SysUtils, SyncObjs, ThreadSafeCollections.Interfaces;
 
 type
   // Generic comparer type
@@ -49,6 +49,7 @@ type
         FList: specialize TThreadSafeList<T>;
         FIndex: Integer;
         FCurrent: T;
+        FLockToken: ILockToken;
       public
         constructor Create(AList: specialize TThreadSafeList<T>);
         destructor Destroy; override;
@@ -58,6 +59,8 @@ type
 
     // GetEnumerator method for for-in loops
     function GetEnumerator: TEnumerator;
+
+    function Lock: ILockToken;
   end;
 
 // Basic comparers declarations
@@ -302,14 +305,14 @@ constructor TThreadSafeList.TEnumerator.Create(AList: specialize TThreadSafeList
 begin
   inherited Create;
   FList := AList;
-  FList.FLock.Acquire; // Acquire lock for safe iteration
+  FLockToken := FList.Lock;
   FIndex := -1;
 end;
 
 destructor TThreadSafeList.TEnumerator.Destroy;
 begin
-  FList.FLock.Release; // Release lock when done
-  inherited Destroy;
+  FLockToken := nil; // Release lock
+  inherited;
 end;
 
 function TThreadSafeList.TEnumerator.MoveNext: Boolean;
@@ -327,6 +330,11 @@ end;
 function TThreadSafeList.GetEnumerator: TEnumerator;
 begin
   Result := TEnumerator.Create(Self);
+end;
+
+function TThreadSafeList.Lock: ILockToken;
+begin
+  Result := TLockToken.Create(FLock);
 end;
 
 end.

@@ -6,7 +6,7 @@ unit ThreadSafeCollections.Dictionary;
 interface
 
 uses
-  SysUtils, Classes, SyncObjs, HashFunctions, TypInfo;
+  SysUtils, Classes, SyncObjs, HashFunctions, TypInfo, ThreadSafeCollections.Interfaces;
 
 { 
   DEBUG_LOGGING: Global flag to control debug output
@@ -54,9 +54,11 @@ type
       FDictionary: TThreadSafeDictionary;
       FCurrentBucket: integer;
       FCurrentEntry: PEntry;
+      FLockToken: ILockToken;
       function GetCurrent: TValue;
     public
       constructor Create(ADictionary: TThreadSafeDictionary);
+      destructor Destroy; override;
       function MoveNext: boolean;
       property Current: TValue read GetCurrent;
     end;
@@ -65,9 +67,11 @@ type
       FDictionary: TThreadSafeDictionary;
       FCurrentBucket: integer;
       FCurrentEntry: PEntry;
+      FLockToken: ILockToken;
       function GetCurrent: specialize TPair<TKey, TValue>;
     public
       constructor Create(ADictionary: TThreadSafeDictionary);
+      destructor Destroy; override;
       function MoveNext: Boolean;
       property Current: specialize TPair<TKey, TValue> read GetCurrent;
     end;
@@ -111,6 +115,7 @@ type
     property Items[const Key: TKey]: TValue read Find write Replace; default;
     function GetIterator: TDictionaryIterator;
     function GetEnumerator: TDictionaryEnumerator;
+    function Lock: ILockToken;
   end;
 
 
@@ -713,6 +718,13 @@ begin
   FDictionary := ADictionary;
   FCurrentBucket := -1;  // Start before first bucket
   FCurrentEntry := nil;
+  FLockToken := FDictionary.Lock;
+end;
+
+destructor TThreadSafeDictionary.TDictionaryIterator.Destroy;
+begin
+  FLockToken := nil; // Release lock
+  inherited;
 end;
 
 function TThreadSafeDictionary.TDictionaryIterator.GetCurrent: TValue;
@@ -764,6 +776,13 @@ begin
   FDictionary := ADictionary;
   FCurrentBucket := -1;  // Start before first bucket
   FCurrentEntry := nil;
+  FLockToken := FDictionary.Lock;
+end;
+
+destructor TThreadSafeDictionary.TDictionaryEnumerator.Destroy;
+begin
+  FLockToken := nil; // Release lock
+  inherited;
 end;
 
 function TThreadSafeDictionary.TDictionaryEnumerator.GetCurrent: specialize TPair<TKey, TValue>;
@@ -806,6 +825,11 @@ end;
 function TThreadSafeDictionary.GetEnumerator: TDictionaryEnumerator;
 begin
   Result := TDictionaryEnumerator.Create(Self);
+end;
+
+function TThreadSafeDictionary.Lock: ILockToken;
+begin
+  Result := TLockToken.Create(FLock);
 end;
 
 end.
