@@ -29,6 +29,7 @@ type
     procedure TestContains;
     procedure TestPushRange;
     procedure TestMultiThreadPushPop;
+    procedure TestLockingMechanism;
   end;
 
 type
@@ -44,6 +45,18 @@ type
     procedure Execute; override;
   private
     function Random(Range: Integer): Integer;
+  end;
+
+type
+  TLockTestThread = class(TThread)
+  private
+    FDeque: TIntegerDeque;
+    FLockCount: Integer;
+    FIterations: Integer;
+  public
+    constructor Create(ADeque: TIntegerDeque; AIterations: Integer);
+    procedure Execute; override;
+    property LockCount: Integer read FLockCount;
   end;
 
 implementation
@@ -233,6 +246,42 @@ begin
     [MilliSecondsBetween(Now, StartTime), THREAD_COUNT, ITERATIONS]));
 end;
 
+procedure TThreadSafeDequeTests.TestLockingMechanism;
+const
+  THREAD_COUNT = 4;
+  ITERATIONS = 1000;
+var
+  Threads: array[0..THREAD_COUNT-1] of TLockTestThread;
+  I: Integer;
+  TotalLocks: Integer;
+  StartTime: TDateTime;
+begin
+  StartTime := Now;
+  
+  // Create threads that will acquire and release locks
+  for I := 0 to THREAD_COUNT-1 do
+  begin
+    Threads[I] := TLockTestThread.Create(FDeque, ITERATIONS);
+    Threads[I].Start;
+  end;
+  
+  // Wait for all threads to complete
+  TotalLocks := 0;
+  for I := 0 to THREAD_COUNT-1 do
+  begin
+    Threads[I].WaitFor;
+    TotalLocks := TotalLocks + Threads[I].LockCount;
+    Threads[I].Free;
+  end;
+  
+  // Verify results
+  AssertEquals('All lock attempts should succeed', 
+    THREAD_COUNT * ITERATIONS, TotalLocks);
+    
+  WriteLn(Format('Lock test took %d ms, %d successful locks across %d threads', 
+    [MilliSecondsBetween(Now, StartTime), TotalLocks, THREAD_COUNT]));
+end;
+
 { TTestThread }
 
 constructor TTestThread.Create(ADeque: TIntegerDeque; AStartValue, ACount, AIterations, ASeed: Integer);
@@ -276,6 +325,41 @@ begin
         if Random(100) < 20 then  // 20% chance to sleep
           Sleep(1 + Random(2));   // Reduced sleep time
       end;
+    end;
+  end;
+end;
+
+{ TLockTestThread }
+
+constructor TLockTestThread.Create(ADeque: TIntegerDeque; AIterations: Integer);
+begin
+  inherited Create(True);
+  FDeque := ADeque;
+  FIterations := AIterations;
+  FLockCount := 0;
+  FreeOnTerminate := False;
+end;
+
+procedure TLockTestThread.Execute;
+var
+  I: Integer;
+  LockToken: ILockToken;
+begin
+  for I := 1 to FIterations do
+  begin
+    try
+      // Get lock token
+      LockToken := FDeque.Lock;
+      
+      // Simulate some work
+      Sleep(Random(2));
+      
+      // Lock will be automatically released when LockToken goes out of scope
+      Inc(FLockCount);
+    except
+      // Count failed lock attempts (should never happen)
+      on E: Exception do
+        WriteLn('Lock failed: ', E.Message);
     end;
   end;
 end;
