@@ -17,12 +17,14 @@ Current State:
 - ✅ Basic operations working (Add, Remove, Find)
 - ✅ Thread safety verified through testing
 - ✅ Memory management stable
-- ✅ Basic iterator support implemented for List, Deque, Dictionary and HashSet
+- ✅ Thread-Safe Iterator Support
+   - Iterators use RAII-style locking through interface counting
+   - Thread-safe iteration with automatic lock management
+   - Each iterator maintains its own lock token
 - ❌ Limited bulk operations
 - ❌ Performance not yet optimized
 
 Planned Features:
-- 🔄 Better iterator features 
 - 🔄 Better naming conventions of methods
 - 🔄 Bulk operations
 - 🔄 Performance optimizations
@@ -40,65 +42,63 @@ Planned Features:
 This library provides four main collection types:
 
 1. **ThreadSafeList**: Like an array that can grow
-   ```pascal
-   var
-     List: specialize TThreadSafeList<Integer>;
-   begin
-     List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
-     try
-       List.Add(42);  // That's it!
-     finally
-       List.Free;
-     end;
-   end;
-   ```
+```pascal
+var
+  List: specialize TThreadSafeList<Integer>;
+begin
+  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  try
+    List.Add(42);  // That's it!
+  finally
+    List.Free;
+  end;
+end;
+```
 
 2. **ThreadSafeDeque**: A double-ended queue
-  ```pascal
-  var
-    Deque: specialize TThreadSafeDeque<Integer>;
-  begin
-    Deque := specialize TThreadSafeDeque<Integer>.Create;
-    try
-      Deque.PushBack(1);
-      Deque.PushFront(2);
-      WriteLn('Front item: ', Deque.PopFront);
-      WriteLn('Back item: ', Deque.PopBack);
-    finally
-      Deque.Free;
-    end;
-  end;
-  ```
+ ```pascal
+ var
+   Deque: specialize TThreadSafeDeque<Integer>;
+ begin
+   Deque := specialize TThreadSafeDeque<Integer>.Create;
+   try
+     Deque.PushBack(1);
+     Deque.PushFront(2);
+     WriteLn('Front item: ', Deque.PopFront);
+     WriteLn('Back item: ', Deque.PopBack);
+   finally
+     Deque.Free;
+   end;
+ end;
+```
 
 3. **ThreadSafeDictionary**: Store key-value pairs
-   ```pascal
-   var
-     Dict: specialize TThreadSafeDictionary<string, integer>;
-   begin
-     Dict := specialize TThreadSafeDictionary<string, integer>.Create;
-     try
-       Dict.Add('one', 1);  // Simple!
-     finally
-       Dict.Free;
-     end;
+ ```pascal
+ var
+   Dict: specialize TThreadSafeDictionary<string, integer>;
+ begin
+   Dict := specialize TThreadSafeDictionary<string, integer>.Create;
+   try
+     Dict.Add('one', 1);  // Simple!
+   finally
+     Dict.Free;
    end;
-   ```
+ end;
+ ```
 
 4. **ThreadSafeHashSet**: Store unique values
-   ```pascal
-   var
-     UniqueNames: TThreadSafeHashSetString;
-   begin
-     UniqueNames := TThreadSafeHashSetString.Create;
-     try
-       UniqueNames.Add('unique');  // Duplicates handled automatically
-     finally
-       UniqueNames.Free;
-     end;
-   end;
-   ```
-
-
+```pascal
+var
+  UniqueNames: TThreadSafeHashSetString;
+begin
+  UniqueNames := TThreadSafeHashSetString.Create;
+  try
+    UniqueNames.Add('unique');  // Duplicates handled automatically
+  finally
+    UniqueNames.Free;
+  end;
+end;
+```
 
 > [!TIP]
 > Always use try-finally blocks to ensure proper cleanup:
@@ -110,25 +110,12 @@ This library provides four main collection types:
 > end;
 > ```
 
-## ✨ Features
-
-- 🛡️ Thread-safe List, Deque, Dictionary and HashSet implementations
-- 🚀 Generic type support (Integer, String, Real, Boolean, Records)
-- 📦 Built-in comparers and hash functions
-- 🔐 Automatic locking mechanism with `TCriticalSection`
-- 🎯 Exception-safe resource management
-- 🧪 Comprehensive test suite with collision testing
-- ⚡ Optimized performance for common operations
-- 📊 Load factor based automatic resizing
-
-## 🎯 Why Use This?
-
-- 🔒 Safe concurrent access from multiple threads
-- 🚀 Fast operations with optimized implementations
-- 💡 Simple to use - just like regular collections, but thread-safe
-- ⚡ Perfect for multi-threaded applications
-
 ## 🚀 Quick Start
+
+### 📋 Requirements
+
+- Free Pascal 3.2.2 or later
+- No external dependencies
 
 ### Using ThreadSafeList
 
@@ -185,14 +172,62 @@ end;
 ### Using ThreadSafeDeque
 
 ```pascal
-uses 
+uses
+  ThreadSafeCollections.Deque;
+
+var
+  Deque: specialize TThreadSafeDeque<string>;
+  Name: string;
+begin
+  Deque := specialize TThreadSafeDeque<string>.Create;
+  try
+    // Add items to the front and back
+    Deque.PushFront('Obed');
+    Deque.PushFront('Jesse');
+    Deque.PushBack('David');
+
+    // Remove items from the front and back
+    if Deque.TryPopFront(Name) then
+      WriteLn('Popped from front: ', Name);
+
+    if Deque.TryPopBack(Name) then
+      WriteLn('Popped from back: ', Name);
+  finally
+    Deque.Free;
+  end;
+
+// Other code
+
+end.
+```
+
+
+### Using ThreadSafeDeque with Custom Types
+
+```pascal
+{$modeSwitch advancedrecords}
+uses
   ThreadSafeCollections.Deque;
 
 type
   TPerson = record
     Name: string;
     Age: Integer;
+    public
+    constructor Create(NewName:string; NewAge:Integer);
+    class operator =(const a,b: TPerson): boolean;
   end;
+
+constructor TPerson.Create(NewName:string; NewAge:Integer);
+begin
+  self.Name := NewName;
+  self.Age:= NewAge;
+end;
+
+class operator TPerson.=(const a,b: TPerson): boolean;
+begin
+  Result := (a.Name = b.Name) and (a.Age = b.Age);
+end;
 
 var
   Deque: specialize TThreadSafeDeque<TPerson>;
@@ -213,7 +248,11 @@ begin
   finally
     Deque.Free;
   end;
-end;
+
+// other code
+
+end.
+
 ```
 
 ### Using ThreadSafeDictionary
@@ -224,15 +263,17 @@ uses
 
 var
   Dict: specialize TThreadSafeDictionary<string, integer>;
+  Pair: TPair<string, integer>;
 
 begin
   Dict := specialize TThreadSafeDictionary<string, integer>.Create;
   try
     Dict.Add('one', 1);
     Dict.Add('two', 2);
-    if Dict.TryGetValue('one', Value) then
-        WriteLn(Value); // Outputs: 1
-    Dict.Remove('two');
+    // Thread-safe iteration with RAII locking
+    for Pair in Dict do  // Lock automatically acquired
+      WriteLn(Pair.Key, ': ', Pair.Value);
+    // Lock automatically released
   finally
     Dict.Free;
   end;
@@ -311,101 +352,166 @@ begin
 end;
 ```
 
-
-
-## 📚 Collection Types
-
-### TThreadSafeList<T>
-- Thread-safe generic list
-- Basic iterator support for single-threaded scenarios
-- Automatic growth and sorting capability
-- Built-in comparers for Integer, String, Boolean, Real
-- Exception-safe operations
-- Index-based access
-
-### TThreadSafeDeque<T>
-- Thread-safe generic deque
-- Basic iterator support for single-threaded scenarios
-- Double-ended queue operations
-- Exception-safe operations
-
-### TThreadSafeDictionary<TKey, TValue>
-- Thread-safe generic dictionary
-- Basic iterator support for single-threaded scenarios
-- Separate chaining for collision resolution
-- Automatic resizing (load factor: 0.75)
-- First/Last key-value pair access
-- Manual bucket count control
-
-### TThreadSafeHashSet<T>
-- Thread-safe generic hash set
-- Basic iterator support for single-threaded scenarios
-- Specialized versions for common types (Integer, String, Boolean, Real)
-- Custom hash function support for testing
-- Automatic resizing at 75% load factor
-- Separate chaining for collisions
-
-## ⚠️ Common Pitfalls and Best Practices
-
-> [!WARNING]
-> Common mistakes to avoid when using thread-safe lists:
-
-1. 🔓 **Not Using Try-Finally**
-```pascal
-// ❌ Wrong: Resource leak possible
-var
-  List: specialize TThreadSafeList<Integer>;
-begin
-  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
-  List.Add(42);  // If exception occurs, List won't be freed
-end;
-
-// ✅ Correct: Always use try-finally
-begin
-  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
-  try
-    List.Add(42);
-  finally
-    List.Free;  // List will always be freed
-  end;
-end;
-```
-
-## ⚠️ Known Limitations
-
-1. **Basic Iterator Support**
-   - Iterators available for all collection types (List, Dictionary, HashSet)
-   - Iterators are not thread-safe (use in single-threaded context only)
-   - No concurrent modification detection
-   - Basic forward-only iteration
-   - Dictionary iterator provides key-value pair enumeration
-   - Each collection's iterator maintains its own position and:
-     * Uses read locks to prevent concurrent modifications
-     * Provides thread-safe iteration within a single thread
-     * Other threads must wait for iteration to complete before modifying
-
-2. **Concurrent Access Pattern**
-   - Uses single-lock strategy with TCriticalSection
-   - All operations are mutually exclusive
-   - May have contention under heavy load
-
-3. **Memory Management**
-   - Collections only grow, never shrink
-   - No manual capacity reduction
-   - May hold excess memory after many removals
-
-4. **Bulk Operations**
-   - No batch Add/Remove operations
-   - Each operation requires separate lock acquisition
-   - Consider alternative if bulk operations are critical
-
 ## 📥 Installation
+
+### Method 1: Using Git
 
 1. Clone the repository:
    ```bash
    git clone https://github.com/ikelaiah/ThreadSafeCollections-FP.git
    ```
-2. Add the source directory to your project's search path.
+
+2. Add to Your Project:
+   - In Lazarus IDE:
+     1. Project → Project Inspector
+     2. Add Unit → Browse to `src` directory
+     3. Select needed units (e.g., ThreadSafeCollections.List.pas)
+
+   - In FPC Project:
+     ```pascal
+     {$UNITPATH your/path/to/ThreadSafeCollections-FP/src}
+     ```
+
+### Method 2: Manual Installation
+
+1. Download ZIP from GitHub
+2. Extract to your preferred location
+3. Add `src` directory to your project's search path:
+   ```pascal
+   program YourProject;
+   
+   {$mode objfpc}{$H+}
+   {$UNITPATH path/to/ThreadSafeCollections-FP/src}
+   
+   uses
+     ThreadSafeCollections.List,  // For List
+     ThreadSafeCollections.Deque, // For Deque
+     // ... other units as needed
+   ```
+
+### Verify Installation
+
+Create a simple test program:
+```pascal
+program TestInstall;
+
+{$mode objfpc}{$H+}
+
+uses
+  ThreadSafeCollections.List;
+
+var
+  List: specialize TThreadSafeList<Integer>;
+begin
+  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  try
+    List.Add(42);
+    WriteLn('Installation successful!');
+  finally
+    List.Free;
+  end;
+end.
+```
+
+### Troubleshooting
+
+1. **Compilation Errors**:
+   - Ensure FPC 3.2.2 or later
+   - Check unit path is correct
+   - Verify all required files are present
+
+2. **Runtime Errors**:
+   - Check memory management (use try-finally)
+   - Verify comparers are provided where needed
+
+## 🧪 Thread Safety Examples
+
+### Safe Iteration
+```pascal
+var
+  List: specialize TThreadSafeList<Integer>;
+  Item: Integer;
+begin
+  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  try
+    // Iterator automatically acquires lock through RAII
+    for Item in List do
+    begin
+      // Other threads wait until iteration completes
+      WriteLn(Item);
+    end; // Lock automatically released here
+  finally
+    List.Free;
+  end;
+end;
+```
+
+### Concurrent Access
+```pascal
+// Thread 1
+procedure Thread1;
+begin
+  ThreadSafeList.Add(42);  // Automatically locked
+end;
+
+// Thread 2
+procedure Thread2;
+begin
+  if ThreadSafeList.Contains(42) then  // Automatically locked
+    WriteLn('Found it!');
+end;
+```
+
+### Safe Resource Management
+```pascal
+var
+  Dict: specialize TThreadSafeDictionary<string, integer>;
+begin
+  Dict := specialize TThreadSafeDictionary<string, integer>.Create;
+  try
+    // Multiple threads can safely access
+    Dict.Add('one', 1);    // Thread 1
+    Dict.Add('two', 2);    // Thread 2
+    Dict.Remove('one');    // Thread 3
+    
+    // Safe iteration with RAII locking
+    for Pair in Dict do
+      WriteLn(Pair.Key, ': ', Pair.Value);
+  finally
+    Dict.Free;
+  end;
+end;
+```
+
+## ✨ Features
+
+- 🛡️ Thread-safe List, Deque, Dictionary and HashSet implementations
+- 🚀 Generic type support (Integer, String, Real, Boolean, Records)
+- 📦 Built-in comparers and hash functions
+- 🔐 Automatic locking mechanism with `TCriticalSection`
+- 🎯 Exception-safe resource management
+- 🧪 Comprehensive test suite with collision testing
+- ⚡ Optimized performance for common operations
+- 📊 Load factor based automatic resizing
+
+## 🔄 Feature Comparison
+
+| Feature                   | List | Deque | Dictionary  | HashSet |
+|---------------------------|------|-------|-------------|---------|
+| Thread-Safe Operations    |  ✅  |  ✅   |    ✅      |   ✅    |
+| RAII Iterator Locking     |  ✅  |  ✅   |    ✅      |   ✅    |
+| Automatic Resizing        |  ✅  |  ✅   |    ✅      |   ✅    |
+| Collision Resolution      |  N/A |  N/A  |    ✅      |   ✅    |
+| Specialized Types         |  ✅  |  ❌   |    ❌      |   ✅    |
+| Custom Comparers          |  ✅  |  ❌   |    ❌      |   ✅    |
+| Bulk Operations           |  ❌  |  ✅   |    ❌      |   ❌    |
+
+## 🎯 Why Use This?
+
+- 🔒 Safe concurrent access from multiple threads
+- 🚀 Fast operations with optimized implementations
+- 💡 Simple to use - just like regular collections, but thread-safe
+- ⚡ Perfect for multi-threaded applications
 
 ## 🧪 Testing
 
@@ -419,6 +525,8 @@ end;
 - [ThreadSafeCollections.Deque.md](docs/ThreadSafeCollections.Deque.md)
 - [ThreadSafeCollections.Dictionary.md](docs/ThreadSafeCollections.Dictionary.md)
 - [ThreadSafeCollections.HashSet.md](docs/ThreadSafeCollections.HashSet.md)
+- [RAII-style locking through interface counting](docs/RAII-style-locking-through-interface-counting.md)
+- [Latest Test Output](docs/LatestTestOutput.md)
 
 ## 📁 Examples
 
@@ -443,4 +551,6 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 - 🎯 Free Pascal and Lazarus community
 - 🧪 FPCUnit testing framework
+
+
 

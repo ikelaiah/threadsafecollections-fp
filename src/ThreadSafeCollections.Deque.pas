@@ -6,18 +6,9 @@ unit ThreadSafeCollections.Deque;
 interface
 
 uses
-  Classes, SysUtils, SyncObjs;
+  Classes, SysUtils, SyncObjs, ThreadSafeCollections.Interfaces;
 
 type
-  { TLockToken }
-  TLockToken = class(TInterfacedObject)
-  private
-    FLock: TCriticalSection;
-  public
-    constructor Create(ALock: TCriticalSection);
-    destructor Destroy; override;
-  end;
-
   { TThreadSafeDeque }
   generic TThreadSafeDeque<T> = class
   private
@@ -42,8 +33,9 @@ type
         FDeque: TThreadSafeDeque;
         FCurrent: T;
         FCurrentNode: PNode;
+        FLockToken: ILockToken;
       public
-        constructor Create(AList: TThreadSafeDeque);
+        constructor Create(ADeque: TThreadSafeDeque);
         destructor Destroy; override;
         function MoveNext: Boolean;
         property Current: T read FCurrent;
@@ -76,7 +68,7 @@ type
     
     // Iterator support
     function GetEnumerator: TEnumerator;
-    function Lock: IInterface;
+    function Lock: ILockToken;
     
     // Check if deque is empty
     function IsEmpty: Boolean;
@@ -302,18 +294,18 @@ end;
 
 { TThreadSafeDeque.TEnumerator }
 
-constructor TThreadSafeDeque.TEnumerator.Create(AList: TThreadSafeDeque);
+constructor TThreadSafeDeque.TEnumerator.Create(ADeque: TThreadSafeDeque);
 begin
   inherited Create;
-  FDeque := AList;
-  FDeque.FLock.Acquire; // Acquire lock for safe iteration
+  FDeque := ADeque;
+  FLockToken := FDeque.Lock;
   FCurrentNode := nil;
 end;
 
 destructor TThreadSafeDeque.TEnumerator.Destroy;
 begin
-  FDeque.FLock.Release; // Release lock when done
-  inherited Destroy;
+  FLockToken := nil;
+  inherited;
 end;
 
 function TThreadSafeDeque.TEnumerator.MoveNext: Boolean;
@@ -333,26 +325,9 @@ begin
   Result := TEnumerator.Create(Self);
 end;
 
-{ Add these methods to TThreadSafeDeque<T> implementation }
-
-function TThreadSafeDeque.Lock: IInterface;
+function TThreadSafeDeque.Lock: ILockToken;
 begin
   Result := TLockToken.Create(FLock);
-end;
-
-{ TLockToken }
-
-constructor TLockToken.Create(ALock: TCriticalSection);
-begin
-  inherited Create;
-  FLock := ALock;
-  FLock.Acquire;
-end;
-
-destructor TLockToken.Destroy;
-begin
-  FLock.Release;
-  inherited;
 end;
 
 function TThreadSafeDeque.IsEmpty: Boolean;

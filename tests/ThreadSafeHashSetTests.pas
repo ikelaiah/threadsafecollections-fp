@@ -5,7 +5,8 @@ unit ThreadSafeHashSetTests;
 interface
 
 uses
-  Classes, SysUtils, fpcunit, testregistry, ThreadSafeCollections.HashSet, Math, HashFunctions;
+  Classes, SysUtils, fpcunit, testregistry, DateUtils,
+  ThreadSafeCollections.HashSet, ThreadSafeCollections.Interfaces, Math, HashFunctions;
 
 const
   INITIAL_BUCKET_COUNT = 16;  // Default size of hash table
@@ -74,6 +75,7 @@ type
     procedure Test11_AggressiveCollisions;  // Multi-threaded collision stress test
     procedure Test12_Iterator;           // Basic iterator functionality
     procedure Test13_IteratorStress;     // Concurrent iterator stress test
+    procedure Test14_LockingMechanism;     // Locking mechanism test
   end;
 
 { Special hash set class that forces collisions for testing }
@@ -863,6 +865,92 @@ begin
     if I mod 2 = 0 then
       FSet.Remove(FStartValue + I div 2);
     Sleep(Random(2));  // Small random delay
+  end;
+end;
+
+// Add this type after other test thread types
+type
+  TLockTestThread = class(TThread)
+  private
+    FSet: TThreadSafeHashSetInteger;
+    FLockCount: Integer;
+    FIterations: Integer;
+  public
+    constructor Create(ASet: TThreadSafeHashSetInteger; AIterations: Integer);
+    procedure Execute; override;
+    property LockCount: Integer read FLockCount;
+  end;
+
+// Add this test method to TThreadSafeHashSetTest published section
+procedure TThreadSafeHashSetTest.Test14_LockingMechanism;
+const
+  THREAD_COUNT = 4;
+  ITERATIONS = 1000;
+var
+  Threads: array[0..THREAD_COUNT-1] of TLockTestThread;
+  I: Integer;
+  TotalLocks: Integer;
+  StartTime: TDateTime;
+begin
+  Log('Test14_LockingMechanism starting...');
+  StartTime := Now;
+  
+  // Create threads that will acquire and release locks
+  for I := 0 to THREAD_COUNT-1 do
+  begin
+    Threads[I] := TLockTestThread.Create(FIntSet, ITERATIONS);
+    Threads[I].Start;
+  end;
+  
+  // Wait for all threads to complete
+  TotalLocks := 0;
+  for I := 0 to THREAD_COUNT-1 do
+  begin
+    Threads[I].WaitFor;
+    TotalLocks := TotalLocks + Threads[I].LockCount;
+    Threads[I].Free;
+  end;
+  
+  // Verify results
+  AssertEquals('All lock attempts should succeed', 
+    THREAD_COUNT * ITERATIONS, TotalLocks);
+    
+  Log(Format('Lock test took %d ms, %d successful locks across %d threads', 
+    [MilliSecondsBetween(Now, StartTime), TotalLocks, THREAD_COUNT]));
+end;
+
+{ TLockTestThread }
+
+constructor TLockTestThread.Create(ASet: TThreadSafeHashSetInteger; AIterations: Integer);
+begin
+  inherited Create(True);
+  FSet := ASet;
+  FIterations := AIterations;
+  FLockCount := 0;
+  FreeOnTerminate := False;
+end;
+
+procedure TLockTestThread.Execute;
+var
+  I: Integer;
+  LockToken: ILockToken;
+begin
+  for I := 1 to FIterations do
+  begin
+    try
+      // Get lock token
+      LockToken := FSet.Lock;
+      
+      // Simulate some work
+      Sleep(Random(2));
+      
+      // Lock will be automatically released when LockToken goes out of scope
+      Inc(FLockCount);
+    except
+      // Count failed lock attempts (should never happen)
+      on E: Exception do
+        WriteLn('Lock failed: ', E.Message);
+    end;
   end;
 end;
 

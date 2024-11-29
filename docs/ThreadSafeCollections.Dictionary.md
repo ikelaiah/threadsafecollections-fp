@@ -23,26 +23,30 @@ classDiagram
         +Clear()
         +Count(): integer
         +ResizeBuckets(NewSize: integer)
-        +GetBucketCount(): integer
         +BucketCount: integer
         +Items[Key]: Value
+        +GetEnumerator(): TEnumerator
+        +Lock(): ILockToken
     }
     
-    class TDictionaryEntry~TKey,TValue~ {
-        +TKey Key
-        +TValue Value
-        +cardinal Hash
-        +PEntry Next
+    class TEnumerator {
+        -FDictionary: TThreadSafeDictionary
+        -FCurrentBucket: integer
+        -FCurrentEntry: PEntry
+        -FLockToken: ILockToken
+        +Create()
+        +Destroy()
+        +MoveNext(): boolean
+        +Current: TPair~TKey,TValue~
     }
 
-    class Constants {
-        +INITIAL_BUCKET_COUNT = 16
-        +LOAD_FACTOR = 0.75
-        +MIN_BUCKET_COUNT = 4
+    class ILockToken {
+        <<interface>>
     }
 
-    TThreadSafeDictionary --* TDictionaryEntry : contains
-    TThreadSafeDictionary --> Constants : uses
+    TThreadSafeDictionary *-- TEnumerator : contains
+    TEnumerator --> ILockToken : uses
+    TThreadSafeDictionary --> ILockToken : creates
 ```
 
 ## Collision Resolution Strategies
@@ -144,21 +148,28 @@ type
     Value: TValue;
   end;
   
-  TIterator = class(TObject)
-  public
-    function MoveNext: Boolean;
-    function GetCurrent: TPair;
-    property Current: TPair read GetCurrent;
-  end;
-
-function GetEnumerator: TIterator;
+  TEnumerator = class
+    private
+      FDictionary: TThreadSafeDictionary;
+      FCurrentBucket: Integer;
+      FCurrentEntry: PEntry;
+      FLockToken: ILockToken;
+      function GetCurrent: TPair<TKey, TValue>;
+    public
+      constructor Create(ADictionary: TThreadSafeDictionary);
+      destructor Destroy; override;
+      function MoveNext: Boolean;
+      property Current: TPair<TKey, TValue> read GetCurrent;
+    end;
+  
+function GetEnumerator: TEnumerator;
 ```
 
 #### Usage Example
 ```pascal
 var
   Dict: specialize TThreadSafeDictionary<string, integer>;
-  Pair: TPair;
+  Pair: specialize TPair<string, integer>;
 begin
   Dict := specialize TThreadSafeDictionary<string, integer>.Create;
   try
@@ -176,10 +187,11 @@ end;
 
 #### Iterator Characteristics
 - Returns key-value pairs during iteration
-- Thread-safe within single thread context
-- Uses read locks during iteration
+- Thread-safe through RAII locking
+- Automatic lock acquisition and release
+- Exception-safe lock management
 - Forward-only iteration
-- Protected from modifications during iteration (via read locks)
+- Protected from modifications during iteration (via RAII lock)
 - Other threads must wait for iteration to complete before modifying
 
 ### Navigation

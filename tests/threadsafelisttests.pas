@@ -5,7 +5,8 @@ unit ThreadSafeListTests;
 interface
 
 uses
-  Classes, SysUtils, fpcunit, testregistry, ThreadSafeCollections.List, DateUtils;
+  Classes, SysUtils, fpcunit, testregistry,
+  ThreadSafeCollections.List, DateUtils, ThreadSafeCollections.Interfaces;
 
 type
 
@@ -19,6 +20,18 @@ type
     constructor Create(AList: specialize TThreadSafeList<Integer>;
       AStartValue, AOperations: Integer);
     procedure Execute; override;
+  end;
+
+  // Add this type after other test thread types
+  TLockTestThread = class(TThread)
+  private
+    FList: specialize TThreadSafeList<Integer>;
+    FLockCount: Integer;
+    FIterations: Integer;
+  public
+    constructor Create(AList: specialize TThreadSafeList<Integer>; AIterations: Integer);
+    procedure Execute; override;
+    property LockCount: Integer read FLockCount;
   end;
 
   TThreadSafeListTest = class(TTestCase)
@@ -64,6 +77,9 @@ type
     procedure TestIterator;
     procedure TestIteratorThreadSafety;
     procedure TestIteratorExceptionSafety;
+
+    // Add this test method to TThreadSafeListTest published section
+    procedure TestLockingMechanism;
   end;
 
 implementation
@@ -102,6 +118,41 @@ begin
            // Ignore concurrent deletion errors
          end;
       2: FList.Find(FStartValue + Random(I + 1));
+    end;
+  end;
+end;
+
+{ TLockTestThread }
+
+constructor TLockTestThread.Create(AList: specialize TThreadSafeList<Integer>; AIterations: Integer);
+begin
+  inherited Create(True);
+  FList := AList;
+  FIterations := AIterations;
+  FLockCount := 0;
+  FreeOnTerminate := False;
+end;
+
+procedure TLockTestThread.Execute;
+var
+  I: Integer;
+  LockToken: ILockToken;
+begin
+  for I := 1 to FIterations do
+  begin
+    try
+      // Get lock token
+      LockToken := FList.Lock;
+      
+      // Simulate some work
+      Sleep(Random(2));
+      
+      // Lock will be automatically released when LockToken goes out of scope
+      Inc(FLockCount);
+    except
+      // Count failed lock attempts (should never happen)
+      on E: Exception do
+        WriteLn('Lock failed: ', E.Message);
     end;
   end;
 end;
@@ -728,6 +779,42 @@ begin
     on E: Exception do
       Fail('List should be accessible after iterator exception: ' + E.Message);
   end;
+end;
+
+procedure TThreadSafeListTest.TestLockingMechanism;
+const
+  THREAD_COUNT = 4;
+  ITERATIONS = 1000;
+var
+  Threads: array[0..THREAD_COUNT-1] of TLockTestThread;
+  I: Integer;
+  TotalLocks: Integer;
+  StartTime: TDateTime;
+begin
+  StartTime := Now;
+  
+  // Create threads that will acquire and release locks
+  for I := 0 to THREAD_COUNT-1 do
+  begin
+    Threads[I] := TLockTestThread.Create(FIntList, ITERATIONS);
+    Threads[I].Start;
+  end;
+  
+  // Wait for all threads to complete
+  TotalLocks := 0;
+  for I := 0 to THREAD_COUNT-1 do
+  begin
+    Threads[I].WaitFor;
+    TotalLocks := TotalLocks + Threads[I].LockCount;
+    Threads[I].Free;
+  end;
+  
+  // Verify results
+  AssertEquals('All lock attempts should succeed', 
+    THREAD_COUNT * ITERATIONS, TotalLocks);
+    
+  WriteLn(Format('Lock test took %d ms, %d successful locks across %d threads', 
+    [MilliSecondsBetween(Now, StartTime), TotalLocks, THREAD_COUNT]));
 end;
 
 initialization

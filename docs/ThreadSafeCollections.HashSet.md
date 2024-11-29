@@ -20,6 +20,21 @@ class TThreadSafeHashSet~T~ {
 +Contains(item: T): Boolean
 +Clear()
 +Count: Integer
++GetEnumerator(): TEnumerator
++Lock(): ILockToken
+}
+class TEnumerator {
+-FSet: TThreadSafeHashSet
+-FCurrentBucket: Integer
+-FCurrentEntry: PEntry
+-FLockToken: ILockToken
++Create()
++Destroy()
++MoveNext(): Boolean
++Current: T
+}
+class ILockToken {
+<<interface>>
 }
 class TThreadSafeHashSetInteger {
 +Create(initialCapacity)
@@ -38,6 +53,9 @@ TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetInteger
 TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetString
 TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetBoolean
 TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetReal
+TThreadSafeHashSet~T~ *-- TEnumerator : contains
+TEnumerator --> ILockToken : uses
+TThreadSafeHashSet~T~ --> ILockToken : creates
 ```
 
 
@@ -47,6 +65,8 @@ TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetReal
 - Separate chaining for collision handling
 - Generic implementation with specialized versions for common types
 - Custom hash function support (especially for testing)
+- RAII-style locking through interface counting
+- Thread-safe iteration support
 
 ### Iterator Support
 

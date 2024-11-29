@@ -6,7 +6,7 @@ unit ThreadSafeCollections.HashSet;
 interface
 
 uses
-  Classes, SysUtils, SyncObjs, HashFunctions, TypInfo;
+  Classes, SysUtils, SyncObjs, HashFunctions, TypInfo, ThreadSafeCollections.Interfaces;
 
 type
   // Function type for comparing two values of type T for equality
@@ -36,7 +36,7 @@ type
       FSet: TThreadSafeHashSet;
       FCurrentBucket: Integer;
       FCurrentEntry: PEntry;
-      FLockHeld: Boolean;
+      FLockToken: ILockToken;
     public
       constructor Create(ASet: TThreadSafeHashSet);
       destructor Destroy; override;
@@ -90,6 +90,8 @@ type
     
     { Iterator support }
     function GetEnumerator: TEnumerator;
+
+    function Lock: ILockToken;
   end;
 
   { Specialized hash set types with predefined hash and equality functions }
@@ -386,17 +388,14 @@ constructor TThreadSafeHashSet.TEnumerator.Create(ASet: TThreadSafeHashSet);
 begin
   inherited Create;
   FSet := ASet;
+  FLockToken := FSet.Lock;
   FCurrentBucket := -1;
   FCurrentEntry := nil;
-  FLockHeld := False;
-  FSet.FLock.Acquire;
-  FLockHeld := True;
 end;
 
 destructor TThreadSafeHashSet.TEnumerator.Destroy;
 begin
-  if FLockHeld then
-    FSet.FLock.Release;
+  FLockToken := nil; // Release lock
   inherited;
 end;
 
@@ -428,6 +427,11 @@ end;
 function TThreadSafeHashSet.GetEnumerator: TEnumerator;
 begin
   Result := TEnumerator.Create(Self);
+end;
+
+function TThreadSafeHashSet.Lock: ILockToken;
+begin
+  Result := TLockToken.Create(FLock);
 end;
 
 // Specialized types with their own constructors
