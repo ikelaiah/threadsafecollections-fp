@@ -39,7 +39,7 @@ type
       // Enumerator Class
       TEnumerator = class
       private
-        FList: TThreadSafeDeque;
+        FDeque: TThreadSafeDeque;
         FCurrent: T;
         FCurrentNode: PNode;
       public
@@ -305,21 +305,21 @@ end;
 constructor TThreadSafeDeque.TEnumerator.Create(AList: TThreadSafeDeque);
 begin
   inherited Create;
-  FList := AList;
-  FList.FLock.Acquire; // Acquire lock for safe iteration
+  FDeque := AList;
+  FDeque.FLock.Acquire; // Acquire lock for safe iteration
   FCurrentNode := nil;
 end;
 
 destructor TThreadSafeDeque.TEnumerator.Destroy;
 begin
-  FList.FLock.Release; // Release lock when done
+  FDeque.FLock.Release; // Release lock when done
   inherited Destroy;
 end;
 
 function TThreadSafeDeque.TEnumerator.MoveNext: Boolean;
 begin
   if FCurrentNode = nil then
-    FCurrentNode := FList.FHead
+    FCurrentNode := FDeque.FHead
   else
     FCurrentNode := FCurrentNode^.Next;
     
