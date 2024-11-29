@@ -172,14 +172,62 @@ end;
 ### Using ThreadSafeDeque
 
 ```pascal
-uses 
+uses
+  ThreadSafeCollections.Deque;
+
+var
+  Deque: specialize TThreadSafeDeque<string>;
+  Name: string;
+begin
+  Deque := specialize TThreadSafeDeque<string>.Create;
+  try
+    // Add items to the front and back
+    Deque.PushFront('Obed');
+    Deque.PushFront('Jesse');
+    Deque.PushBack('David');
+
+    // Remove items from the front and back
+    if Deque.TryPopFront(Name) then
+      WriteLn('Popped from front: ', Name);
+
+    if Deque.TryPopBack(Name) then
+      WriteLn('Popped from back: ', Name);
+  finally
+    Deque.Free;
+  end;
+
+// Other code
+
+end.
+```
+
+
+### Using ThreadSafeDeque with Custom Types
+
+```pascal
+{$modeSwitch advancedrecords}
+uses
   ThreadSafeCollections.Deque;
 
 type
   TPerson = record
     Name: string;
     Age: Integer;
+    public
+    constructor Create(NewName:string; NewAge:Integer);
+    class operator =(const a,b: TPerson): boolean;
   end;
+
+constructor TPerson.Create(NewName:string; NewAge:Integer);
+begin
+  self.Name := NewName;
+  self.Age:= NewAge;
+end;
+
+class operator TPerson.=(const a,b: TPerson): boolean;
+begin
+  Result := (a.Name = b.Name) and (a.Age = b.Age);
+end;
 
 var
   Deque: specialize TThreadSafeDeque<TPerson>;
@@ -200,7 +248,11 @@ begin
   finally
     Deque.Free;
   end;
-end;
+
+// other code
+
+end.
+
 ```
 
 ### Using ThreadSafeDictionary
