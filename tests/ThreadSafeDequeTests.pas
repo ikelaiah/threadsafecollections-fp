@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, fpcunit, testregistry,
-  ThreadSafeCollections.Deque, DateUtils;
+  ThreadSafeCollections.Deque, DateUtils, ThreadSafeCollections.Interfaces;
 
 type
   TIntegerDeque = specialize TThreadSafeDeque<Integer>;

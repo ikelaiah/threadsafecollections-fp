@@ -5,8 +5,8 @@ unit ThreadSafeDictionaryTests;
 interface
 
 uses
-  Classes, SysUtils, fpcunit, testregistry,
-  ThreadSafeCollections.Dictionary;
+  Classes, SysUtils, fpcunit, testregistry, DateUtils,
+  ThreadSafeCollections.Dictionary, ThreadSafeCollections.Interfaces;
 
 type
   TIntStringDictionary = specialize TThreadSafeDictionary<integer, string>;
@@ -93,6 +93,21 @@ type
     procedure TestIteratorModification;
     procedure TestMultipleIterators;
     procedure TestIteratorReset;
+
+    // RAII locking mechanism tests
+    procedure TestLockingMechanism;
+  end;
+
+  // Add this type after other test thread types
+  TLockTestThread = class(TThread)
+  private
+    FDict: TStringIntDictionary;
+    FLockCount: Integer;
+    FIterations: Integer;
+  public
+    constructor Create(ADict: TStringIntDictionary; AIterations: Integer);
+    procedure Execute; override;
+    property LockCount: Integer read FLockCount;
   end;
 
 implementation
@@ -1025,6 +1040,77 @@ begin
     begin
       WriteLn('TestIteratorReset failed: ', E.Message);
       raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.TestLockingMechanism;
+const
+  THREAD_COUNT = 4;
+  ITERATIONS = 1000;
+var
+  Threads: array[0..THREAD_COUNT-1] of TLockTestThread;
+  I: Integer;
+  TotalLocks: Integer;
+  StartTime: TDateTime;
+begin
+  StartTime := Now;
+  
+  // Create threads that will acquire and release locks
+  for I := 0 to THREAD_COUNT-1 do
+  begin
+    Threads[I] := TLockTestThread.Create(FStrDict, ITERATIONS);
+    Threads[I].Start;
+  end;
+  
+  // Wait for all threads to complete
+  TotalLocks := 0;
+  for I := 0 to THREAD_COUNT-1 do
+  begin
+    Threads[I].WaitFor;
+    TotalLocks := TotalLocks + Threads[I].LockCount;
+    Threads[I].Free;
+  end;
+  
+  // Verify results
+  AssertEquals('All lock attempts should succeed', 
+    THREAD_COUNT * ITERATIONS, TotalLocks);
+    
+  WriteLn(Format('Lock test took %d ms, %d successful locks across %d threads', 
+    [MilliSecondsBetween(Now, StartTime), TotalLocks, THREAD_COUNT]));
+end;
+
+{ TLockTestThread }
+
+constructor TLockTestThread.Create(ADict: TStringIntDictionary; AIterations: Integer);
+begin
+  inherited Create(True);
+  FDict := ADict;
+  FIterations := AIterations;
+  FLockCount := 0;
+  FreeOnTerminate := False;
+end;
+
+procedure TLockTestThread.Execute;
+var
+  I: Integer;
+  LockToken: ILockToken;
+begin
+  for I := 1 to FIterations do
+  begin
+    try
+      // Get lock token
+      LockToken := FDict.Lock;
+      
+      // Simulate some work
+      Sleep(Random(2));
+      
+      // Lock will be automatically released when LockToken goes out of scope
+      Inc(FLockCount);
+    except
+      // Count failed lock attempts (should never happen)
+      on E: Exception do
+        WriteLn('Lock failed: ', E.Message);
     end;
   end;
 end;
