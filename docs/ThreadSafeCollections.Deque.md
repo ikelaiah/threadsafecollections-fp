@@ -1,16 +1,160 @@
 # ThreadSafeCollections.Deque API Documentation
 
-## Overview
+## Component Diagram
 
-A thread-safe double-ended queue (deque) implementation for Free Pascal, supporting generic types and concurrent access.
+```mermaid
+classDiagram
+    class TThreadSafeDeque~T~ {
+        -FHead: PNode
+        -FTail: PNode
+        -FCount: Integer
+        -FLock: TCriticalSection
+        +Create()
+        +Destroy()
+        +PushFront(Item: T)
+        +PushBack(Item: T)
+        +PopFront(): T
+        +PopBack(): T
+        +TryPopFront(out Value: T): Boolean
+        +TryPopBack(out Value: T): Boolean
+        +PeekFront(): T
+        +PeekBack(): T
+        +TryPeekFront(out Value: T): Boolean
+        +TryPeekBack(out Value: T): Boolean
+        +Clear()
+        +IsEmpty(): Boolean
+        +Contains(Item: T): Boolean
+        +ToArray(): TArray~T~
+        +CopyTo(var Arr: array of T)
+        +PushRangeBack(Items: array of T)
+        +PushRangeFront(Items: array of T)
+        +GetEnumerator(): TEnumerator
+        +Count: Integer
+    }
+    class TDequeNode~T~ {
+        +Data: T
+        +Next: ^TDequeNode~T~
+        +Prev: ^TDequeNode~T~
+    }
+    class TEnumerator {
+        -FDeque: TThreadSafeDeque~T~
+        -FCurrent: T
+        -FCurrentNode: PNode
+        +Create(ADeque: TThreadSafeDeque~T~)
+        +Destroy()
+        +MoveNext(): Boolean
+        +Current: T
+    }
+    class TLockToken {
+        -FLock: TCriticalSection
+        +Create(ALock: TCriticalSection)
+        +Destroy()
+    }
+    TThreadSafeDeque ..> TDequeNode : contains
+    TThreadSafeDeque ..> TEnumerator : creates
+    TThreadSafeDeque ..> TLockToken : uses
+    TEnumerator --> TThreadSafeDeque : references
+```
+
+## Core Components
+
+### TDequeNode<T>
+Internal node structure for the deque:
+- Data: Generic type T
+- Next: Pointer to next node
+- Prev: Pointer to previous node
+- Used for doubly-linked list implementation
+
+### TThreadSafeDeque<T>
+Thread-safe double-ended queue implementation with built-in synchronization.
+
+#### Properties
+- `Count: Integer` - Number of elements in the deque
+- `IsEmpty: Boolean` - Quick check for empty state
+
+#### Thread Safety Features
+- All public methods are protected by `TCriticalSection`
+- Automatic locking/unlocking for all operations
+- Exception-safe lock management
+- RAII pattern for iterator locking
+
+#### Methods
+
+##### Constructor
+```pascal
+constructor Create;
+```
+- Creates new empty deque
+- Initializes internal lock
+
+##### Basic Operations
+```pascal
+procedure PushFront(const Item: T);
+procedure PushBack(const Item: T);
+function PopFront: T;
+function PopBack: T;
+```
+
+##### Safe Operations
+```pascal
+function TryPopFront(out AValue: T): Boolean;
+function TryPopBack(out AValue: T): Boolean;
+function TryPeekFront(out AValue: T): Boolean;
+function TryPeekBack(out AValue: T): Boolean;
+```
+
+##### Bulk Operations
+```pascal
+procedure PushRangeBack(const AItems: array of T);
+procedure PushRangeFront(const AItems: array of T);
+procedure CopyTo(var AArray: array of T; AStartIndex: Integer = 0);
+function ToArray: specialize TArray<T>;
+```
+
+### Iterator Support
+```pascal
+type
+  TEnumerator = class
+  private
+    FDeque: TThreadSafeDeque;
+    FCurrent: T;
+    FCurrentNode: PNode;
+  public
+    constructor Create(ADeque: TThreadSafeDeque);
+    destructor Destroy; override;
+    function MoveNext: Boolean;
+    property Current: T read FCurrent;
+  end;
+
+function GetEnumerator: TEnumerator;
+```
+
+#### Usage Example
+```pascal
+var
+  Deque: specialize TThreadSafeDeque<Integer>;
+  Item: Integer;
+begin
+  Deque := specialize TThreadSafeDeque<Integer>.Create;
+  try
+    Deque.PushBack(1);
+    Deque.PushBack(2);
+    
+    // Using iterator
+    for Item in Deque do
+      WriteLn(Item);
+  finally
+    Deque.Free;
+  end;
+end;
+```
 
 ## Design Decisions
 
-### FPC 3.2.2 Limitations and Solutions
-
+### FPC 3.2.2 Compatibility
 1. **Generic Type Forward Declarations**
-   - FPC 3.2.2 does not support forward declarations of generic types
-   - Solution: Nested type declarations within the main generic class
+   - FPC 3.2.2 limitation: No support for generic type forward declarations
+   - Solution: Nested type declarations within main class
    ```pascal
    generic TThreadSafeDeque<T> = class
    private
@@ -19,210 +163,78 @@ A thread-safe double-ended queue (deque) implementation for Free Pascal, support
          Data: T;
          Next, Prev: ^TDequeNode;
        end;
-       PNode = ^TDequeNode;
    ```
 
 2. **Node Structure**
-   - Simplified pointer declarations using nested types
-   - Avoids complex generic type references
    - Self-contained type definitions
+   - Simplified pointer declarations
+   - Avoids complex generic type references
 
-### Thread Safety Features
-
-1. **Critical Section Locking**
-   ```pascal
-   FLock: TCriticalSection;
-   ```
-   - All public operations are protected
-   - Automatic lock cleanup through try-finally blocks
-
-2. **RAII Lock Pattern**
-   ```pascal
-   TLockToken = class(TInterfacedObject)
-   private
-     FLock: TCriticalSection;
-   public
-     constructor Create(ALock: TCriticalSection);
-     destructor Destroy; override;
-   end;
-   ```
-   - Automatic lock release through interface reference counting
-   - Used for safe iteration
-
-## Core Components
-
-### Node Structure
-```pascal
-TDequeNode = record
-  Data: T;
-  Next, Prev: ^TDequeNode;
-end;
-```
-- Doubly-linked structure
-- Generic data storage
-- Internal pointer management
-
-### Iterator Support
-```pascal
-TEnumerator = class
-private
-  FDeque: TThreadSafeDeque;
-  FCurrent: T;
-  FCurrentNode: PNode;
-public
-  constructor Create(AList: TThreadSafeDeque);
-  destructor Destroy; override;
-  function MoveNext: Boolean;
-  property Current: T read FCurrent;
-end;
-```
-- Thread-safe iteration
-- Automatic lock management
-- Forward-only traversal
-
-## Public Interface
-
-### Basic Operations
-
-```pascal
-procedure PushFront(const AItem: T);
-procedure PushBack(const AItem: T);
-function PopFront: T;
-function PopBack: T;
-```
-
-### Safe Operations
-```pascal
-function TryPopFront(out AValue: T): Boolean;
-function TryPopBack(out AValue: T): Boolean;
-function TryPeekFront(out AValue: T): Boolean;
-function TryPeekBack(out AValue: T): Boolean;
-```
-
-### Bulk Operations
-```pascal
-procedure PushRangeBack(const AItems: array of T);
-procedure PushRangeFront(const AItems: array of T);
-procedure CopyTo(var AArray: array of T; AStartIndex: Integer = 0);
-function ToArray: specialize TArray<T>;
-```
-
-### Query Operations
-```pascal
-function IsEmpty: Boolean;
-function Contains(const AItem: T): Boolean;
-property Count: Integer read FCount;
-```
-
-## Thread Safety Guarantees
-
-1. **Operation Atomicity**
-   - All public methods are atomic
-   - Protected by critical section
-   - Exception-safe locking
+### Thread Safety Implementation
+1. **Critical Section**
+   - Single lock for all operations
+   - RAII pattern through TLockToken
+   - Exception-safe lock management
 
 2. **Iterator Safety**
+   - Lock held during entire iteration
+   - Automatic lock release via destructor
    - Thread-safe enumeration
-   - Holds lock during iteration
-   - Automatic lock release
-
-3. **Memory Management**
-   - Safe node allocation/deallocation
-   - No memory leaks in error conditions
-   - Clean cleanup in destructor
-
-## Usage Examples
-
-### Basic Usage
-```pascal
-var
-  Deque: specialize TThreadSafeDeque<Integer>;
-begin
-  Deque := specialize TThreadSafeDeque<Integer>.Create;
-  try
-    Deque.PushBack(1);
-    Deque.PushFront(2);
-    // ... use deque ...
-  finally
-    Deque.Free;
-  end;
-end;
-```
-
-### Thread-Safe Iteration
-```pascal
-var
-  Item: Integer;
-begin
-  for Item in Deque do
-    WriteLn(Item);
-end;
-```
-
-### Safe Operations
-```pascal
-var
-  Value: Integer;
-begin
-  if Deque.TryPopFront(Value) then
-    WriteLn('Got value: ', Value)
-  else
-    WriteLn('Deque is empty');
-end;
-```
 
 ## Performance Considerations
 
 1. **Lock Contention**
-   - Single lock for all operations
-   - May impact performance under high concurrency
-   - Consider operation grouping for better throughput
+   - Single lock strategy
+   - All operations mutually exclusive
+   - May impact concurrent performance
 
-2. **Memory Allocation**
-   - Dynamic node allocation for each item
-   - No pre-allocation or pooling
-   - Consider bulk operations for better performance
+2. **Memory Management**
+   - Dynamic node allocation
+   - No pre-allocation
+   - Node cleanup in Clear/Destroy
 
 3. **Iterator Performance**
-   - Holds lock during entire iteration
-   - May block other threads
-   - Use ToArray for snapshot iteration
+   - Holds lock during iteration
+   - Forward-only traversal
+   - Consider ToArray for snapshots
 
 ## Known Limitations
 
 1. **No Bulk Remove**
    - Individual removal only
-   - No range removal operations
-   - Consider clear and rebuild if needed
+   - No range removal
+   - Clear and rebuild if needed
 
 2. **No Capacity Control**
-   - No maximum size limit
-   - No memory usage control
-   - Monitor usage in memory-constrained environments
+   - Unlimited growth
+   - No memory limits
+   - Monitor usage in constrained environments
 
 3. **Single Lock**
-   - All operations mutually exclusive
+   - All operations exclusive
    - No reader/writer separation
-   - May impact concurrent read performance
+   - May impact read performance
 
 ## Thread Safety Testing
 
-The implementation includes comprehensive multi-threading tests:
-- Concurrent push/pop operations
-- Multiple threads accessing simultaneously
-- Random delays to increase contention
-- Data integrity verification
-- Sum verification across operations
+The implementation includes comprehensive tests:
+```pascal
+procedure TestMultiThreadPushPop;
+const
+  THREAD_COUNT = 4;
+  ITEMS_PER_THREAD = 1000;
+  ITERATIONS = 10;
+```
 
-Example test output:
+Test characteristics:
+- Multiple concurrent threads
+- Mixed operations (push/pop)
+- Random delays for contention
+- Data integrity verification
+- Sum verification
+
+Example output:
 ```
 Test took 30819 ms with 4 threads doing 10 iterations each
-All 11 tests passed successfully
+All tests passed successfully
 ```
-
-## Version History
-
-- 1.0.0: Initial implementation
-  - Basic thread-safe operations
-  - Iterator support
-  - FPC 3.2.2 compatibility 
