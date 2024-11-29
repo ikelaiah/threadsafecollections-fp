@@ -22,12 +22,34 @@ class TThreadSafeList~T~ {
   +Last(): T
   +IsSorted(): Boolean
   +Items[Index: Integer]: T
+  +GetEnumerator(): TEnumerator
+  +Lock(): ILockToken
 }
+
+class TEnumerator {
+  -FList: TThreadSafeList
+  -FIndex: Integer
+  -FCurrent: T
+  -FLockToken: ILockToken
+  +Create()
+  +Destroy()
+  +MoveNext(): Boolean
+  +Current: T
+}
+
+class ILockToken {
+  <<interface>>
+}
+
 class TComparer~T~ {
   <<function>>
   +Compare(A: T, B: T): Integer
 }
+
 TThreadSafeList ..> TComparer : uses
+TThreadSafeList *-- TEnumerator : contains
+TEnumerator --> ILockToken : uses
+TThreadSafeList --> ILockToken : creates
 ```
     
 ## Core Components
@@ -165,10 +187,11 @@ end;
 ```
 
 #### Iterator Characteristics
-- Thread-safe within single thread context
-- Uses read locks during iteration
+- Thread-safe through RAII locking
+- Automatic lock acquisition and release
+- Exception-safe lock management
 - Forward-only iteration
-- Protected from modifications during iteration (via read locks)
+- Protected from modifications during iteration (via RAII lock)
 - Other threads must wait for iteration to complete before modifying
 
 ## Built-in Comparers
@@ -239,10 +262,10 @@ end;
 
 ## Known Limitations
 
-1. **No Iterator Support**
-   - No built-in mechanism for safe iteration
-   - No foreach-style enumeration
-   - Must access items individually via index
+1. **Iterator Limitations**
+   - Forward-only iteration
+   - No concurrent modification detection
+   - Must wait for iteration to complete before modifying
 
 2. **No Bulk Operations**
    - No batch Add/Delete operations
