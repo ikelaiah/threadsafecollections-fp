@@ -4,11 +4,12 @@ program TestRunner;
 
 uses
   Classes
-  , consoletestrunner, testutils, DateUtils, SysUtils
+  , consoletestrunner, testutils, testregistry, DateUtils, SysUtils
   , ThreadSafeListTests
   , ThreadSafeListStudentTests
   , ThreadSafeDictionaryTests
-  , ThreadSafeHashSetTests, testregistry;
+  , ThreadSafeHashSetTests
+  , ThreadSafeDequeTests;
 
 type
 
@@ -30,7 +31,7 @@ end;
 
 var
   Application: TMyTestRunner;
-  i:integer;
+
 begin
   try
     WriteLn('Starting test runner...');

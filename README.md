@@ -17,12 +17,13 @@ Current State:
 - ✅ Basic operations working (Add, Remove, Find)
 - ✅ Thread safety verified through testing
 - ✅ Memory management stable
-- ✅ Basic iterator support implemented for List, Dictionary, and HashSet
+- ✅ Basic iterator support implemented for List, Deque, Dictionary and HashSet
 - ❌ Limited bulk operations
 - ❌ Performance not yet optimized
 
 Planned Features:
-- 🔄 Advanced iterator features
+- 🔄 Better iterator features 
+- 🔄 Better naming conventions of methods
 - 🔄 Bulk operations
 - 🔄 Performance optimizations
 - 🔄 More specialized types
@@ -36,7 +37,7 @@ Planned Features:
 
 ## 🎓 Getting Started
 
-This library provides three main collection types:
+This library provides four main collection types:
 
 1. **ThreadSafeList**: Like an array that can grow
    ```pascal
@@ -52,7 +53,24 @@ This library provides three main collection types:
    end;
    ```
 
-2. **ThreadSafeDictionary**: Store key-value pairs
+2. **ThreadSafeDeque**: A double-ended queue
+  ```pascal
+  var
+    Deque: specialize TThreadSafeDeque<Integer>;
+  begin
+    Deque := specialize TThreadSafeDeque<Integer>.Create;
+    try
+      Deque.PushBack(1);
+      Deque.PushFront(2);
+      WriteLn('Front item: ', Deque.PopFront);
+      WriteLn('Back item: ', Deque.PopBack);
+    finally
+      Deque.Free;
+    end;
+  end;
+  ```
+
+3. **ThreadSafeDictionary**: Store key-value pairs
    ```pascal
    var
      Dict: specialize TThreadSafeDictionary<string, integer>;
@@ -66,7 +84,7 @@ This library provides three main collection types:
    end;
    ```
 
-3. **ThreadSafeHashSet**: Store unique values
+4. **ThreadSafeHashSet**: Store unique values
    ```pascal
    var
      UniqueNames: TThreadSafeHashSetString;
@@ -80,6 +98,8 @@ This library provides three main collection types:
    end;
    ```
 
+
+
 > [!TIP]
 > Always use try-finally blocks to ensure proper cleanup:
 > ```pascal
@@ -92,10 +112,10 @@ This library provides three main collection types:
 
 ## ✨ Features
 
-- 🛡️ Thread-safe List, Dictionary, and HashSet implementations
+- 🛡️ Thread-safe List, Deque, Dictionary and HashSet implementations
 - 🚀 Generic type support (Integer, String, Real, Boolean, Records)
 - 📦 Built-in comparers and hash functions
-- 🔐 Automatic locking mechanism with TCriticalSection
+- 🔐 Automatic locking mechanism with `TCriticalSection`
 - 🎯 Exception-safe resource management
 - 🧪 Comprehensive test suite with collision testing
 - ⚡ Optimized performance for common operations
@@ -161,6 +181,41 @@ begin
   end;
 end;
 ```
+
+### Using ThreadSafeDeque
+
+```pascal
+uses 
+  ThreadSafeCollections.Deque;
+
+type
+  TPerson = record
+    Name: string;
+    Age: Integer;
+  end;
+
+var
+  Deque: specialize TThreadSafeDeque<TPerson>;
+  Person: TPerson;
+begin
+  Deque := specialize TThreadSafeDeque<TPerson>.Create;
+  try
+    // Add items to the front and back
+    Deque.PushFront(TPerson.Create('Alice', 30));
+    Deque.PushBack(TPerson.Create('Bob', 25));
+
+    // Remove items from the front and back
+    if Deque.TryPopFront(Person) then
+      WriteLn('Popped from front: ', Person.Name);
+
+    if Deque.TryPopBack(Person) then
+      WriteLn('Popped from back: ', Person.Name);
+  finally
+    Deque.Free;
+  end;
+end;
+```
+
 ### Using ThreadSafeDictionary
 
 ```pascal
@@ -183,7 +238,6 @@ begin
   end;
 end;
 ```
-
 
 ### Using ThreadSafeHashSet
 
@@ -257,6 +311,8 @@ begin
 end;
 ```
 
+
+
 ## 📚 Collection Types
 
 ### TThreadSafeList<T>
@@ -266,6 +322,12 @@ end;
 - Built-in comparers for Integer, String, Boolean, Real
 - Exception-safe operations
 - Index-based access
+
+### TThreadSafeDeque<T>
+- Thread-safe generic deque
+- Basic iterator support for single-threaded scenarios
+- Double-ended queue operations
+- Exception-safe operations
 
 ### TThreadSafeDictionary<TKey, TValue>
 - Thread-safe generic dictionary
@@ -354,6 +416,7 @@ end;
 ## 📚 Documentation
 
 - [ThreadSafeCollections.List.md](docs/ThreadSafeCollections.List.md)
+- [ThreadSafeCollections.Deque.md](docs/ThreadSafeCollections.Deque.md)
 - [ThreadSafeCollections.Dictionary.md](docs/ThreadSafeCollections.Dictionary.md)
 - [ThreadSafeCollections.HashSet.md](docs/ThreadSafeCollections.HashSet.md)
 
