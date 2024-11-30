@@ -2,6 +2,7 @@ program DequeWithCustomType;
 
 {$mode objfpc}{$H+}{$J-}
 {$modeSwitch advancedrecords}
+
 uses
   ThreadSafeCollections.Deque;
 
@@ -10,19 +11,13 @@ type
     Name: string;
     Age: Integer;
     public
-    constructor Create(NewName:string; NewAge:Integer);
-    class operator =(const a,b: TPerson): boolean;
+    constructor Create(NewName: string; NewAge: Integer);
   end;
 
-constructor TPerson.Create(NewName:string; NewAge:Integer);
+constructor TPerson.Create(NewName: string; NewAge: Integer);
 begin
-  self.Name := NewName;
-  self.Age:= NewAge;
-end;
-
-class operator TPerson.=(const a,b: TPerson): boolean;
-begin
-  Result := (a.Name = b.Name) and (a.Age = b.Age);
+  Name := NewName;
+  Age := NewAge;
 end;
 
 var

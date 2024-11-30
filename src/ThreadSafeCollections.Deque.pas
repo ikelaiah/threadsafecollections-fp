@@ -31,14 +31,15 @@ type
       TEnumerator = class
       private
         FDeque: TThreadSafeDeque;
-        FCurrent: T;
         FCurrentNode: PNode;
+        FCurrent: T;
         FLockToken: ILockToken;
+        function GetCurrent: T;
       public
         constructor Create(ADeque: TThreadSafeDeque);
         destructor Destroy; override;
         function MoveNext: Boolean;
-        property Current: T read FCurrent;
+        property Current: T read GetCurrent;
       end;
 
     constructor Create;
@@ -75,9 +76,6 @@ type
     
     // Convert to array
     function ToArray: specialize TArray<T>;
-    
-    // Find an item
-    function Contains(const AItem: T): Boolean;
     
     // Copy all items to an array
     procedure CopyTo(var AArray: array of T; AStartIndex: Integer = 0);
@@ -320,6 +318,13 @@ begin
     FCurrent := FCurrentNode^.Data;
 end;
 
+function TThreadSafeDeque.TEnumerator.GetCurrent: T;
+begin
+  if FCurrentNode = nil then
+    raise Exception.Create('Invalid enumerator position');
+  Result := FCurrentNode^.Data;
+end;
+
 function TThreadSafeDeque.GetEnumerator: TEnumerator;
 begin
   Result := TEnumerator.Create(Self);
@@ -355,28 +360,6 @@ begin
       Result[I] := Current^.Data;
       Current := Current^.Next;
       Inc(I);
-    end;
-  finally
-    FLock.Release;
-  end;
-end;
-
-function TThreadSafeDeque.Contains(const AItem: T): Boolean;
-var
-  Current: PNode;
-begin
-  Result := False;
-  FLock.Acquire;
-  try
-    Current := FHead;
-    while Current <> nil do
-    begin
-      if Current^.Data = AItem then
-      begin
-        Result := True;
-        Break;
-      end;
-      Current := Current^.Next;
     end;
   finally
     FLock.Release;

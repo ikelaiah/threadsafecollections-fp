@@ -26,7 +26,6 @@ type
     procedure TestTryOperations;
     procedure TestIsEmpty;
     procedure TestToArray;
-    procedure TestContains;
     procedure TestPushRange;
     procedure TestMultiThreadPushPop;
     procedure TestLockingMechanism;
@@ -167,16 +166,6 @@ begin
   AssertEquals('First element should be 1', 1, Arr[0]);
   AssertEquals('Second element should be 2', 2, Arr[1]);
   AssertEquals('Third element should be 3', 3, Arr[2]);
-end;
-
-procedure TThreadSafeDequeTests.TestContains;
-begin
-  FDeque.PushBack(1);
-  FDeque.PushBack(2);
-  
-  AssertTrue('Should contain 1', FDeque.Contains(1));
-  AssertTrue('Should contain 2', FDeque.Contains(2));
-  AssertFalse('Should not contain 3', FDeque.Contains(3));
 end;
 
 procedure TThreadSafeDequeTests.TestPushRange;
