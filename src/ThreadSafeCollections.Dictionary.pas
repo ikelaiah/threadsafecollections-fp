@@ -31,12 +31,15 @@ type
     Next: ^TDictionaryEntry;
   end;
 
-
-  generic TPair<TKey, TValue> = record
+  // First declare TDictionaryPair
+  generic TDictionaryPair<TKey, TValue> = record
     Key: TKey;
     Value: TValue;
   end;
 
+  // Then declare hash function types
+  generic THashFunction<T> = function(const Key: T): Cardinal;
+  generic TEqualityComparison<T> = function(const Left, Right: T): Boolean;
 
   {
     TThreadSafeDictionary: Thread-safe generic dictionary implementation
@@ -62,12 +65,12 @@ type
       FCurrentBucket: Integer;
       FCurrentEntry: PEntry;
       FLockToken: ILockToken;
-      function GetCurrent: specialize TPair<TKey, TValue>;
+      function GetCurrent: specialize TDictionaryPair<TKey, TValue>;
     public
       constructor Create(ADictionary: TThreadSafeDictionary);
       destructor Destroy; override;
       function MoveNext: Boolean;
-      property Current: specialize TPair<TKey, TValue> read GetCurrent;
+      property Current: specialize TDictionaryPair<TKey, TValue> read GetCurrent;
     end;
 
   private
@@ -80,6 +83,8 @@ type
     FLock: TCriticalSection;     // Thread synchronization
     FBuckets: array of PEntry;   // Array of bucket heads
     FCount: integer;             // Number of items in dictionary
+    FHashFunc: specialize THashFunction<TKey>;
+    FEqualityComparer: specialize TEqualityComparison<TKey>;
 
     { Internal methods for hash table operations }
     function GetHashValue(const Key: TKey): cardinal;
@@ -88,9 +93,14 @@ type
     procedure CheckLoadFactor;
     function FindEntry(const Key: TKey; Hash: cardinal; BucketIdx: integer): PEntry;
     function GetNextPowerOfTwo(Value: integer): integer;
+    function CompareKeys(const Left, Right: TKey): Boolean;
   public
     constructor Create;
-    constructor Create(InitialCapacity: integer); overload;
+    constructor Create(const AHashFunc: specialize THashFunction<TKey> = nil;
+                      const AEqualityComparer: specialize TEqualityComparison<TKey> = nil);
+    constructor Create(InitialCapacity: integer;
+                      const AHashFunc: specialize THashFunction<TKey> = nil;
+                      const AEqualityComparer: specialize TEqualityComparison<TKey> = nil);
     destructor Destroy; override;
 
     procedure Add(const Key: TKey; const Value: TValue);
@@ -111,7 +121,6 @@ type
     function GetEnumerator: TEnumerator;
     function Lock: ILockToken;
   end;
-
 
 implementation
 
@@ -147,19 +156,35 @@ end;
   Parameters:
   - InitialCapacity: Desired initial bucket count
 }
-constructor TThreadSafeDictionary.Create(InitialCapacity: integer);
+constructor TThreadSafeDictionary.Create(const AHashFunc: specialize THashFunction<TKey> = nil;
+                                        const AEqualityComparer: specialize TEqualityComparison<TKey> = nil);
+begin
+  Create(INITIAL_BUCKET_COUNT, AHashFunc, AEqualityComparer);
+end;
+
+{
+  Create: Constructor with initial capacity
+  - Adjusts capacity to next power of 2
+  - Ensures minimum bucket count
+  
+  Parameters:
+  - InitialCapacity: Desired initial bucket count
+}
+constructor TThreadSafeDictionary.Create(InitialCapacity: integer;
+                                       const AHashFunc: specialize THashFunction<TKey> = nil;
+                                       const AEqualityComparer: specialize TEqualityComparison<TKey> = nil);
 var
   AdjustedSize: integer;
 begin
   inherited Create;
   FLock := TCriticalSection.Create;
   
+  // Store the custom functions or use defaults
+  FHashFunc := AHashFunc;
+  FEqualityComparer := AEqualityComparer;
+  
   // Ensure power of 2 and minimum size
   AdjustedSize := GetNextPowerOfTwo(InitialCapacity);
-  if DEBUG_LOGGING then
-    WriteLn(Format('Create: Adjusted initial capacity from %d to %d',
-        [InitialCapacity, AdjustedSize]));
-        
   SetLength(FBuckets, AdjustedSize);
   FCount := 0;
 end;
@@ -238,37 +263,22 @@ end;
   - Always returns a positive value (masked with $7FFFFFFF)
 }
 function TThreadSafeDictionary.GetHashValue(const Key: TKey): cardinal;
-var
-  S: string;
-  I: integer;
-  RawHash: cardinal;
 begin
-  // Type-specific hash calculation
-  if TypeInfo(TKey) = TypeInfo(string) then
-  begin
-    S := string((@Key)^);
-    RawHash := XXHash32(S);
-    if DEBUG_LOGGING then WriteLn(Format('GetHashValue: Raw hash for string "%s": %d',
-        [S, integer(RawHash)]));
-  end
-  else if TypeInfo(TKey) = TypeInfo(integer) then
-  begin
-    I := integer((@Key)^);
-    RawHash := MultiplicativeHash(cardinal(I));
-    if DEBUG_LOGGING then WriteLn(Format('GetHashValue: Raw hash for int %d: %d',
-        [I, integer(RawHash)]));
-  end
+  // Use custom hash function if provided
+  if Assigned(FHashFunc) then
+    Result := FHashFunc(Key)
   else
   begin
-    RawHash := DefaultHash(Key);
-    if DEBUG_LOGGING then WriteLn(Format('GetHashValue: Raw hash for other type: %d',
-        [integer(RawHash)]));
+    // Original type-specific hash logic
+    if TypeInfo(TKey) = TypeInfo(string) then
+      Result := XXHash32(string((@Key)^))
+    else if TypeInfo(TKey) = TypeInfo(integer) then
+      Result := MultiplicativeHash(cardinal(integer((@Key)^)))
+    else
+      Result := DefaultHash(Key);
   end;
   
-  // Ensure positive hash value
-  Result := RawHash and $7FFFFFFF;
-  if DEBUG_LOGGING then WriteLn(Format('GetHashValue: Masked hash: %d',
-      [integer(Result)]));
+  Result := Result and $7FFFFFFF; // Ensure positive
 end;
 
 {
@@ -375,7 +385,7 @@ begin
   Entry := FBuckets[BucketIdx];
   while Entry <> nil do
   begin
-    if (Entry^.Hash = Hash) and (Entry^.Key = Key) then
+    if (Entry^.Hash = Hash) and CompareKeys(Entry^.Key, Key) then
       Exit(Entry);
     Entry := Entry^.Next;
   end;
@@ -493,7 +503,7 @@ begin
 
     while Entry <> nil do
     begin
-      if (Entry^.Hash = Hash) and (Entry^.Key = Key) then
+      if (Entry^.Hash = Hash) and CompareKeys(Entry^.Key, Key) then
       begin
         if Prev = nil then
           FBuckets[BucketIdx] := Entry^.Next
@@ -721,7 +731,7 @@ begin
   inherited;
 end;
 
-function TThreadSafeDictionary.TEnumerator.GetCurrent: specialize TPair<TKey, TValue>;
+function TThreadSafeDictionary.TEnumerator.GetCurrent: specialize TDictionaryPair<TKey, TValue>;
 begin
   if FCurrentEntry = nil then
     raise Exception.Create('Invalid enumerator position');
@@ -766,6 +776,15 @@ end;
 function TThreadSafeDictionary.Lock: ILockToken;
 begin
   Result := TLockToken.Create(FLock);
+end;
+
+{ Helper function to compare keys safely }
+function TThreadSafeDictionary.CompareKeys(const Left, Right: TKey): Boolean;
+begin
+  if Assigned(FEqualityComparer) then
+    Result := FEqualityComparer(Left, Right)
+  else
+    Result := CompareByte(Left, Right, SizeOf(TKey)) = 0;
 end;
 
 end.
