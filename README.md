@@ -205,7 +205,7 @@ end.
 ### Using ThreadSafeDeque with Custom Types
 
 ```pascal
-{$mode objfpc}{$H+}
+{$mode objfpc}{$H+}{$J-}
 {$modeswitch advancedrecords}
 
 uses
@@ -372,7 +372,7 @@ end;
    ```pascal
    program YourProject;
    
-   {$mode objfpc}{$H+}
+   {$mode objfpc}{$H+}{$J-}
    {$UNITPATH path/to/ThreadSafeCollections-FP/src}
    
    uses
@@ -387,7 +387,7 @@ Create a simple test program:
 ```pascal
 program TestInstall;
 
-{$mode objfpc}{$H+}
+{$mode objfpc}{$H+}{$J-}
 
 uses
   ThreadSafeCollections.List;

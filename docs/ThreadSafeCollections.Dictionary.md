@@ -317,10 +317,9 @@ end;
 
 ## Known Limitations
 
-1. No iterator support
-2. First/Last operations are not order-preserving
-3. No bulk operations
-4. No concurrent iteration support
+1. First/Last operations are not order-preserving
+2. No bulk operations
+3. No concurrent iteration support
 
 ## Debugging
 
@@ -329,10 +328,3 @@ Set `DEBUG_LOGGING := True` for detailed operation logging:
 const
   DEBUG_LOGGING = True;  // Enable debug output
 ```
-
-## Version History
-
-- 0.1.0: Initial implementation
-  - Basic thread-safe operations
-  - Separate chaining
-  - Dynamic resizing

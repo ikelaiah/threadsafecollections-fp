@@ -309,9 +309,3 @@ end;
    - Initial capacity starts at 0
    - Grows by doubling (4, 8, 16, etc.)
    - No way to preset optimal capacity
-
-## Version History
-
-- 0.1.0: Initial implementation
-  - Basic thread-safe operations
-  - Dynamic resizing
