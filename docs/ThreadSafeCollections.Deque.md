@@ -239,3 +239,29 @@ Example output:
 Test took 30819 ms with 4 threads doing 10 iterations each
 All tests passed successfully
 ```
+
+## Release Notes
+
+### 2024-11-30
+
+Closer to C++ STL std::deque operations:
+
+Core operations:
+- Push/pop at both ends (push_front, push_back, pop_front, pop_back)
+- Access elements (front, back)
+- Size operations (size, empty)
+- Modifiers (clear)
+- Iterator support
+
+Our implementation now aligns well with this standard design, focusing on the essential deque operations. We've kept:
+- Core push/pop operations (PushFront, PushBack, PopFront, PopBack)
+- Safe variants (TryPopFront, TryPopBack, TryPeekFront, TryPeekBack)
+- Size operations (Count, IsEmpty)
+- Clear operation
+- Iterator support (GetEnumerator)
+
+Plus we've added some convenient bulk operations (PushRangeBack, PushRangeFront) and array conversion (ToArray, CopyTo).
+
+The removal of `Contains` makes the implementation both simpler and more aligned with the standard deque concept in C++. 
+
+If users need to search for elements, they can use the iterator to implement their own search logic based on their specific needs.
