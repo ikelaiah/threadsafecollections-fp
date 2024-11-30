@@ -1,7 +1,6 @@
 program SimpleDeque;
 
 {$mode objfpc}{$H+}{$J-}
-{$modeSwitch advancedrecords}
 uses
   ThreadSafeCollections.Deque;
 
@@ -15,6 +14,7 @@ begin
     Deque.PushFront('Obed');
     Deque.PushFront('Jesse');
     Deque.PushBack('David');
+    Deque.PushBack('Jonathan');
 
     // Remove items from the front and back
     if Deque.TryPopFront(Name) then

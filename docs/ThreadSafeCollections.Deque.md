@@ -23,7 +23,6 @@ classDiagram
         +TryPeekBack(out Value: T): Boolean
         +Clear()
         +IsEmpty(): Boolean
-        +Contains(Item: T): Boolean
         +ToArray(): TArray~T~
         +CopyTo(var Arr: array of T)
         +PushRangeBack(Items: array of T)
@@ -40,6 +39,8 @@ classDiagram
         -FDeque: TThreadSafeDeque~T~
         -FCurrent: T
         -FCurrentNode: PNode
+        -FLockToken: ILockToken
+        -GetCurrent(): T
         +Create(ADeque: TThreadSafeDeque~T~)
         +Destroy()
         +MoveNext(): Boolean
@@ -140,7 +141,7 @@ begin
     Deque.PushBack(1);
     Deque.PushBack(2);
     
-    // Using iterator
+    // Using iterator - thread-safe enumeration
     for Item in Deque do
       WriteLn(Item);
   finally
