@@ -5,13 +5,14 @@ unit ThreadSafeDictionaryTests;
 interface
 
 uses
-  Classes, SysUtils, fpcunit, testregistry, DateUtils,
-  ThreadSafeCollections.Dictionary, ThreadSafeCollections.Interfaces;
+  Classes, SysUtils, fpcunit, testregistry, DateUtils, HashFunctions,
+  ThreadSafeCollections.Dictionary, ThreadSafeCollections.Interfaces, Generics.Collections;
 
 type
   TIntStringDictionary = specialize TThreadSafeDictionary<integer, string>;
   TStringIntDictionary = specialize TThreadSafeDictionary<string, integer>;
   TStringObjectDictionary = specialize TThreadSafeDictionary<string, TObject>;
+  TStringIntDictionaryPair = specialize TDictionaryPair<string, integer>;
 
   TAdderThread = class(TThread)
   private
@@ -96,6 +97,11 @@ type
 
     // RAII locking mechanism tests
     procedure TestLockingMechanism;
+
+    // New tests for compound keys and custom constructors
+    procedure TestCompoundKeyBasic;
+    procedure TestCompoundKeyIteration;
+    procedure TestCustomConstructors;
   end;
 
   // Add this type after other test thread types
@@ -111,6 +117,28 @@ type
   end;
 
 implementation
+
+// Add after the type declarations but before the thread classes
+function HashString(const Key: string): Cardinal;
+begin
+  Result := XXHash32(Key);
+end;
+
+function CompareString(const Left, Right: string): Boolean;
+begin
+  Result := Left = Right;
+end;
+
+function HashInteger(const Key: Integer): Cardinal;
+begin
+  Result := MultiplicativeHash(Cardinal(Key));
+end;
+
+function CompareInteger(const Left, Right: Integer): Boolean;
+begin
+  Result := Left = Right;
+end;
+
 
 const
   STRESS_THREAD_COUNT = 10;
@@ -210,12 +238,23 @@ end;
 { TThreadSafeDictionaryTest }
 
 procedure TThreadSafeDictionaryTest.SetUp;
+var
+  NullIntHashFunc: specialize THashFunction<integer>;
+  NullIntEqualityFunc: specialize TEqualityComparison<integer>;
+  NullStrHashFunc: specialize THashFunction<string>;
+  NullStrEqualityFunc: specialize TEqualityComparison<string>;
 begin
   try
     WriteLn('Setting up test...');
-    FIntDict := TIntStringDictionary.Create;
-    FStrDict := TStringIntDictionary.Create;
-    FMixedDict := TStringObjectDictionary.Create;
+    NullIntHashFunc := nil;
+    NullIntEqualityFunc := nil;
+    NullStrHashFunc := nil;
+    NullStrEqualityFunc := nil;
+    
+    // Explicitly call the constructor with hash/equality functions
+    FIntDict := TIntStringDictionary.Create(NullIntHashFunc, NullIntEqualityFunc);
+    FStrDict := TStringIntDictionary.Create(NullStrHashFunc, NullStrEqualityFunc);
+    FMixedDict := TStringObjectDictionary.Create(NullStrHashFunc, NullStrEqualityFunc);
     WriteLn('Setup complete');
   except
     on E: Exception do
@@ -279,7 +318,14 @@ var
   I: integer;
   StartTick, EndTick: QWord;
   Key: string;
+  HashFunc: specialize THashFunction<string>;
+  EqualityFunc: specialize TEqualityComparison<string>;
 begin
+  HashFunc := @HashString;
+  EqualityFunc := @CompareString;
+  FStrDict.Free;  // Free the old dictionary
+  FStrDict := TStringIntDictionary.Create(HashFunc, EqualityFunc);
+  
   StartTick := GetTickCount64;
 
   // Test adding large number of items
@@ -585,7 +631,14 @@ procedure TThreadSafeDictionaryTest.TestBoundaries;
 var
   I: integer;
   Key: string;
+  HashFunc: specialize THashFunction<string>;
+  EqualityFunc: specialize TEqualityComparison<string>;
 begin
+  HashFunc := @HashString;
+  EqualityFunc := @CompareString;
+  FStrDict.Free;  // Free the old dictionary
+  FStrDict := TStringIntDictionary.Create(HashFunc, EqualityFunc);
+  
   // Test with very long keys
   Key := StringOfChar('A', 1000);
   FStrDict.Add(Key, 1);
@@ -772,10 +825,17 @@ procedure TThreadSafeDictionaryTest.TestResizeWithData;
 var
   I: Integer;
   Key: string;
+  HashFunc: specialize THashFunction<string>;
+  EqualityFunc: specialize TEqualityComparison<string>;
 begin
   WriteLn('Starting TestResizeWithData');
   IncrementTestCounter;
   try
+    HashFunc := @HashString;
+    EqualityFunc := @CompareString;
+    FStrDict.Free;  // Free the old dictionary
+    FStrDict := TStringIntDictionary.Create(HashFunc, EqualityFunc);
+    
     // Add some data
     for I := 1 to 10 do
     begin
@@ -864,7 +924,7 @@ procedure TThreadSafeDictionaryTest.TestIteratorBasic;
 var
   Iterator: TStringIntDictionary.TEnumerator;
   ExpectedCount: Integer;
-  Pair: specialize TPair<string, Integer>;
+  Pair: TStringIntDictionaryPair;
 begin
   WriteLn('Starting TestIteratorBasic');
   IncrementTestCounter;
@@ -924,7 +984,7 @@ end;
 procedure TThreadSafeDictionaryTest.TestIteratorModification;
 var
   Iterator: TStringIntDictionary.TEnumerator;
-  Pair: specialize TPair<string, Integer>;
+  Pair: TStringIntDictionaryPair;
 begin
   WriteLn('Starting TestIteratorModification');
   IncrementTestCounter;
@@ -961,7 +1021,7 @@ end;
 procedure TThreadSafeDictionaryTest.TestMultipleIterators;
 var
   Iterator1, Iterator2: TStringIntDictionary.TEnumerator;
-  Pair1, Pair2: specialize TPair<string, Integer>;
+  Pair1, Pair2: TStringIntDictionaryPair;
   Count1, Count2: Integer;
 begin
   WriteLn('Starting TestMultipleIterators');
@@ -1006,7 +1066,7 @@ end;
 procedure TThreadSafeDictionaryTest.TestIteratorReset;
 var
   Iterator: TStringIntDictionary.TEnumerator;
-  FirstPair, CurrentPair: specialize TPair<string, Integer>;
+  FirstPair, CurrentPair: TStringIntDictionaryPair;
 begin
   WriteLn('Starting TestIteratorReset');
   IncrementTestCounter;
@@ -1078,6 +1138,176 @@ begin
     
   WriteLn(Format('Lock test took %d ms, %d successful locks across %d threads', 
     [MilliSecondsBetween(Now, StartTime), TotalLocks, THREAD_COUNT]));
+end;
+
+type
+  TPersonKey = record
+    FirstName: string;
+    LastName: string;
+  end;
+
+  TPersonDictionary = specialize TThreadSafeDictionary<TPersonKey, Integer>;
+  TPersonDictionaryPair = specialize TDictionaryPair<TPersonKey, Integer>;
+  TPersonHashFunction = specialize THashFunction<TPersonKey>;
+  TPersonEqualityComparison = specialize TEqualityComparison<TPersonKey>;
+
+function HashPerson(const Key: TPersonKey): Cardinal;
+begin
+  Result := XXHash32(Key.FirstName + '|' + Key.LastName);
+end;
+
+function ComparePerson(const Left, Right: TPersonKey): Boolean;
+begin
+  Result := (Left.FirstName = Right.FirstName) and 
+            (Left.LastName = Right.LastName);
+end;
+
+procedure TThreadSafeDictionaryTest.TestCompoundKeyBasic;
+var
+  Dict: TPersonDictionary;
+  Person: TPersonKey;
+  Value: Integer;
+  HashFunc: TPersonHashFunction;
+  EqualityFunc: TPersonEqualityComparison;
+begin
+  WriteLn('Starting TestCompoundKeyBasic');
+  IncrementTestCounter;
+  try
+    HashFunc := @HashPerson;
+    EqualityFunc := @ComparePerson;
+    Dict := TPersonDictionary.Create(HashFunc, EqualityFunc);
+    try
+      // Test adding and retrieving
+      Person.FirstName := 'John';
+      Person.LastName := 'Doe';
+      Dict.Add(Person, 42);
+
+      AssertTrue('Should find existing compound key',
+        Dict.TryGetValue(Person, Value));
+      AssertEquals('Should retrieve correct value', 42, Value);
+
+      // Test non-existent key
+      Person.FirstName := 'Jane';
+      AssertFalse('Should not find non-existent key',
+        Dict.TryGetValue(Person, Value));
+
+      WriteLn('TestCompoundKeyBasic passed');
+    finally
+      Dict.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestCompoundKeyBasic failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.TestCompoundKeyIteration;
+var
+  Dict: TPersonDictionary;
+  Person: TPersonKey;
+  Pair: TPersonDictionaryPair;
+  Count: Integer;
+  HashFunc: TPersonHashFunction;
+  EqualityFunc: TPersonEqualityComparison;
+begin
+  WriteLn('Starting TestCompoundKeyIteration');
+  IncrementTestCounter;
+  try
+    HashFunc := @HashPerson;
+    EqualityFunc := @ComparePerson;
+    Dict := TPersonDictionary.Create(HashFunc, EqualityFunc);
+    try
+      // Add multiple entries
+      Person.FirstName := 'John';
+      Person.LastName := 'Doe';
+      Dict.Add(Person, 42);
+
+      Person.FirstName := 'Jane';
+      Person.LastName := 'Smith';
+      Dict.Add(Person, 30);
+
+      // Test iteration
+      Count := 0;
+      for Pair in Dict do
+      begin
+        Inc(Count);
+        if (Pair.Key.FirstName = 'John') and (Pair.Key.LastName = 'Doe') then
+          AssertEquals('Wrong value for John Doe', 42, Pair.Value)
+        else if (Pair.Key.FirstName = 'Jane') and (Pair.Key.LastName = 'Smith') then
+          AssertEquals('Wrong value for Jane Smith', 30, Pair.Value)
+        else
+          Fail('Unknown key in iteration');
+      end;
+
+      AssertEquals('Wrong number of iterations', 2, Count);
+      WriteLn('TestCompoundKeyIteration passed');
+    finally
+      Dict.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestCompoundKeyIteration failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.TestCustomConstructors;
+var
+  Dict: TPersonDictionary;
+  Person: TPersonKey;
+  Value: Integer;
+  HashFunc: TPersonHashFunction;
+  EqualityFunc: TPersonEqualityComparison;
+begin
+  WriteLn('Starting TestCustomConstructors');
+  IncrementTestCounter;
+  try
+    HashFunc := @HashPerson;
+    EqualityFunc := @ComparePerson;
+    
+    // Test constructor with initial capacity
+    Dict := TPersonDictionary.Create(32, HashFunc, EqualityFunc);
+    try
+      AssertEquals('Initial bucket count should be 32', 32, Dict.BucketCount);
+
+      Person.FirstName := 'John';
+      Person.LastName := 'Doe';
+      Dict.Add(Person, 42);
+
+      AssertTrue('Should find value with custom constructor',
+        Dict.TryGetValue(Person, Value));
+      AssertEquals('Wrong value with custom constructor', 42, Value);
+    finally
+      Dict.Free;
+    end;
+
+    // Test default constructor with comparers
+    Dict := TPersonDictionary.Create(HashFunc, EqualityFunc);
+    try
+      Person.FirstName := 'Jane';
+      Person.LastName := 'Smith';
+      Dict.Add(Person, 30);
+
+      AssertTrue('Should find value with default constructor',
+        Dict.TryGetValue(Person, Value));
+      AssertEquals('Wrong value with default constructor', 30, Value);
+    finally
+      Dict.Free;
+    end;
+
+    WriteLn('TestCustomConstructors passed');
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestCustomConstructors failed: ', E.Message);
+      raise;
+    end;
+  end;
 end;
 
 { TLockTestThread }

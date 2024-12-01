@@ -4,54 +4,54 @@ program DictionaryWithCustomType;
 {$modeSwitch advancedrecords}
 
 uses
-  ThreadSafeCollections.Dictionary, HashFunctions, SysUtils;
+  ThreadSafeCollections.Dictionary,
+  HashFunctions,
+  SysUtils;
 
 type
   TPersonKey = record
     FirstName: string;
     LastName: string;
+  public
+    constructor Create(NewFirstName, NewLastName: string);
+  end;
+
+  constructor TPersonKey.Create(NewFirstName, NewLastName: string);
+  begin
+    FirstName := NewFirstName;
+    LastName := NewLastName;
   end;
 
   // Custom hash function for TPersonKey
-  function HashPerson(const Key: TPersonKey): Cardinal;
+  function HashPerson(const Key: TPersonKey): cardinal;
   begin
     Result := XXHash32(Key.FirstName + '|' + Key.LastName);
   end;
 
   // Custom equality comparison for TPersonKey
-  function ComparePerson(const Left, Right: TPersonKey): Boolean;
+  function ComparePerson(const Left, Right: TPersonKey): boolean;
   begin
     Result := (Left.FirstName = Right.FirstName) and
-              (Left.LastName = Right.LastName);
+      (Left.LastName = Right.LastName);
   end;
 
 var
-  Dict: specialize TThreadSafeDictionary<TPersonKey, Integer>;
-  Person: TPersonKey;
-  Pair: specialize TDictionaryPair<TPersonKey, Integer>;
+  Dict: specialize TThreadSafeDictionary<TPersonKey, integer>;
+  Pair: specialize TDictionaryPair<TPersonKey, integer>;
 begin
-  Dict := specialize TThreadSafeDictionary<TPersonKey, Integer>.Create(
-    @HashPerson,
-    @ComparePerson
-  );
+  Dict := specialize TThreadSafeDictionary<TPersonKey, integer>.Create(
+    @HashPerson, @ComparePerson);
   try
     // Create and add some people
-    Person.FirstName := 'John';
-    Person.LastName := 'Doe';
-    Dict.Add(Person, 25);
-
-    Person.FirstName := 'Jane';
-    Person.LastName := 'Smith';
-    Dict.Add(Person, 30);
+    Dict.Add(TPersonKey.create('John','Doe'), 25);
+    Dict.Add(TPersonKey.Create('Jane', 'Smith'), 30);
 
     // Iterate using for..in loop
     WriteLn('All people in dictionary:');
     for Pair in Dict do
     begin
-      WriteLn(Format('%s %s: %d years old',
-        [Pair.Key.FirstName,
-         Pair.Key.LastName,
-         Pair.Value]));
+      WriteLn(Format('%s %s: %d years old', [Pair.Key.FirstName,
+        Pair.Key.LastName, Pair.Value]));
     end;
 
   finally
