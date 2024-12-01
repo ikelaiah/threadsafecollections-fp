@@ -6,22 +6,16 @@ A thread-safe, generic dictionary implementation in Free Pascal using separate c
 
 ### Basic Types (string, integer)
 ```pascal
-type
-  TStringIntDictionary = specialize TThreadSafeDictionary<string, integer>;
-  TIntStringDictionary = specialize TThreadSafeDictionary<integer, string>;
 var
-  StringIntDict: TStringIntDictionary;
-  IntStringDict: TIntStringDictionary;
+  Dict: specialize TThreadSafeDictionary<string, integer>;
 begin
   // Simple creation - uses built-in hash functions
-  StringIntDict := TStringIntDictionary.Create;
-  IntStringDict := TIntStringDictionary.Create;
+  Dict := specialize TThreadSafeDictionary<string, integer>.Create;
   try
-    StringIntDict.Add('one', 1);
-    IntStringDict.Add(1, 'one');
+    Dict.Add('one', 1);
+    Dict.Add('two', 2);
   finally
-    StringIntDict.Free;
-    IntStringDict.Free;
+    Dict.Free;
   end;
 end;
 ```
@@ -33,8 +27,6 @@ type
     FirstName: string;
     LastName: string;
   end;
-
-  TPersonDictionary = specialize TThreadSafeDictionary<TPersonKey, integer>;
 
 // Define hash function
 function HashPerson(const Key: TPersonKey): Cardinal;
@@ -50,35 +42,74 @@ begin
 end;
 
 var
-  PersonDict: TPersonDictionary;
-  Person: TPersonKey;
+  Dict: specialize TThreadSafeDictionary<TPersonKey, integer>;
 begin
-  // Create with custom hash and equality functions
-  PersonDict := TPersonDictionary.Create(@HashPerson, @ComparePerson);
+  // Create with custom hash and equality functions (both required for custom types)
+  Dict := specialize TThreadSafeDictionary<TPersonKey, integer>.Create(@HashPerson, @ComparePerson);
   try
+    var Person: TPersonKey;
     Person.FirstName := 'John';
     Person.LastName := 'Doe';
-    PersonDict.Add(Person, 42);
+    Dict.Add(Person, 42);
   finally
-    PersonDict.Free;
+    Dict.Free;
   end;
 end;
 ```
 
-## Hash Functions
+## Constructors
 
-### Built-in Hash Functions
+The dictionary provides four constructors for different use cases:
+
+1. Default Constructor - For basic types (string, integer)
+```pascal
+constructor Create;
+```
+- Uses built-in hash functions
+- Default initial capacity (16 buckets)
+- Perfect for string, integer keys
+
+2. Capacity Constructor - For basic types with known size
+```pascal
+constructor Create(InitialCapacity: integer);
+```
+- Uses built-in hash functions
+- Custom initial capacity
+- Good for performance optimization
+
+3. Custom Hash Constructor - For compound/custom types
+```pascal
+constructor Create(const AHashFunc: THashFunction<TKey>;
+                  const AEqualityComparer: TEqualityComparison<TKey>);
+```
+- Requires both hash and equality functions
+- Default initial capacity
+- Required for custom record types
+
+4. Full Constructor - Complete control
+```pascal
+constructor Create(InitialCapacity: integer;
+                  const AHashFunc: THashFunction<TKey>;
+                  const AEqualityComparer: TEqualityComparison<TKey>);
+```
+- Custom initial capacity
+- Custom hash and equality functions
+- Maximum flexibility
+
+## Built-in Hash Functions
+
 The dictionary includes efficient built-in hash functions for common types:
 
-| Type | Hash Function | Description |
+| Type | Hash Function | When to Use |
 |------|--------------|-------------|
-| string | XXHash32 | Fast non-cryptographic hash, good distribution |
-| integer | MultiplicativeHash | Efficient integer hash function |
-| other types | DefaultHash | Generic fallback hash function |
+| string | XXHash32 | Default for string keys |
+| integer | MultiplicativeHash | Default for integer keys |
+| other basic types | DefaultHash | Default for other types |
 
-You don't need to provide hash functions for basic types - the dictionary automatically uses the appropriate built-in function.
+For basic types, just use `Create` or `Create(capacity)` - no need to provide hash functions.
 
-### Custom Hash Functions
+## Custom Hash Functions
+
 For compound or custom types, you must provide:
 1. A hash function: `function(const Key: T): Cardinal`
 2. An equality comparison function: `function(const Left, Right: T): Boolean`
@@ -97,28 +128,8 @@ begin
   Result := (Left.Field1 = Right.Field1) and (Left.Field2 = Right.Field2);
 end;
 
-// Create dictionary with custom functions
+// Create dictionary with custom functions (both required)
 Dict := TThreadSafeDictionary.Create(@HashMyRecord, @CompareMyRecord);
-```
-
-## Constructors
-
-### Basic Creation
-```pascal
-// Default constructor - uses built-in hash for basic types
-Dict := TThreadSafeDictionary.Create;
-
-// With initial capacity (will be rounded to next power of 2)
-Dict := TThreadSafeDictionary.Create(32);
-```
-
-### Custom Types Creation
-```pascal
-// With custom hash functions
-Dict := TThreadSafeDictionary.Create(@MyHashFunc, @MyEqualityFunc);
-
-// With initial capacity and custom functions
-Dict := TThreadSafeDictionary.Create(32, @MyHashFunc, @MyEqualityFunc);
 ```
 
 ## Architecture Diagram
@@ -131,8 +142,9 @@ classDiagram
         -integer FCount
         -THashFunction~TKey~ FHashFunc
         -TEqualityComparison~TKey~ FEqualityComparer
-        +Create()
-        +Create(HashFunc: THashFunction~TKey~, EqualityComparer: TEqualityComparison~TKey~)
+        +Create()                                                      %% For basic types
+        +Create(InitialCapacity: integer)                             %% For basic types with size
+        +Create(HashFunc: THashFunction~TKey~, EqualityComparer: TEqualityComparison~TKey~)  %% For custom types
         +Create(InitialCapacity: integer, HashFunc: THashFunction~TKey~, EqualityComparer: TEqualityComparison~TKey~)
         +Destroy()
         +Add(const Key: TKey, const Value: TValue)

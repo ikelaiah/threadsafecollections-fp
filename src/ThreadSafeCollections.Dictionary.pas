@@ -96,11 +96,12 @@ type
     function CompareKeys(const Left, Right: TKey): Boolean;
   public
     constructor Create;
-    constructor Create(const AHashFunc: specialize THashFunction<TKey> = nil;
-                      const AEqualityComparer: specialize TEqualityComparison<TKey> = nil);
+    constructor Create(InitialCapacity: integer);
+    constructor Create(const AHashFunc: specialize THashFunction<TKey>;
+                      const AEqualityComparer: specialize TEqualityComparison<TKey>);
     constructor Create(InitialCapacity: integer;
-                      const AHashFunc: specialize THashFunction<TKey> = nil;
-                      const AEqualityComparer: specialize TEqualityComparison<TKey> = nil);
+                      const AHashFunc: specialize THashFunction<TKey>;
+                      const AEqualityComparer: specialize TEqualityComparison<TKey>);
     destructor Destroy; override;
 
     procedure Add(const Key: TKey; const Value: TValue);
@@ -142,39 +143,58 @@ end;
 {
   Create: Default constructor
   - Initializes with DEFAULT_BUCKET_COUNT buckets
+  - Uses built-in hash functions for basic types
 }
 constructor TThreadSafeDictionary.Create;
 begin
-  Create(INITIAL_BUCKET_COUNT);
+  Create(INITIAL_BUCKET_COUNT, nil, nil);  // Pass nil for hash and equality functions
 end;
 
 {
   Create: Constructor with initial capacity
   - Adjusts capacity to next power of 2
   - Ensures minimum bucket count
+  - Uses built-in hash functions for basic types
   
   Parameters:
   - InitialCapacity: Desired initial bucket count
 }
-constructor TThreadSafeDictionary.Create(const AHashFunc: specialize THashFunction<TKey> = nil;
-                                        const AEqualityComparer: specialize TEqualityComparison<TKey> = nil);
+constructor TThreadSafeDictionary.Create(InitialCapacity: integer);
+begin
+  Create(InitialCapacity, nil, nil);  // Pass nil for hash and equality functions
+end;
+
+{
+  Create: Constructor with custom hash and equality functions
+  - Uses default bucket count
+  - Required for compound/custom types
+  
+  Parameters:
+  - AHashFunc: Custom hash function for the key type
+  - AEqualityComparer: Custom equality comparison for the key type
+}
+constructor TThreadSafeDictionary.Create(const AHashFunc: specialize THashFunction<TKey>;
+                                       const AEqualityComparer: specialize TEqualityComparison<TKey>);
 begin
   Create(INITIAL_BUCKET_COUNT, AHashFunc, AEqualityComparer);
 end;
 
 {
-  Create: Constructor with initial capacity
+  Create: Full constructor with all options
   - Adjusts capacity to next power of 2
   - Ensures minimum bucket count
+  - Can use custom hash and equality functions
   
   Parameters:
-  - InitialCapacity: Desired initial bucket count
+  - InitialCapacity: Desired initial bucket count (will be rounded up to power of 2)
+  - AHashFunc: Custom hash function (nil uses built-in hash)
+  - AEqualityComparer: Custom equality comparison (nil uses built-in comparison)
 }
 constructor TThreadSafeDictionary.Create(InitialCapacity: integer;
-                                       const AHashFunc: specialize THashFunction<TKey> = nil;
-                                       const AEqualityComparer: specialize TEqualityComparison<TKey> = nil);
+                                       const AHashFunc: specialize THashFunction<TKey>;
+                                       const AEqualityComparer: specialize TEqualityComparison<TKey>);
 var
-  AdjustedSize: integer;
+  AdjustedSize:Integer;
 begin
   inherited Create;
   FLock := TCriticalSection.Create;
