@@ -6,13 +6,16 @@ A thread-safe, generic dictionary implementation in Free Pascal using separate c
 
 ### Basic Types (string, integer)
 ```pascal
+type
+  TStringIntDictionary = specialize TThreadSafeDictionary<string, integer>;
+  TIntStringDictionary = specialize TThreadSafeDictionary<integer, string>;
 var
-  StringIntDict: specialize TThreadSafeDictionary<string, integer>;
-  IntStringDict: specialize TThreadSafeDictionary<integer, string>;
+  StringIntDict: TStringIntDictionary;
+  IntStringDict: TIntStringDictionary;
 begin
   // Simple creation - uses built-in hash functions
-  StringIntDict := TThreadSafeDictionary.Create;
-  IntStringDict := TThreadSafeDictionary.Create;
+  StringIntDict := TStringIntDictionary.Create;
+  IntStringDict := TIntStringDictionary.Create;
   try
     StringIntDict.Add('one', 1);
     IntStringDict.Add(1, 'one');
@@ -31,6 +34,8 @@ type
     LastName: string;
   end;
 
+  TPersonDictionary = specialize TThreadSafeDictionary<TPersonKey, integer>;
+
 // Define hash function
 function HashPerson(const Key: TPersonKey): Cardinal;
 begin
@@ -45,12 +50,12 @@ begin
 end;
 
 var
-  PersonDict: specialize TThreadSafeDictionary<TPersonKey, integer>;
+  PersonDict: TPersonDictionary;
+  Person: TPersonKey;
 begin
   // Create with custom hash and equality functions
-  PersonDict := TThreadSafeDictionary.Create(@HashPerson, @ComparePerson);
+  PersonDict := TPersonDictionary.Create(@HashPerson, @ComparePerson);
   try
-    var Person: TPersonKey;
     Person.FirstName := 'John';
     Person.LastName := 'Doe';
     PersonDict.Add(Person, 42);
@@ -124,23 +129,45 @@ classDiagram
         -TCriticalSection FLock
         -array of PEntry FBuckets
         -integer FCount
+        -THashFunction~TKey~ FHashFunc
+        -TEqualityComparison~TKey~ FEqualityComparer
         +Create()
-        +Create(InitialCapacity: integer)
+        +Create(HashFunc: THashFunction~TKey~, EqualityComparer: TEqualityComparison~TKey~)
+        +Create(InitialCapacity: integer, HashFunc: THashFunction~TKey~, EqualityComparer: TEqualityComparison~TKey~)
         +Destroy()
-        +Add(Key, Value)
-        +Find(Key): Value
-        +TryGetValue(Key, out Value): boolean
-        +Remove(Key): boolean
-        +Replace(Key, Value)
-        +First(out Key, out Value): boolean
-        +Last(out Key, out Value): boolean
+        +Add(const Key: TKey, const Value: TValue)
+        +Find(const Key: TKey): TValue
+        +TryGetValue(const Key: TKey, out Value: TValue): boolean
+        +Remove(const Key: TKey): boolean
+        +Replace(const Key: TKey, const Value: TValue)
+        +First(out Key: TKey, out Value: TValue): boolean
+        +Last(out Key: TKey, out Value: TValue): boolean
         +Clear()
         +Count(): integer
         +ResizeBuckets(NewSize: integer)
         +BucketCount: integer
-        +Items[Key]: Value
+        +Items[const Key: TKey]: TValue
         +GetEnumerator(): TEnumerator
         +Lock(): ILockToken
+        -GetHashValue(const Key: TKey): cardinal
+        -GetBucketIndex(Hash: cardinal): integer
+        -Resize(NewSize: integer)
+        -CheckLoadFactor()
+        -FindEntry(const Key: TKey, Hash: cardinal, BucketIdx: integer): PEntry
+        -GetNextPowerOfTwo(Value: integer): integer
+        -CompareKeys(const Left, Right: TKey): Boolean
+    }
+    
+    class TDictionaryEntry~TKey,TValue~ {
+        +Key: TKey
+        +Value: TValue
+        +Hash: cardinal
+        +Next: ^TDictionaryEntry
+    }
+
+    class TDictionaryPair~TKey,TValue~ {
+        +Key: TKey
+        +Value: TValue
     }
     
     class TEnumerator {
@@ -148,10 +175,10 @@ classDiagram
         -FCurrentBucket: integer
         -FCurrentEntry: PEntry
         -FLockToken: ILockToken
-        +Create()
+        +Create(ADictionary: TThreadSafeDictionary)
         +Destroy()
         +MoveNext(): boolean
-        +Current: TPair~TKey,TValue~
+        +Current: TDictionaryPair~TKey,TValue~
     }
 
     class ILockToken {
@@ -159,6 +186,8 @@ classDiagram
     }
 
     TThreadSafeDictionary *-- TEnumerator : contains
+    TThreadSafeDictionary *-- TDictionaryEntry : uses internally
+    TThreadSafeDictionary *-- TDictionaryPair : returns in enumerator
     TEnumerator --> ILockToken : uses
     TThreadSafeDictionary --> ILockToken : creates
 ```
