@@ -2,6 +2,120 @@
 
 A thread-safe, generic dictionary implementation in Free Pascal using separate chaining for collision resolution.
 
+## Quick Start
+
+### Basic Types (string, integer)
+```pascal
+var
+  StringIntDict: specialize TThreadSafeDictionary<string, integer>;
+  IntStringDict: specialize TThreadSafeDictionary<integer, string>;
+begin
+  // Simple creation - uses built-in hash functions
+  StringIntDict := TThreadSafeDictionary.Create;
+  IntStringDict := TThreadSafeDictionary.Create;
+  try
+    StringIntDict.Add('one', 1);
+    IntStringDict.Add(1, 'one');
+  finally
+    StringIntDict.Free;
+    IntStringDict.Free;
+  end;
+end;
+```
+
+### Custom/Compound Types
+```pascal
+type
+  TPersonKey = record
+    FirstName: string;
+    LastName: string;
+  end;
+
+// Define hash function
+function HashPerson(const Key: TPersonKey): Cardinal;
+begin
+  Result := XXHash32(Key.FirstName + '|' + Key.LastName);
+end;
+
+// Define equality comparison
+function ComparePerson(const Left, Right: TPersonKey): Boolean;
+begin
+  Result := (Left.FirstName = Right.FirstName) and 
+            (Left.LastName = Right.LastName);
+end;
+
+var
+  PersonDict: specialize TThreadSafeDictionary<TPersonKey, integer>;
+begin
+  // Create with custom hash and equality functions
+  PersonDict := TThreadSafeDictionary.Create(@HashPerson, @ComparePerson);
+  try
+    var Person: TPersonKey;
+    Person.FirstName := 'John';
+    Person.LastName := 'Doe';
+    PersonDict.Add(Person, 42);
+  finally
+    PersonDict.Free;
+  end;
+end;
+```
+
+## Hash Functions
+
+### Built-in Hash Functions
+The dictionary includes efficient built-in hash functions for common types:
+
+| Type | Hash Function | Description |
+|------|--------------|-------------|
+| string | XXHash32 | Fast non-cryptographic hash, good distribution |
+| integer | MultiplicativeHash | Efficient integer hash function |
+| other types | DefaultHash | Generic fallback hash function |
+
+You don't need to provide hash functions for basic types - the dictionary automatically uses the appropriate built-in function.
+
+### Custom Hash Functions
+For compound or custom types, you must provide:
+1. A hash function: `function(const Key: T): Cardinal`
+2. An equality comparison function: `function(const Left, Right: T): Boolean`
+
+Example:
+```pascal
+// Hash function for a record type
+function HashMyRecord(const Key: TMyRecord): Cardinal;
+begin
+  Result := XXHash32(Key.Field1 + '|' + Key.Field2);
+end;
+
+// Equality comparison for a record type
+function CompareMyRecord(const Left, Right: TMyRecord): Boolean;
+begin
+  Result := (Left.Field1 = Right.Field1) and (Left.Field2 = Right.Field2);
+end;
+
+// Create dictionary with custom functions
+Dict := TThreadSafeDictionary.Create(@HashMyRecord, @CompareMyRecord);
+```
+
+## Constructors
+
+### Basic Creation
+```pascal
+// Default constructor - uses built-in hash for basic types
+Dict := TThreadSafeDictionary.Create;
+
+// With initial capacity (will be rounded to next power of 2)
+Dict := TThreadSafeDictionary.Create(32);
+```
+
+### Custom Types Creation
+```pascal
+// With custom hash functions
+Dict := TThreadSafeDictionary.Create(@MyHashFunc, @MyEqualityFunc);
+
+// With initial capacity and custom functions
+Dict := TThreadSafeDictionary.Create(32, @MyHashFunc, @MyEqualityFunc);
+```
+
 ## Architecture Diagram
 
 ```mermaid
