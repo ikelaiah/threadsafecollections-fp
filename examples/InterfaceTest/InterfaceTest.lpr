@@ -57,7 +57,6 @@ begin
     TestDeque;
 
     WriteLn('All tests completed successfully');
-    ReadLn;
   except
     on E: Exception do
     begin
