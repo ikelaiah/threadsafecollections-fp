@@ -4,9 +4,13 @@
 
 ```mermaid
 classDiagram
+    class IThreadSafeDeque~T~ {
+        <<interface>>
+    }
+
     class TThreadSafeDeque~T~ {
-        -FHead: PNode
-        -FTail: PNode
+        -FHead: ^TDequeNode
+        -FTail: ^TDequeNode
         -FCount: Integer
         -FLock: TCriticalSection
         +Create()
@@ -28,13 +32,24 @@ classDiagram
         +PushRangeBack(Items: array of T)
         +PushRangeFront(Items: array of T)
         +GetEnumerator(): TEnumerator
+        +Lock(): ILockToken
         +Count: Integer
     }
-    class TDequeNode~T~ {
+    
+    class TDequeNode {
+        <<record>>
         +Data: T
-        +Next: ^TDequeNode~T~
-        +Prev: ^TDequeNode~T~
+        +Next: ^TDequeNode
+        +Prev: ^TDequeNode
     }
+    
+    class IEnumerator~T~ {
+        <<interface>>
+        +MoveNext(): Boolean
+        +GetCurrent(): T
+        +Current: T
+    }
+    
     class TEnumerator {
         -FDeque: TThreadSafeDeque~T~
         -FCurrent: T
@@ -46,15 +61,18 @@ classDiagram
         +MoveNext(): Boolean
         +Current: T
     }
-    class TLockToken {
-        -FLock: TCriticalSection
-        +Create(ALock: TCriticalSection)
-        +Destroy()
+    
+    class ILockToken {
+        <<interface>>
     }
-    TThreadSafeDeque ..> TDequeNode : contains
-    TThreadSafeDeque ..> TEnumerator : creates
-    TThreadSafeDeque ..> TLockToken : uses
-    TEnumerator --> TThreadSafeDeque : references
+    
+    TThreadSafeDeque~T~ --|> TInterfacedObject : extends
+    TThreadSafeDeque~T~ ..|> IThreadSafeDeque~T~ : implements
+    TThreadSafeDeque~T~ *-- TDequeNode : inner type
+    TThreadSafeDeque~T~ *-- TEnumerator : inner type
+    TEnumerator ..|> IEnumerator~T~ : implements
+    TEnumerator --> TThreadSafeDeque~T~ : references
+    TEnumerator --> ILockToken : uses
 ```
 
 ## Core Components
