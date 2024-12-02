@@ -43,48 +43,82 @@ This library provides four main collection types:
 
 1. **ThreadSafeList**: Like an array that can grow
 ```pascal
+uses 
+  ThreadSafeCollections.List;  // Built-in comparers included!
+
 var
   List: specialize TThreadSafeList<Integer>;
 begin
-  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  // Two ways to create a list:
+  
+  // 1. Basic creation (using built-in comparers)
+  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);    // For integers
+  // List := specialize TThreadSafeList<string>.Create(@StringComparer);   // For strings
+  // List := specialize TThreadSafeList<Boolean>.Create(@BooleanComparer); // For booleans
+  // List := specialize TThreadSafeList<Real>.Create(@RealComparer);       // For reals
+  
+  // 2. With initial capacity (for better performance)
+  List := specialize TThreadSafeList<Integer>.Create(1000, @IntegerComparer);
+  
   try
-    List.Add(42);  // That's it!
+    List.Add(42);  // Simple to use!
+    List.Sort;     // Automatic sorting with the comparer
   finally
     List.Free;
   end;
 end;
 ```
 
+> [!TIP]
+> Built-in comparers in ThreadSafeCollections.List:
+> - `IntegerComparer`: For Integer types
+> - `StringComparer`: For string types
+> - `BooleanComparer`: For Boolean types
+> - `RealComparer`: For Real types
+> 
+> For custom types, implement your own comparer: `function MyComparer(const A, B: TMyType): Integer;`
+
 2. **ThreadSafeDeque**: A double-ended queue
- ```pascal
- var
-   Deque: specialize TThreadSafeDeque<Integer>;
- begin
-   Deque := specialize TThreadSafeDeque<Integer>.Create;
-   try
-     Deque.PushBack(1);
-     Deque.PushFront(2);
-     WriteLn('Front item: ', Deque.PopFront);
-     WriteLn('Back item: ', Deque.PopBack);
-   finally
-     Deque.Free;
-   end;
- end;
+```pascal
+var
+  Deque: specialize TThreadSafeDeque<Integer>;
+begin
+  Deque := specialize TThreadSafeDeque<Integer>.Create;
+  try
+    Deque.PushBack(1);
+    Deque.PushFront(2);
+    WriteLn('Front item: ', Deque.PopFront);
+    WriteLn('Back item: ', Deque.PopBack);
+  finally
+    Deque.Free;
+  end;
+end;
 ```
 
 3. **ThreadSafeDictionary**: Store key-value pairs
- ```pascal
- var
-   Dict: specialize TThreadSafeDictionary<string, integer>;
- begin
-   Dict := specialize TThreadSafeDictionary<string, integer>.Create;
-   try
-     Dict.Add('one', 1);  // Simple!
-   finally
-     Dict.Free;
-   end;
- end;
- ```
+```pascal
+uses 
+  ThreadSafeCollections.Dictionary;
+
+var
+  Dict: specialize TThreadSafeDictionary<string, integer>;
+begin
+  Dict := specialize TThreadSafeDictionary<string, integer>.Create;
+  try
+    Dict.Add('one', 1);
+    Dict.Add('two', 2);
+    
+    if Dict.Contains('one') then
+      WriteLn('Found: ', Dict['one']);
+  finally
+    Dict.Free;
+  end;
+end;
+```
+
+> [!TIP]
+> - For basic types (integer, string, etc.), use `Create` or `Create(capacity)`
+> - For custom types, use `Create(hashFunc, equalityFunc)` or `Create(capacity, hashFunc, equalityFunc)`
 
 4. **ThreadSafeHashSet**: Store unique values
 ```pascal
@@ -243,31 +277,6 @@ begin
       WriteLn('Popped from back: ', Person.Name);
   finally
     Deque.Free;
-  end;
-end;
-```
-
-### Using ThreadSafeDictionary
-
-```pascal
-uses 
-  ThreadSafeCollections.Dictionary;
-
-var
-  Dict: specialize TThreadSafeDictionary<string, integer>;
-  Pair: TPair<string, integer>;
-
-begin
-  Dict := specialize TThreadSafeDictionary<string, integer>.Create;
-  try
-    Dict.Add('one', 1);
-    Dict.Add('two', 2);
-    // Thread-safe iteration with RAII locking
-    for Pair in Dict do  // Lock automatically acquired
-      WriteLn(Pair.Key, ': ', Pair.Value);
-    // Lock automatically released
-  finally
-    Dict.Free;
   end;
 end;
 ```
@@ -489,21 +498,14 @@ end;
 ## 🔄 Feature Comparison
 
 | Feature                   | List | Deque | Dictionary  | HashSet |
-|---------------------------|------|-------|-------------|---------|
-| Thread-Safe Operations    |  ✅  |  ✅   |    ✅      |   ✅    |
-| RAII Iterator Locking     |  ✅  |  ✅   |    ✅      |   ✅    |
-| Automatic Resizing        |  ✅  |  ✅   |    ✅      |   ✅    |
-| Collision Resolution      |  N/A |  N/A  |    ✅      |   ✅    |
-| Specialized Types         |  ✅  |  ❌   |    ❌      |   ✅    |
-| Custom Comparers          |  ✅  |  ❌   |    ❌      |   ✅    |
-| Bulk Operations           |  ❌  |  ✅   |    ❌      |   ❌    |
-
-## 🎯 Why Use This?
-
-- 🔒 Safe concurrent access from multiple threads
-- 🚀 Fast operations with optimized implementations
-- 💡 Simple to use - just like regular collections, but thread-safe
-- ⚡ Perfect for multi-threaded applications
+|--------------------------|------|-------|-------------|---------|
+| Thread-Safe Operations   |  ✅  |  ✅   |    ✅      |   ✅    |
+| RAII Iterator Locking    |  ✅  |  ✅   |    ✅      |   ✅    |
+| Automatic Resizing       |  ✅  |  ✅   |    ✅      |   ✅    |
+| Collision Resolution     |  N/A |  N/A  |    ✅      |   ✅    |
+| Specialized Types        |  ✅  |  ❌   |    ❌      |   ✅    |
+| Custom Comparers         |  ✅  |  ❌   |    ✅      |   ✅    |
+| Bulk Operations          |  ❌  |  ✅   |    ❌      |   ❌    |
 
 ## 🧪 Testing
 

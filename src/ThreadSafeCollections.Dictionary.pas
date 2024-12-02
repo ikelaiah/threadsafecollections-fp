@@ -31,12 +31,15 @@ type
     Next: ^TDictionaryEntry;
   end;
 
-
-  generic TPair<TKey, TValue> = record
+  // First declare TDictionaryPair
+  generic TDictionaryPair<TKey, TValue> = record
     Key: TKey;
     Value: TValue;
   end;
 
+  // Then declare hash function types
+  generic THashFunction<T> = function(const Key: T): Cardinal;
+  generic TEqualityComparison<T> = function(const Left, Right: T): Boolean;
 
   {
     TThreadSafeDictionary: Thread-safe generic dictionary implementation
@@ -46,72 +49,144 @@ type
   }
   generic TThreadSafeDictionary<TKey, TValue> = class
   private
-  type
-    PEntry = ^TEntry;
-    TEntry = record
-      Key: TKey;
-      Value: TValue;
-      Hash: Cardinal;
-      Next: PEntry;
-    end;
+    type
+      // PEntry is a pointer to a TEntry record, representing a single entry in the hash table
+      PEntry = ^TEntry;
 
-    // Single enumerator class
-    TEnumerator = class
-    private
-      FDictionary: TThreadSafeDictionary;
-      FCurrentBucket: Integer;
-      FCurrentEntry: PEntry;
-      FLockToken: ILockToken;
-      function GetCurrent: specialize TPair<TKey, TValue>;
-    public
-      constructor Create(ADictionary: TThreadSafeDictionary);
-      destructor Destroy; override;
-      function MoveNext: Boolean;
-      property Current: specialize TPair<TKey, TValue> read GetCurrent;
-    end;
+      // TEntry represents a key-value pair stored in the dictionary along with its hash and a pointer to the next entry (for collision resolution)
+      TEntry = record
+        Key: TKey;                         // The key associated with the value
+        Value: TValue;                     // The value associated with the key
+        Hash: Cardinal;                    // Cached hash value of the key to optimize lookups
+        Next: PEntry;                      // Pointer to the next entry in the same bucket (in case of hash collisions)
+      end;
+
+      // TEnumerator is a helper class to enable iteration over the dictionary's key-value pairs
+      TEnumerator = class
+      private
+        FDictionary: TThreadSafeDictionary;          // Reference to the dictionary being enumerated
+        FCurrentBucket: Integer;                     // Index of the current bucket being iterated
+        FCurrentEntry: PEntry;                       // Pointer to the current entry in the bucket
+        FLockToken: ILockToken;                      // Token for managing thread-safe access during enumeration
+
+        // Retrieves the current key-value pair
+        function GetCurrent: specialize TDictionaryPair<TKey, TValue>;
+      public
+        // Constructor initializes the enumerator with a reference to the dictionary
+        constructor Create(ADictionary: TThreadSafeDictionary);
+
+        // Destructor cleans up any resources
+        destructor Destroy; override;
+
+        // Advances the enumerator to the next key-value pair
+        function MoveNext: Boolean;
+
+        // Property to access the current key-value pair
+        property Current: specialize TDictionaryPair<TKey, TValue> read GetCurrent;
+      end;
 
   private
-  const
-    INITIAL_BUCKET_COUNT = 16;   // Initial size of hash table
-    LOAD_FACTOR = 0.75;          // Threshold for resizing (75% full)
-    MIN_BUCKET_COUNT = 4;        // Minimum number of buckets
+    const
+      INITIAL_BUCKET_COUNT = 16;   // Initial number of buckets in the hash table
+      LOAD_FACTOR = 0.75;          // Load factor threshold to trigger resizing (75% full)
+      MIN_BUCKET_COUNT = 4;        // Minimum number of buckets to maintain
 
   private
-    FLock: TCriticalSection;     // Thread synchronization
-    FBuckets: array of PEntry;   // Array of bucket heads
-    FCount: integer;             // Number of items in dictionary
+    FLock: TCriticalSection;     // Critical section object to ensure thread safety during operations
+    FBuckets: array of PEntry;   // Dynamic array of bucket heads; each bucket is a linked list of entries
+    FCount: integer;             // Current number of key-value pairs stored in the dictionary
+    FHashFunc: specialize THashFunction<TKey>;             // Custom hash function for hashing keys
+    FEqualityComparer: specialize TEqualityComparison<TKey>; // Custom equality comparison function for keys
 
-    { Internal methods for hash table operations }
+    { 
+      Internal methods for hash table operations 
+    }
+
+    // Computes the hash value for a given key using the hash function
     function GetHashValue(const Key: TKey): cardinal;
+
+    // Determines the bucket index for a given hash value
     function GetBucketIndex(Hash: cardinal): integer; inline;
+
+    // Resizes the hash table to the new specified size
     procedure Resize(NewSize: integer);
+
+    // Checks if the current load factor exceeds the threshold and triggers resizing if necessary
     procedure CheckLoadFactor;
+
+    // Finds the entry for a given key within the specified bucket
     function FindEntry(const Key: TKey; Hash: cardinal; BucketIdx: integer): PEntry;
+
+    // Calculates the next power of two greater than or equal to the provided value
     function GetNextPowerOfTwo(Value: integer): integer;
+
+    // Compares two keys for equality using the equality comparer
+    function CompareKeys(const Left, Right: TKey): Boolean;
+
   public
+    // Default constructor initializes the dictionary with default settings
     constructor Create;
-    constructor Create(InitialCapacity: integer); overload;
+
+    // Constructor with specified initial capacity
+    constructor Create(InitialCapacity: integer);
+
+    // Constructor with custom hash and equality functions
+    constructor Create(const AHashFunc: specialize THashFunction<TKey>;
+                      const AEqualityComparer: specialize TEqualityComparison<TKey>);
+
+    // Constructor with specified initial capacity and custom hash and equality functions
+    constructor Create(InitialCapacity: integer;
+                      const AHashFunc: specialize THashFunction<TKey>;
+                      const AEqualityComparer: specialize TEqualityComparison<TKey>);
+
+    // Destructor releases all resources used by the dictionary
     destructor Destroy; override;
 
+    // Adds a new key-value pair to the dictionary
     procedure Add(const Key: TKey; const Value: TValue);
+
+    // Tries to get the value associated with the specified key
     function TryGetValue(const Key: TKey; out Value: TValue): boolean;
+
+    // Removes the key-value pair with the specified key from the dictionary
     function Remove(const Key: TKey): boolean;
+
+    // Replaces the value for the specified key with a new value
     procedure Replace(const Key: TKey; const Value: TValue);
 
+    // Retrieves the first key-value pair in the dictionary
     function First(out Key: TKey; out Value: TValue): boolean;
+
+    // Retrieves the last key-value pair in the dictionary
     function Last(out Key: TKey; out Value: TValue): boolean;
+
+    // Finds and returns the value associated with the specified key
     function Find(const Key: TKey): TValue;
 
+    // Clears all key-value pairs from the dictionary
     procedure Clear;
+
+    // Returns the number of key-value pairs currently stored in the dictionary
     function Count: integer; 
+
+    // Resizes the internal buckets to the new specified size
     procedure ResizeBuckets(NewSize: integer);
+
+    // Retrieves the current number of buckets in the hash table
     function GetBucketCount: integer; 
+
+    // Property to access the number of buckets
     property BucketCount: integer read GetBucketCount; 
+
+    // Default property to access items by key, supports read and write operations
     property Items[const Key: TKey]: TValue read Find write Replace; default;
+
+    // Retrieves an enumerator to iterate over the dictionary's key-value pairs
     function GetEnumerator: TEnumerator;
+
+    // Locks the dictionary for thread-safe operations and returns a lock token
     function Lock: ILockToken;
   end;
-
 
 implementation
 
@@ -133,33 +208,68 @@ end;
 {
   Create: Default constructor
   - Initializes with DEFAULT_BUCKET_COUNT buckets
+  - Uses built-in hash functions for basic types
 }
 constructor TThreadSafeDictionary.Create;
 begin
-  Create(INITIAL_BUCKET_COUNT);
+  Create(INITIAL_BUCKET_COUNT, nil, nil);  // Pass nil for hash and equality functions
 end;
 
 {
   Create: Constructor with initial capacity
   - Adjusts capacity to next power of 2
   - Ensures minimum bucket count
+  - Uses built-in hash functions for basic types
   
   Parameters:
   - InitialCapacity: Desired initial bucket count
 }
 constructor TThreadSafeDictionary.Create(InitialCapacity: integer);
+begin
+  Create(InitialCapacity, nil, nil);  // Pass nil for hash and equality functions
+end;
+
+{
+  Create: Constructor with custom hash and equality functions
+  - Uses default bucket count
+  - Required for compound/custom types
+  
+  Parameters:
+  - AHashFunc: Custom hash function for the key type
+  - AEqualityComparer: Custom equality comparison for the key type
+}
+constructor TThreadSafeDictionary.Create(const AHashFunc: specialize THashFunction<TKey>;
+                                       const AEqualityComparer: specialize TEqualityComparison<TKey>);
+begin
+  Create(INITIAL_BUCKET_COUNT, AHashFunc, AEqualityComparer);
+end;
+
+{
+  Create: Full constructor with all options
+  - Adjusts capacity to next power of 2
+  - Ensures minimum bucket count
+  - Can use custom hash and equality functions
+  
+  Parameters:
+  - InitialCapacity: Desired initial bucket count (will be rounded up to power of 2)
+  - AHashFunc: Custom hash function (nil uses built-in hash)
+  - AEqualityComparer: Custom equality comparison (nil uses built-in comparison)
+}
+constructor TThreadSafeDictionary.Create(InitialCapacity: integer;
+                                       const AHashFunc: specialize THashFunction<TKey>;
+                                       const AEqualityComparer: specialize TEqualityComparison<TKey>);
 var
-  AdjustedSize: integer;
+  AdjustedSize:Integer;
 begin
   inherited Create;
   FLock := TCriticalSection.Create;
   
+  // Store the custom functions or use defaults
+  FHashFunc := AHashFunc;
+  FEqualityComparer := AEqualityComparer;
+  
   // Ensure power of 2 and minimum size
   AdjustedSize := GetNextPowerOfTwo(InitialCapacity);
-  if DEBUG_LOGGING then
-    WriteLn(Format('Create: Adjusted initial capacity from %d to %d',
-        [InitialCapacity, AdjustedSize]));
-        
   SetLength(FBuckets, AdjustedSize);
   FCount := 0;
 end;
@@ -238,37 +348,22 @@ end;
   - Always returns a positive value (masked with $7FFFFFFF)
 }
 function TThreadSafeDictionary.GetHashValue(const Key: TKey): cardinal;
-var
-  S: string;
-  I: integer;
-  RawHash: cardinal;
 begin
-  // Type-specific hash calculation
-  if TypeInfo(TKey) = TypeInfo(string) then
-  begin
-    S := string((@Key)^);
-    RawHash := XXHash32(S);
-    if DEBUG_LOGGING then WriteLn(Format('GetHashValue: Raw hash for string "%s": %d',
-        [S, integer(RawHash)]));
-  end
-  else if TypeInfo(TKey) = TypeInfo(integer) then
-  begin
-    I := integer((@Key)^);
-    RawHash := MultiplicativeHash(cardinal(I));
-    if DEBUG_LOGGING then WriteLn(Format('GetHashValue: Raw hash for int %d: %d',
-        [I, integer(RawHash)]));
-  end
+  // Use custom hash function if provided
+  if Assigned(FHashFunc) then
+    Result := FHashFunc(Key)
   else
   begin
-    RawHash := DefaultHash(Key);
-    if DEBUG_LOGGING then WriteLn(Format('GetHashValue: Raw hash for other type: %d',
-        [integer(RawHash)]));
+    // Original type-specific hash logic
+    if TypeInfo(TKey) = TypeInfo(string) then
+      Result := XXHash32(string((@Key)^))
+    else if TypeInfo(TKey) = TypeInfo(integer) then
+      Result := MultiplicativeHash(cardinal(integer((@Key)^)))
+    else
+      Result := DefaultHash(Key);
   end;
   
-  // Ensure positive hash value
-  Result := RawHash and $7FFFFFFF;
-  if DEBUG_LOGGING then WriteLn(Format('GetHashValue: Masked hash: %d',
-      [integer(Result)]));
+  Result := Result and $7FFFFFFF; // Ensure positive
 end;
 
 {
@@ -375,7 +470,7 @@ begin
   Entry := FBuckets[BucketIdx];
   while Entry <> nil do
   begin
-    if (Entry^.Hash = Hash) and (Entry^.Key = Key) then
+    if (Entry^.Hash = Hash) and CompareKeys(Entry^.Key, Key) then
       Exit(Entry);
     Entry := Entry^.Next;
   end;
@@ -493,7 +588,7 @@ begin
 
     while Entry <> nil do
     begin
-      if (Entry^.Hash = Hash) and (Entry^.Key = Key) then
+      if (Entry^.Hash = Hash) and CompareKeys(Entry^.Key, Key) then
       begin
         if Prev = nil then
           FBuckets[BucketIdx] := Entry^.Next
@@ -721,7 +816,7 @@ begin
   inherited;
 end;
 
-function TThreadSafeDictionary.TEnumerator.GetCurrent: specialize TPair<TKey, TValue>;
+function TThreadSafeDictionary.TEnumerator.GetCurrent: specialize TDictionaryPair<TKey, TValue>;
 begin
   if FCurrentEntry = nil then
     raise Exception.Create('Invalid enumerator position');
@@ -766,6 +861,15 @@ end;
 function TThreadSafeDictionary.Lock: ILockToken;
 begin
   Result := TLockToken.Create(FLock);
+end;
+
+{ Helper function to compare keys safely }
+function TThreadSafeDictionary.CompareKeys(const Left, Right: TKey): Boolean;
+begin
+  if Assigned(FEqualityComparer) then
+    Result := FEqualityComparer(Left, Right)
+  else
+    Result := CompareByte(Left, Right, SizeOf(TKey)) = 0;
 end;
 
 end.

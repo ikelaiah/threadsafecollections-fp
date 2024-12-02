@@ -9,7 +9,7 @@ uses
 
 var
   Dict: specialize TThreadSafeDictionary<string, integer>;
-  Pair: specialize TPair<string, integer>;
+  Pair: specialize TDictionaryPair<string, integer>;
 begin
   Dict := specialize TThreadSafeDictionary<string, integer>.Create;
   try

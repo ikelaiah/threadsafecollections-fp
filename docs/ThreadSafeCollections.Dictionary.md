@@ -2,6 +2,136 @@
 
 A thread-safe, generic dictionary implementation in Free Pascal using separate chaining for collision resolution.
 
+## Quick Start
+
+### Basic Types (string, integer)
+```pascal
+var
+  Dict: specialize TThreadSafeDictionary<string, integer>;
+begin
+  // Simple creation - uses built-in hash functions
+  Dict := specialize TThreadSafeDictionary<string, integer>.Create;
+  try
+    Dict.Add('one', 1);
+    Dict.Add('two', 2);
+  finally
+    Dict.Free;
+  end;
+end;
+```
+
+### Custom/Compound Types
+```pascal
+type
+  TPersonKey = record
+    FirstName: string;
+    LastName: string;
+  end;
+
+// Define hash function
+function HashPerson(const Key: TPersonKey): Cardinal;
+begin
+  Result := XXHash32(Key.FirstName + '|' + Key.LastName);
+end;
+
+// Define equality comparison
+function ComparePerson(const Left, Right: TPersonKey): Boolean;
+begin
+  Result := (Left.FirstName = Right.FirstName) and 
+            (Left.LastName = Right.LastName);
+end;
+
+var
+  Dict: specialize TThreadSafeDictionary<TPersonKey, integer>;
+begin
+  // Create with custom hash and equality functions (both required for custom types)
+  Dict := specialize TThreadSafeDictionary<TPersonKey, integer>.Create(@HashPerson, @ComparePerson);
+  try
+    var Person: TPersonKey;
+    Person.FirstName := 'John';
+    Person.LastName := 'Doe';
+    Dict.Add(Person, 42);
+  finally
+    Dict.Free;
+  end;
+end;
+```
+
+## Constructors
+
+The dictionary provides four constructors for different use cases:
+
+1. Default Constructor - For basic types (string, integer)
+```pascal
+constructor Create;
+```
+- Uses built-in hash functions
+- Default initial capacity (16 buckets)
+- Perfect for string, integer keys
+
+2. Capacity Constructor - For basic types with known size
+```pascal
+constructor Create(InitialCapacity: integer);
+```
+- Uses built-in hash functions
+- Custom initial capacity
+- Good for performance optimization
+
+3. Custom Hash Constructor - For compound/custom types
+```pascal
+constructor Create(const AHashFunc: THashFunction<TKey>;
+                  const AEqualityComparer: TEqualityComparison<TKey>);
+```
+- Requires both hash and equality functions
+- Default initial capacity
+- Required for custom record types
+
+4. Full Constructor - Complete control
+```pascal
+constructor Create(InitialCapacity: integer;
+                  const AHashFunc: THashFunction<TKey>;
+                  const AEqualityComparer: TEqualityComparison<TKey>);
+```
+- Custom initial capacity
+- Custom hash and equality functions
+- Maximum flexibility
+
+## Built-in Hash Functions
+
+The dictionary includes efficient built-in hash functions for common types:
+
+| Type | Hash Function | When to Use |
+|------|--------------|-------------|
+| string | XXHash32 | Default for string keys |
+| integer | MultiplicativeHash | Default for integer keys |
+| other basic types | DefaultHash | Default for other types |
+
+For basic types, just use `Create` or `Create(capacity)` - no need to provide hash functions.
+
+## Custom Hash Functions
+
+For compound or custom types, you must provide:
+1. A hash function: `function(const Key: T): Cardinal`
+2. An equality comparison function: `function(const Left, Right: T): Boolean`
+
+Example:
+```pascal
+// Hash function for a record type
+function HashMyRecord(const Key: TMyRecord): Cardinal;
+begin
+  Result := XXHash32(Key.Field1 + '|' + Key.Field2);
+end;
+
+// Equality comparison for a record type
+function CompareMyRecord(const Left, Right: TMyRecord): Boolean;
+begin
+  Result := (Left.Field1 = Right.Field1) and (Left.Field2 = Right.Field2);
+end;
+
+// Create dictionary with custom functions (both required)
+Dict := TThreadSafeDictionary.Create(@HashMyRecord, @CompareMyRecord);
+```
+
 ## Architecture Diagram
 
 ```mermaid
@@ -10,23 +140,46 @@ classDiagram
         -TCriticalSection FLock
         -array of PEntry FBuckets
         -integer FCount
-        +Create()
-        +Create(InitialCapacity: integer)
+        -THashFunction~TKey~ FHashFunc
+        -TEqualityComparison~TKey~ FEqualityComparer
+        +Create()                                                      %% For basic types
+        +Create(InitialCapacity: integer)                             %% For basic types with size
+        +Create(HashFunc: THashFunction~TKey~, EqualityComparer: TEqualityComparison~TKey~)  %% For custom types
+        +Create(InitialCapacity: integer, HashFunc: THashFunction~TKey~, EqualityComparer: TEqualityComparison~TKey~)
         +Destroy()
-        +Add(Key, Value)
-        +Find(Key): Value
-        +TryGetValue(Key, out Value): boolean
-        +Remove(Key): boolean
-        +Replace(Key, Value)
-        +First(out Key, out Value): boolean
-        +Last(out Key, out Value): boolean
+        +Add(const Key: TKey, const Value: TValue)
+        +Find(const Key: TKey): TValue
+        +TryGetValue(const Key: TKey, out Value: TValue): boolean
+        +Remove(const Key: TKey): boolean
+        +Replace(const Key: TKey, const Value: TValue)
+        +First(out Key: TKey, out Value: TValue): boolean
+        +Last(out Key: TKey, out Value: TValue): boolean
         +Clear()
         +Count(): integer
         +ResizeBuckets(NewSize: integer)
         +BucketCount: integer
-        +Items[Key]: Value
+        +Items[const Key: TKey]: TValue
         +GetEnumerator(): TEnumerator
         +Lock(): ILockToken
+        -GetHashValue(const Key: TKey): cardinal
+        -GetBucketIndex(Hash: cardinal): integer
+        -Resize(NewSize: integer)
+        -CheckLoadFactor()
+        -FindEntry(const Key: TKey, Hash: cardinal, BucketIdx: integer): PEntry
+        -GetNextPowerOfTwo(Value: integer): integer
+        -CompareKeys(const Left, Right: TKey): Boolean
+    }
+    
+    class TDictionaryEntry~TKey,TValue~ {
+        +Key: TKey
+        +Value: TValue
+        +Hash: cardinal
+        +Next: ^TDictionaryEntry
+    }
+
+    class TDictionaryPair~TKey,TValue~ {
+        +Key: TKey
+        +Value: TValue
     }
     
     class TEnumerator {
@@ -34,10 +187,10 @@ classDiagram
         -FCurrentBucket: integer
         -FCurrentEntry: PEntry
         -FLockToken: ILockToken
-        +Create()
+        +Create(ADictionary: TThreadSafeDictionary)
         +Destroy()
         +MoveNext(): boolean
-        +Current: TPair~TKey,TValue~
+        +Current: TDictionaryPair~TKey,TValue~
     }
 
     class ILockToken {
@@ -45,6 +198,8 @@ classDiagram
     }
 
     TThreadSafeDictionary *-- TEnumerator : contains
+    TThreadSafeDictionary *-- TDictionaryEntry : uses internally
+    TThreadSafeDictionary *-- TDictionaryPair : returns in enumerator
     TEnumerator --> ILockToken : uses
     TThreadSafeDictionary --> ILockToken : creates
 ```

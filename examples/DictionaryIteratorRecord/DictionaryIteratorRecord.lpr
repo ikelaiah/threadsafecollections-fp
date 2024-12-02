@@ -33,7 +33,7 @@ type
 
 var
   Clients: specialize TThreadSafeDictionary<integer, TClient>;
-  Pair: specialize TPair<integer, TClient>;
+  Pair: specialize TDictionaryPair<integer, TClient>;
   Client: TClient;
 
 begin
