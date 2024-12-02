@@ -136,44 +136,70 @@ Dict := TThreadSafeDictionary.Create(@HashMyRecord, @CompareMyRecord);
 
 ```mermaid
 classDiagram
+    class IThreadSafeCollection~T~ {
+        <<interface>>
+        +GetCount(): Integer
+        +IsEmpty(): Boolean
+        +Clear()
+        +Lock(): ILockToken
+        +Count: Integer
+    }
+
+    class IThreadSafeDictionary~TKey,TValue~ {
+        <<interface>>
+        +Add(const Key: TKey, const Value: TValue)
+        +Remove(const Key: TKey): Boolean
+        +TryGetValue(const Key: TKey, out Value: TValue): Boolean
+        +Replace(const Key: TKey, const Value: TValue)
+        +ContainsKey(const Key: TKey): Boolean
+        +GetItem(const Key: TKey): TValue
+        +SetItem(const Key: TKey, const Value: TValue)
+        +GetCount(): Integer
+        +Clear()
+        +Lock(): ILockToken
+        +Items[const Key: TKey]: TValue
+        +Count: Integer
+    }
+
     class TThreadSafeDictionary~TKey,TValue~ {
         -TCriticalSection FLock
         -array of PEntry FBuckets
         -integer FCount
         -THashFunction~TKey~ FHashFunc
         -TEqualityComparison~TKey~ FEqualityComparer
-        +Create()                                                      %% For basic types
-        +Create(InitialCapacity: integer)                             %% For basic types with size
-        +Create(HashFunc: THashFunction~TKey~, EqualityComparer: TEqualityComparison~TKey~)  %% For custom types
+        +Create()
+        +Create(InitialCapacity: integer)
+        +Create(HashFunc: THashFunction~TKey~, EqualityComparer: TEqualityComparison~TKey~)
         +Create(InitialCapacity: integer, HashFunc: THashFunction~TKey~, EqualityComparer: TEqualityComparison~TKey~)
         +Destroy()
         +Add(const Key: TKey, const Value: TValue)
         +Find(const Key: TKey): TValue
-        +TryGetValue(const Key: TKey, out Value: TValue): boolean
-        +Remove(const Key: TKey): boolean
+        +TryGetValue(const Key: TKey, out Value: TValue): Boolean
+        +Remove(const Key: TKey): Boolean
         +Replace(const Key: TKey, const Value: TValue)
-        +First(out Key: TKey, out Value: TValue): boolean
-        +Last(out Key: TKey, out Value: TValue): boolean
+        +ContainsKey(const Key: TKey): Boolean
+        +First(out Key: TKey, out Value: TValue): Boolean
+        +Last(out Key: TKey, out Value: TValue): Boolean
         +Clear()
-        +Count(): integer
-        +ResizeBuckets(NewSize: integer)
-        +BucketCount: integer
+        +Count(): Integer
+        +ResizeBuckets(NewSize: Integer)
+        +BucketCount: Integer
         +Items[const Key: TKey]: TValue
         +GetEnumerator(): TEnumerator
         +Lock(): ILockToken
-        -GetHashValue(const Key: TKey): cardinal
-        -GetBucketIndex(Hash: cardinal): integer
-        -Resize(NewSize: integer)
+        -GetHashValue(const Key: TKey): Cardinal
+        -GetBucketIndex(Hash: Cardinal): Integer
+        -Resize(NewSize: Integer)
         -CheckLoadFactor()
-        -FindEntry(const Key: TKey, Hash: cardinal, BucketIdx: integer): PEntry
-        -GetNextPowerOfTwo(Value: integer): integer
+        -FindEntry(const Key: TKey, Hash: Cardinal, BucketIdx: Integer): PEntry
+        -GetNextPowerOfTwo(Value: Integer): Integer
         -CompareKeys(const Left, Right: TKey): Boolean
     }
     
     class TDictionaryEntry~TKey,TValue~ {
         +Key: TKey
         +Value: TValue
-        +Hash: cardinal
+        +Hash: Cardinal
         +Next: ^TDictionaryEntry
     }
 
@@ -184,24 +210,35 @@ classDiagram
     
     class TEnumerator {
         -FDictionary: TThreadSafeDictionary
-        -FCurrentBucket: integer
+        -FCurrentBucket: Integer
         -FCurrentEntry: PEntry
         -FLockToken: ILockToken
         +Create(ADictionary: TThreadSafeDictionary)
         +Destroy()
-        +MoveNext(): boolean
+        +MoveNext(): Boolean
         +Current: TDictionaryPair~TKey,TValue~
     }
 
     class ILockToken {
         <<interface>>
+        +Release()
     }
 
+    class TLockToken {
+        -FLock: TCriticalSection
+        +Create(ALock: TCriticalSection)
+        +Destroy()
+        +Release()
+    }
+
+    IThreadSafeDictionary --|> IThreadSafeCollection
+    TThreadSafeDictionary ..|> IThreadSafeDictionary
     TThreadSafeDictionary *-- TEnumerator : contains
     TThreadSafeDictionary *-- TDictionaryEntry : uses internally
     TThreadSafeDictionary *-- TDictionaryPair : returns in enumerator
     TEnumerator --> ILockToken : uses
     TThreadSafeDictionary --> ILockToken : creates
+    TLockToken ..|> ILockToken
 ```
 
 ## Collision Resolution Strategies

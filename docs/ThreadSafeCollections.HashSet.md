@@ -7,55 +7,77 @@ ThreadSafeHashSet is a generic, thread-safe implementation of a hash set in Free
 
 ```mermaid
 classDiagram
-class TThreadSafeHashSet~T~ {
--FBuckets: array of PEntry
--FCount: Integer
--FLock: TCriticalSection
--FEqualityComparer: TEqualityComparer~T~
--FHashFunction: THashFunction~T~
-+Create(equalityComparer, hashFunction, initialCapacity)
-+Destroy()
-+Add(item: T): Boolean
-+Remove(item: T): Boolean
-+Contains(item: T): Boolean
-+Clear()
-+Count: Integer
-+GetEnumerator(): TEnumerator
-+Lock(): ILockToken
-}
-class TEnumerator {
--FSet: TThreadSafeHashSet
--FCurrentBucket: Integer
--FCurrentEntry: PEntry
--FLockToken: ILockToken
-+Create()
-+Destroy()
-+MoveNext(): Boolean
-+Current: T
-}
-class ILockToken {
-<<interface>>
-}
-class TThreadSafeHashSetInteger {
-+Create(initialCapacity)
-}
-class TThreadSafeHashSetString {
-+Create(initialCapacity)
-+Create(hashFunction, initialCapacity)
-}
-class TThreadSafeHashSetBoolean {
-+Create(initialCapacity)
-}
-class TThreadSafeHashSetReal {
-+Create(initialCapacity)
-}
-TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetInteger
-TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetString
-TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetBoolean
-TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetReal
-TThreadSafeHashSet~T~ *-- TEnumerator : contains
-TEnumerator --> ILockToken : uses
-TThreadSafeHashSet~T~ --> ILockToken : creates
+    class IThreadSafeCollection~T~ {
+        <<interface>>
+        +GetCount(): Integer
+        +IsEmpty(): Boolean
+        +Clear()
+        +Lock(): ILockToken
+        +Count: Integer
+    }
+    class IThreadSafeHashSet~T~ {
+        <<interface>>
+        +Add(item: T): Boolean
+        +Remove(item: T): Boolean
+        +Contains(item: T): Boolean
+        +ToArray(): TArray~T~
+    }
+    class TThreadSafeHashSet~T~ {
+        -FBuckets: array of PEntry
+        -FCount: Integer
+        -FLock: TCriticalSection
+        -FEqualityComparer: TEqualityComparer~T~
+        -FHashFunction: THashFunction~T~
+        +Create(equalityComparer, hashFunction, initialCapacity)
+        +Destroy()
+        +Add(item: T): Boolean
+        +Remove(item: T): Boolean
+        +Contains(item: T): Boolean
+        +Clear()
+        +Count: Integer
+        +GetEnumerator(): TEnumerator
+        +Lock(): ILockToken
+        +IsEmpty(): Boolean
+        +ToArray(): TArray~T~
+    }
+    class TEnumerator {
+        -FSet: TThreadSafeHashSet
+        -FCurrentBucket: Integer
+        -FCurrentEntry: PEntry
+        -FLockToken: ILockToken
+        +Create()
+        +Destroy()
+        +MoveNext(): Boolean
+        +GetCurrent(): T
+        +Current: T
+    }
+    class ILockToken {
+        <<interface>>
+        +Release()
+    }
+    class TThreadSafeHashSetInteger {
+        +Create(initialCapacity)
+    }
+    class TThreadSafeHashSetString {
+        +Create(initialCapacity)
+        +Create(hashFunction, initialCapacity)
+    }
+    class TThreadSafeHashSetBoolean {
+        +Create(initialCapacity)
+    }
+    class TThreadSafeHashSetReal {
+        +Create(initialCapacity)
+    }
+
+    IThreadSafeCollection~T~ <|-- IThreadSafeHashSet~T~
+    IThreadSafeHashSet~T~ <|.. TThreadSafeHashSet~T~
+    TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetInteger
+    TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetString
+    TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetBoolean
+    TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetReal
+    TThreadSafeHashSet~T~ *-- TEnumerator : contains
+    TEnumerator --> ILockToken : uses
+    TThreadSafeHashSet~T~ --> ILockToken : creates
 ```
 
 

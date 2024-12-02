@@ -4,52 +4,91 @@
 
 ```mermaid
 classDiagram
-class TThreadSafeList~T~ {
-  -FList: array of T
-  -FCount: Integer
-  -FCapacity: Integer
-  -FLock: TCriticalSection
-  -FComparer: TComparer~T~
-  -FSorted: Boolean
-  +Create(AComparer)
-  +Destroy()
-  +Add(Item: T)
-  +Delete(Index: Integer)
-  +Find(Item: T)
-  +Sort(Ascending)
-  +Replace(Index, Item)
-  +First(): T
-  +Last(): T
-  +IsSorted(): Boolean
-  +Items[Index: Integer]: T
-  +GetEnumerator(): TEnumerator
-  +Lock(): ILockToken
-}
+    class IThreadSafeCollection~T~ {
+        <<interface>>
+        +GetCount(): Integer
+        +IsEmpty(): Boolean
+        +Clear()
+        +Lock(): ILockToken
+        +Count: Integer
+    }
 
-class TEnumerator {
-  -FList: TThreadSafeList
-  -FIndex: Integer
-  -FCurrent: T
-  -FLockToken: ILockToken
-  +Create()
-  +Destroy()
-  +MoveNext(): Boolean
-  +Current: T
-}
+    class IThreadSafeList~T~ {
+        <<interface>>
+        +Add(Item: T): Integer
+        +Delete(Index: Integer)
+        +Find(Item: T): Integer
+        +First(): T
+        +Last(): T
+        +Sort(Ascending: Boolean)
+        +IsSorted(): Boolean
+        +Replace(Index: Integer, Item: T)
+        +GetItem(Index: Integer): T
+        +SetItem(Index: Integer, Value: T)
+        +Items[Index: Integer]: T
+    }
 
-class ILockToken {
-  <<interface>>
-}
+    class TThreadSafeList~T~ {
+        -FList: array of T
+        -FCount: Integer
+        -FCapacity: Integer
+        -FLock: TCriticalSection
+        -FComparer: TComparer~T~
+        -FSorted: Boolean
+        +Create(AComparer)
+        +Destroy()
+        -Grow()
+        -QuickSort(Left, Right: Integer, Ascending: Boolean)
+        +Add(Item: T): Integer
+        +Delete(Index: Integer)
+        +Find(Item: T): Integer
+        +Sort(Ascending: Boolean)
+        +Replace(Index, Item)
+        +First(): T
+        +Last(): T
+        +IsSorted(): Boolean
+        +Clear()
+        +IsEmpty(): Boolean
+        +Items[Index: Integer]: T
+        +GetEnumerator(): TEnumerator
+        +Lock(): ILockToken
+    }
 
-class TComparer~T~ {
-  <<function>>
-  +Compare(A: T, B: T): Integer
-}
+    class TEnumerator~T~ {
+        -FList: TThreadSafeList~T~
+        -FIndex: Integer
+        -FCurrent: T
+        -FLockToken: ILockToken
+        +Create(AList: TThreadSafeList~T~)
+        +Destroy()
+        +MoveNext(): Boolean
+        +Current: T
+    }
 
-TThreadSafeList ..> TComparer : uses
-TThreadSafeList *-- TEnumerator : contains
-TEnumerator --> ILockToken : uses
-TThreadSafeList --> ILockToken : creates
+    class ILockToken {
+        <<interface>>
+        +Release()
+    }
+
+    class TLockToken {
+        -FLock: TCriticalSection
+        +Create(ALock: TCriticalSection)
+        +Destroy()
+        +Release()
+    }
+
+    class TComparer~T~ {
+        <<function>>
+        +Compare(A: T, B: T): Integer
+    }
+
+    IThreadSafeCollection~T~ <|-- IThreadSafeList~T~
+    IThreadSafeList~T~ <|.. TThreadSafeList~T~
+    TThreadSafeList~T~ ..> TComparer~T~ : uses
+    TThreadSafeList~T~ *-- TEnumerator~T~ : contains
+    TEnumerator~T~ --> ILockToken : uses
+    TThreadSafeList~T~ --> ILockToken : creates
+    ILockToken <|.. TLockToken : implements
 ```
     
 ## Core Components
