@@ -49,77 +49,142 @@ type
   }
   generic TThreadSafeDictionary<TKey, TValue> = class
   private
-  type
-    PEntry = ^TEntry;
-    TEntry = record
-      Key: TKey;
-      Value: TValue;
-      Hash: Cardinal;
-      Next: PEntry;
-    end;
+    type
+      // PEntry is a pointer to a TEntry record, representing a single entry in the hash table
+      PEntry = ^TEntry;
 
-    // Single enumerator class
-    TEnumerator = class
-    private
-      FDictionary: TThreadSafeDictionary;
-      FCurrentBucket: Integer;
-      FCurrentEntry: PEntry;
-      FLockToken: ILockToken;
-      function GetCurrent: specialize TDictionaryPair<TKey, TValue>;
-    public
-      constructor Create(ADictionary: TThreadSafeDictionary);
-      destructor Destroy; override;
-      function MoveNext: Boolean;
-      property Current: specialize TDictionaryPair<TKey, TValue> read GetCurrent;
-    end;
+      // TEntry represents a key-value pair stored in the dictionary along with its hash and a pointer to the next entry (for collision resolution)
+      TEntry = record
+        Key: TKey;                         // The key associated with the value
+        Value: TValue;                     // The value associated with the key
+        Hash: Cardinal;                    // Cached hash value of the key to optimize lookups
+        Next: PEntry;                      // Pointer to the next entry in the same bucket (in case of hash collisions)
+      end;
+
+      // TEnumerator is a helper class to enable iteration over the dictionary's key-value pairs
+      TEnumerator = class
+      private
+        FDictionary: TThreadSafeDictionary;          // Reference to the dictionary being enumerated
+        FCurrentBucket: Integer;                     // Index of the current bucket being iterated
+        FCurrentEntry: PEntry;                       // Pointer to the current entry in the bucket
+        FLockToken: ILockToken;                      // Token for managing thread-safe access during enumeration
+
+        // Retrieves the current key-value pair
+        function GetCurrent: specialize TDictionaryPair<TKey, TValue>;
+      public
+        // Constructor initializes the enumerator with a reference to the dictionary
+        constructor Create(ADictionary: TThreadSafeDictionary);
+
+        // Destructor cleans up any resources
+        destructor Destroy; override;
+
+        // Advances the enumerator to the next key-value pair
+        function MoveNext: Boolean;
+
+        // Property to access the current key-value pair
+        property Current: specialize TDictionaryPair<TKey, TValue> read GetCurrent;
+      end;
 
   private
-  const
-    INITIAL_BUCKET_COUNT = 16;   // Initial size of hash table
-    LOAD_FACTOR = 0.75;          // Threshold for resizing (75% full)
-    MIN_BUCKET_COUNT = 4;        // Minimum number of buckets
+    const
+      INITIAL_BUCKET_COUNT = 16;   // Initial number of buckets in the hash table
+      LOAD_FACTOR = 0.75;          // Load factor threshold to trigger resizing (75% full)
+      MIN_BUCKET_COUNT = 4;        // Minimum number of buckets to maintain
 
   private
-    FLock: TCriticalSection;     // Thread synchronization
-    FBuckets: array of PEntry;   // Array of bucket heads
-    FCount: integer;             // Number of items in dictionary
-    FHashFunc: specialize THashFunction<TKey>;
-    FEqualityComparer: specialize TEqualityComparison<TKey>;
+    FLock: TCriticalSection;     // Critical section object to ensure thread safety during operations
+    FBuckets: array of PEntry;   // Dynamic array of bucket heads; each bucket is a linked list of entries
+    FCount: integer;             // Current number of key-value pairs stored in the dictionary
+    FHashFunc: specialize THashFunction<TKey>;             // Custom hash function for hashing keys
+    FEqualityComparer: specialize TEqualityComparison<TKey>; // Custom equality comparison function for keys
 
-    { Internal methods for hash table operations }
+    { 
+      Internal methods for hash table operations 
+    }
+
+    // Computes the hash value for a given key using the hash function
     function GetHashValue(const Key: TKey): cardinal;
+
+    // Determines the bucket index for a given hash value
     function GetBucketIndex(Hash: cardinal): integer; inline;
+
+    // Resizes the hash table to the new specified size
     procedure Resize(NewSize: integer);
+
+    // Checks if the current load factor exceeds the threshold and triggers resizing if necessary
     procedure CheckLoadFactor;
+
+    // Finds the entry for a given key within the specified bucket
     function FindEntry(const Key: TKey; Hash: cardinal; BucketIdx: integer): PEntry;
+
+    // Calculates the next power of two greater than or equal to the provided value
     function GetNextPowerOfTwo(Value: integer): integer;
+
+    // Compares two keys for equality using the equality comparer
     function CompareKeys(const Left, Right: TKey): Boolean;
+
   public
+    // Default constructor initializes the dictionary with default settings
     constructor Create;
+
+    // Constructor with specified initial capacity
     constructor Create(InitialCapacity: integer);
+
+    // Constructor with custom hash and equality functions
     constructor Create(const AHashFunc: specialize THashFunction<TKey>;
                       const AEqualityComparer: specialize TEqualityComparison<TKey>);
+
+    // Constructor with specified initial capacity and custom hash and equality functions
     constructor Create(InitialCapacity: integer;
                       const AHashFunc: specialize THashFunction<TKey>;
                       const AEqualityComparer: specialize TEqualityComparison<TKey>);
+
+    // Destructor releases all resources used by the dictionary
     destructor Destroy; override;
 
+    // Adds a new key-value pair to the dictionary
     procedure Add(const Key: TKey; const Value: TValue);
+
+    // Tries to get the value associated with the specified key
     function TryGetValue(const Key: TKey; out Value: TValue): boolean;
+
+    // Removes the key-value pair with the specified key from the dictionary
     function Remove(const Key: TKey): boolean;
+
+    // Replaces the value for the specified key with a new value
     procedure Replace(const Key: TKey; const Value: TValue);
 
+    // Retrieves the first key-value pair in the dictionary
     function First(out Key: TKey; out Value: TValue): boolean;
+
+    // Retrieves the last key-value pair in the dictionary
     function Last(out Key: TKey; out Value: TValue): boolean;
+
+    // Finds and returns the value associated with the specified key
     function Find(const Key: TKey): TValue;
 
+    // Clears all key-value pairs from the dictionary
     procedure Clear;
+
+    // Returns the number of key-value pairs currently stored in the dictionary
     function Count: integer; 
+
+    // Resizes the internal buckets to the new specified size
     procedure ResizeBuckets(NewSize: integer);
+
+    // Retrieves the current number of buckets in the hash table
     function GetBucketCount: integer; 
+
+    // Property to access the number of buckets
     property BucketCount: integer read GetBucketCount; 
+
+    // Default property to access items by key, supports read and write operations
     property Items[const Key: TKey]: TValue read Find write Replace; default;
+
+    // Retrieves an enumerator to iterate over the dictionary's key-value pairs
     function GetEnumerator: TEnumerator;
+
+    // Locks the dictionary for thread-safe operations and returns a lock token
     function Lock: ILockToken;
   end;
 
