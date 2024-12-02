@@ -13,57 +13,150 @@ type
   generic TComparer<T> = function(const A, B: T): Integer;
 
   // Generic ThreadSafe List
+  // This class provides a thread-safe implementation of a generic list.
+  // It allows concurrent access and modifications by multiple threads without data corruption.
   generic TThreadSafeList<T> = class(TInterfacedObject, specialize IThreadSafeList<T>)
   private
-    FList: array of T;
-    FCount: Integer;
-    FCapacity: Integer;
-    FLock: TCriticalSection;
-    FComparer: specialize TComparer<T>;
-    FSorted: Boolean;
-    
+    FList: array of T;                             // Internal dynamic array to store list items
+    FCount: Integer;                               // Current number of items in the list
+    FCapacity: Integer;                            // Current capacity of the internal array
+    FLock: TCriticalSection;                       // Critical section to manage thread synchronization
+    FComparer: specialize TComparer<T>;            // Comparer function to define the sorting logic
+    FSorted: Boolean;                              // Indicates whether the list is currently sorted
+
+    // Increases the capacity of the internal array when needed
     procedure Grow;
+
+    // Performs the QuickSort algorithm on the list
+    // Parameters:
+    //   Left: The starting index of the segment to sort
+    //   Right: The ending index of the segment to sort
+    //   Ascending: Determines the sort order (True for ascending, False for descending)
     procedure QuickSort(Left, Right: Integer; Ascending: Boolean);
+
+    // Retrieves an item at a specific index with thread safety
+    // Parameters:
+    //   Index: The position of the item to retrieve
+    // Returns:
+    //   The item at the specified index
     function GetItem(Index: Integer): T;
+
+    // Sets the value of an item at a specific index with thread safety
+    // Parameters:
+    //   Index: The position of the item to set
+    //   Value: The new value to assign to the item
     procedure SetItem(Index: Integer; const Value: T);
+
+    // Retrieves the current count of items with thread safety
+    // Returns:
+    //   The number of items in the list
     function GetCount: Integer;
   public
+    // Constructor
+    // Initializes the thread-safe list with a provided comparer for sorting
+    // Parameters:
+    //   AComparer: A comparer function to determine the order of elements
     constructor Create(AComparer: specialize TComparer<T>);
+
+    // Destructor
+    // Cleans up resources used by the list, including the critical section
     destructor Destroy; override;
-    
+
+    // Adds a new item to the list in a thread-safe manner
+    // Parameters:
+    //   Item: The item to add to the list
+    // Returns:
+    //   The index at which the item was added
     function Add(const Item: T): Integer;
+
+    // Deletes an item from the list at a specified index in a thread-safe manner
+    // Parameters:
+    //   Index: The position of the item to delete
     procedure Delete(Index: Integer);
+
+    // Finds the index of a specific item in the list
+    // Parameters:
+    //   Item: The item to search for
+    // Returns:
+    //   The index of the item if found; otherwise, -1
     function Find(const Item: T): Integer;
+
+    // Retrieves the first item in the list in a thread-safe manner
+    // Returns:
+    //   The first item in the list
     function First: T;
+
+    // Retrieves the last item in the list in a thread-safe manner
+    // Returns:
+    //   The last item in the list
     function Last: T;
+
+    // Sorts the list using the provided comparer
+    // Parameters:
+    //   Ascending: Optional parameter to sort in ascending order (default is True)
     procedure Sort(Ascending: Boolean = True);
+
+    // Checks if the list is currently sorted
+    // Returns:
+    //   True if the list is sorted; otherwise, False
     function IsSorted: Boolean;
+
+    // Replaces an item at a specified index with a new item in a thread-safe manner
+    // Parameters:
+    //   Index: The position of the item to replace
+    //   Item: The new item to assign to the specified index
     procedure Replace(Index: Integer; const Item: T);
-    
+
+    // Clears all items from the list in a thread-safe manner
     procedure Clear;
+
+    // Checks if the list is empty in a thread-safe manner
+    // Returns:
+    //   True if the list contains no items; otherwise, False
     function IsEmpty: Boolean;
-    
+
+    // Default property to access items by index with thread safety
     property Items[Index: Integer]: T read GetItem write SetItem; default;
+
+    // Property to get the current count of items with thread safety
     property Count: Integer read GetCount;
 
     // Enumerator Class
+    // Provides iteration capabilities for the thread-safe list
     type
       TEnumerator = class
       private
-        FList: specialize TThreadSafeList<T>;
-        FIndex: Integer;
-        FCurrent: T;
-        FLockToken: ILockToken;
+        FList: specialize TThreadSafeList<T>;      // Reference to the thread-safe list being enumerated
+        FIndex: Integer;                           // Current index in the enumeration
+        FCurrent: T;                               // Current element in the enumeration
+        FLockToken: ILockToken;                    // Lock token to ensure thread safety during enumeration
       public
+        // Constructor
+        // Initializes the enumerator with a reference to the thread-safe list
+        // Parameters:
+        //   AList: The thread-safe list to enumerate
         constructor Create(AList: specialize TThreadSafeList<T>);
+
+        // Destructor
+        // Releases the lock token when the enumerator is destroyed
         destructor Destroy; override;
+
+        // Moves to the next element in the list
+        // Returns:
+        //   True if there is a next element; otherwise, False
         function MoveNext: Boolean;
+
+        // Property to access the current element in the enumeration
         property Current: T read FCurrent;
       end;
 
     // GetEnumerator method for for-in loops
+    // Returns an enumerator to iterate over the list's elements
     function GetEnumerator: TEnumerator;
 
+    // Acquires a lock token for thread-safe operations outside the class
+    // Returns:
+    //   An ILockToken that manages the critical section lock
     function Lock: ILockToken;
   end;
 

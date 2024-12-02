@@ -9,80 +9,212 @@ uses
   Classes, SysUtils, SyncObjs, ThreadSafeCollections.Interfaces;
 
 type
-  { TThreadSafeDeque }
+  
+  {
+    TThreadSafeDeque<T> is a generic, thread-safe double-ended queue (deque) implementation.
+    It allows multiple threads to concurrently add or remove items from both the front and back
+    of the queue without causing data corruption or race conditions.
+  }
   generic TThreadSafeDeque<T> = class(TInterfacedObject, specialize IThreadSafeDeque<T>)
   private
     type
+      {
+        TDequeNode represents a single node within the deque.
+        Each node holds the data of type T and pointers to both the next and previous nodes,
+        facilitating efficient insertion and removal from either end of the deque.
+      }
       TDequeNode = record
-        Data: T;
-        Next, Prev: ^TDequeNode;
+        Data: T;                     // The data stored in the deque node.
+        Next, Prev: ^TDequeNode;     // Pointers to the next and previous nodes in the deque.
       end;
+
+      {
+        PNode is a pointer type to a TDequeNode.
+        It simplifies node manipulations by providing a direct reference to deque nodes.
+      }
       PNode = ^TDequeNode;
   private
-    FLock: TCriticalSection;
-    FHead: PNode;
-    FTail: PNode;
-    FCount: Integer;
-    
+    FLock: TCriticalSection; // Synchronization object to ensure that deque operations are thread-safe.
+    FHead: PNode;            // Pointer to the first node (front) of the deque.
+    FTail: PNode;            // Pointer to the last node (back) of the deque.
+    FCount: Integer;         // Tracks the current number of elements in the deque.
+
+    {
+      Frees the memory allocated for a deque node.
+      This is essential for preventing memory leaks when nodes are removed from the deque.
+    }
     procedure FreeNode(ANode: PNode);
+
+    {
+      Retrieves the current number of elements in the deque in a thread-safe manner.
+      Utilizes the critical section to prevent race conditions during access.
+    }
     function GetCount: Integer;
   public
     type
-      // Enumerator Class
+      {
+        TEnumerator provides the functionality to iterate over the elements of the deque.
+        It ensures that the deque remains in a consistent state during enumeration by locking it.
+      }
       TEnumerator = class
       private
-        FDeque: TThreadSafeDeque;
-        FCurrentNode: PNode;
-        FCurrent: T;
-        FLockToken: ILockToken;
+        FDeque: TThreadSafeDeque;     // Reference to the deque being enumerated.
+        FCurrentNode: PNode;          // Pointer to the current node in the iteration.
+        FCurrent: T;                  // Holds the current value of type T during iteration.
+        FLockToken: ILockToken;       // Manages the lock to ensure thread safety throughout enumeration.
+
+        {
+          Retrieves the current element in the enumeration.
+        }
         function GetCurrent: T;
       public
+        {
+          Initializes the enumerator with a reference to the deque.
+          Acquires a lock to ensure the deque remains unchanged during iteration.
+        }
         constructor Create(ADeque: TThreadSafeDeque);
+
+        {
+          Cleans up resources used by the enumerator.
+          Ensures that the lock is released when the enumerator is destroyed.
+        }
         destructor Destroy; override;
+
+        {
+          Advances the enumerator to the next element in the deque.
+        }
         function MoveNext: Boolean;
+
+        {
+          Provides read-only access to the current element in the enumeration.
+        }
         property Current: T read GetCurrent;
       end;
 
+    {
+      Constructs a new instance of TThreadSafeDeque.
+      Initializes the critical section and sets the head and tail pointers to nil,
+      indicating that the deque is initially empty.
+    }
     constructor Create;
+
+    {
+      Destroys the deque instance.
+      Ensures that all nodes are properly freed to prevent memory leaks
+      and releases the critical section resource.
+    }
     destructor Destroy; override;
-    
-    // Add elements
+
+    {
+      Adds an item to the front of the deque.
+      This operation is thread-safe and can be performed concurrently by multiple threads.
+    }
     procedure PushFront(const AItem: T);
+
+    {
+      Adds an item to the back of the deque.
+      This operation is thread-safe and can be performed concurrently by multiple threads.
+    }
     procedure PushBack(const AItem: T);
-    
-    // Remove and return elements
+
+    {
+      Removes and returns the item at the front of the deque.
+      Ensures thread safety by locking the deque during the operation.
+    }
     function PopFront: T;
+
+    {
+      Attempts to remove the item from the front of the deque without raising an exception if the deque is empty.
+    }
     function TryPopFront(out AValue: T): Boolean;
+
+    {
+      Removes and returns the item at the back of the deque.
+      Ensures thread safety by locking the deque during the operation.
+    }
     function PopBack: T;
+
+    {
+      Attempts to remove the item from the back of the deque without raising an exception if the deque is empty.
+    }
     function TryPopBack(out AValue: T): Boolean;
     
-    // Peek without removing
+    {
+      Retrieves the item at the front of the deque without removing it.
+      Ensures thread safety by locking the deque during the operation.
+    }
     function PeekFront: T;
+
+    {
+      Attempts to retrieve the item at the front of the deque without removing it and without raising an exception.
+    }
     function TryPeekFront(out AValue: T): Boolean;
+
+    {
+      Retrieves the item at the back of the deque without removing it.
+      Ensures thread safety by locking the deque during the operation.
+    }
     function PeekBack: T;
+
+    {
+      Attempts to retrieve the item at the back of the deque without removing it and without raising an exception.
+    }
     function TryPeekBack(out AValue: T): Boolean;
     
-    // Clear all elements
+    {
+      Removes all elements from the deque, effectively resetting it to an empty state.
+      Ensures thread safety by locking the deque during the operation.
+    }
     procedure Clear;
     
-    // Properties
+    {
+      Provides read-only access to the number of elements currently in the deque.
+      This property is thread-safe and reflects the real-time count of elements.
+    }
     property Count: Integer read GetCount;
     
-    // Iterator support
+    {
+      Creates and returns an enumerator for iterating over the deque's elements.
+      The enumerator maintains thread safety by locking the deque during enumeration.
+    }
     function GetEnumerator: TEnumerator;
+
+    {
+      Acquires a read lock on the deque to prevent other threads from modifying it.
+      This is useful for performing multiple read operations atomically.
+      The returned ILockToken automatically releases the lock when it goes out of scope,
+      ensuring that locks are properly managed even if exceptions occur.
+    }
     function Lock: ILockToken;
     
-    // Check if deque is empty
+    {
+      Checks whether the deque contains any elements.
+    }
     function IsEmpty: Boolean;
     
-    // Convert to array
+    {
+      Converts all elements of the deque into a dynamic array.
+      This is useful for scenarios where array-based operations or interoperability is required.
+      Ensures thread safety by locking the deque during the conversion process.
+    }
     function ToArray: specialize TArray<T>;
     
-    // Copy all items to an array
+    {
+      Copies the elements of the deque into a provided array starting at a specified index.
+      Ensures that the destination array has sufficient capacity to hold the copied elements.
+    }
     procedure CopyTo(var AArray: array of T; AStartIndex: Integer = 0);
     
-    // Add multiple items
+    {
+      Adds a range of items to the back of the deque in a single operation.
+      This method enhances performance by reducing the overhead of multiple individual push operations.
+    }
     procedure PushRangeBack(const AItems: array of T);
+
+    {
+      Adds a range of items to the front of the deque in a single operation.
+      This method enhances performance by reducing the overhead of multiple individual push operations.
+    }
     procedure PushRangeFront(const AItems: array of T);
   end;
 

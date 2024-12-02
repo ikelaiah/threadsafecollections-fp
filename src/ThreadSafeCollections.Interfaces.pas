@@ -87,13 +87,38 @@ type
     property Count: Integer read GetCount;
   end;
 
-  { TLockToken - Basic implementation of ILockToken }
+  { TLockToken - Basic implementation of ILockToken
+    This class provides a simple mechanism to manage the lifecycle of a lock (critical section).
+    When an instance is created, it acquires the provided critical section.
+    Upon destruction or when Release is called, it ensures the critical section is properly released.
+    This ensures that locks are released even if an exception occurs, preventing potential deadlocks.
+  }
   TLockToken = class(TInterfacedObject, ILockToken)
   private
-    FLock: TCriticalSection;
+    FLock: TCriticalSection; // The critical section being managed
   public
+    { 
+      constructor Create(ALock: TCriticalSection);
+        // Initializes the TLockToken with a given critical section.
+        // Acquires the critical section to ensure exclusive access.
+        // Parameters:
+        //   ALock - The critical section to manage.
+    }
     constructor Create(ALock: TCriticalSection);
+    
+    { 
+      destructor Destroy; override;
+        // Destructor ensures that the critical section is released when the TLockToken is destroyed.
+        // If Release has not been called manually, the lock is still released to prevent deadlocks.
+    }
     destructor Destroy; override;
+    
+    { 
+      procedure Release;
+        // Manually releases the critical section.
+        // After calling Release, the TLockToken no longer holds the lock and cannot release it again.
+        // This is useful when you want to release the lock before the TLockToken is destroyed.
+    }
     procedure Release;
   end;
 
