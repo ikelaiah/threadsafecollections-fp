@@ -13,7 +13,7 @@ type
   generic TComparer<T> = function(const A, B: T): Integer;
 
   // Generic ThreadSafe List
-  generic TThreadSafeList<T> = class
+  generic TThreadSafeList<T> = class(TInterfacedObject, specialize IThreadSafeList<T>)
   private
     FList: array of T;
     FCount: Integer;
@@ -26,6 +26,7 @@ type
     procedure QuickSort(Left, Right: Integer; Ascending: Boolean);
     function GetItem(Index: Integer): T;
     procedure SetItem(Index: Integer; const Value: T);
+    function GetCount: Integer;
   public
     constructor Create(AComparer: specialize TComparer<T>);
     destructor Destroy; override;
@@ -39,8 +40,11 @@ type
     function IsSorted: Boolean;
     procedure Replace(Index: Integer; const Item: T);
     
+    procedure Clear;
+    function IsEmpty: Boolean;
+    
     property Items[Index: Integer]: T read GetItem write SetItem; default;
-    property Count: Integer read FCount;
+    property Count: Integer read GetCount;
 
     // Enumerator Class
     type
@@ -335,6 +339,39 @@ end;
 function TThreadSafeList.Lock: ILockToken;
 begin
   Result := TLockToken.Create(FLock);
+end;
+
+function TThreadSafeList.GetCount: Integer;
+begin
+  FLock.Acquire;
+  try
+    Result := FCount;
+  finally
+    FLock.Release;
+  end;
+end;
+
+procedure TThreadSafeList.Clear;
+begin
+  FLock.Acquire;
+  try
+    SetLength(FList, 0);
+    FCount := 0;
+    FCapacity := 0;
+    FSorted := True;
+  finally
+    FLock.Release;
+  end;
+end;
+
+function TThreadSafeList.IsEmpty: Boolean;
+begin
+  FLock.Acquire;
+  try
+    Result := FCount = 0;
+  finally
+    FLock.Release;
+  end;
 end;
 
 end.

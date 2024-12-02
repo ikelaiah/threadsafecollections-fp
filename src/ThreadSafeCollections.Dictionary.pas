@@ -17,6 +17,8 @@ const
   DEBUG_LOGGING = False;
 
 type
+  EKeyNotFoundException = class(Exception);
+
   { 
     TDictionaryEntry: Generic record representing a key-value pair in the hash table
     - Key: The lookup key
@@ -47,7 +49,7 @@ type
     - Implements separate chaining for collision resolution
     - Automatic resizing when load factor threshold is reached
   }
-  generic TThreadSafeDictionary<TKey, TValue> = class
+  generic TThreadSafeDictionary<TKey, TValue> = class(TInterfacedObject, specialize IThreadSafeDictionary<TKey, TValue>)
   private
     type
       // PEntry is a pointer to a TEntry record, representing a single entry in the hash table
@@ -123,6 +125,11 @@ type
     // Compares two keys for equality using the equality comparer
     function CompareKeys(const Left, Right: TKey): Boolean;
 
+    // Private helper methods
+    function GetCount: Integer;  // Add this for interface
+    function GetItem(const Key: TKey): TValue;  // Add this for interface
+    procedure SetItem(const Key: TKey; const Value: TValue);  // Add this for interface
+
   public
     // Default constructor initializes the dictionary with default settings
     constructor Create;
@@ -186,6 +193,9 @@ type
 
     // Locks the dictionary for thread-safe operations and returns a lock token
     function Lock: ILockToken;
+
+    // IThreadSafeDictionary interface implementation
+    function ContainsKey(const Key: TKey): Boolean;
   end;
 
 implementation
@@ -870,6 +880,42 @@ begin
     Result := FEqualityComparer(Left, Right)
   else
     Result := CompareByte(Left, Right, SizeOf(TKey)) = 0;
+end;
+
+function TThreadSafeDictionary.GetCount: Integer;
+begin
+  FLock.Enter;
+  try
+    Result := FCount;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TThreadSafeDictionary.GetItem(const Key: TKey): TValue;
+begin
+  if not TryGetValue(Key, Result) then
+    raise EKeyNotFoundException.Create('Key not found');
+end;
+
+procedure TThreadSafeDictionary.SetItem(const Key: TKey; const Value: TValue);
+begin
+  Replace(Key, Value);
+end;
+
+function TThreadSafeDictionary.ContainsKey(const Key: TKey): Boolean;
+var
+  Hash: Cardinal;
+  BucketIdx: Integer;
+begin
+  FLock.Enter;
+  try
+    Hash := GetHashValue(Key);
+    BucketIdx := GetBucketIndex(Hash);
+    Result := FindEntry(Key, Hash, BucketIdx) <> nil;
+  finally
+    FLock.Leave;
+  end;
 end;
 
 end.

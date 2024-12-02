@@ -19,7 +19,7 @@ type
     - Uses separate chaining for collision resolution
     - Automatically resizes when load factor exceeds threshold
     - Thread-safe for all operations }
-  generic TThreadSafeHashSet<T> = class
+  generic TThreadSafeHashSet<T> = class(TInterfacedObject, specialize IThreadSafeHashSet<T>)
   private
   type
     // Entry structure for hash set elements
@@ -72,6 +72,9 @@ type
     // Calculates next power of 2 for bucket count
     function GetNextPowerOfTwo(Value: Integer): Integer;
 
+    // Add these private methods for interface implementation
+    function GetCount: Integer;
+
   public
     // Creates a new hash set with specified equality and hash functions
     constructor Create(AEqualityComparer: specialize TEqualityComparer<T>;
@@ -86,12 +89,18 @@ type
     function Contains(const Item: T): Boolean; // Returns true if item exists
     procedure Clear;                           // Removes all items
     
-    property Count: Integer read FCount;       // Number of items in set
+    property Count: Integer read GetCount;       // Number of items in set
     
     { Iterator support }
     function GetEnumerator: TEnumerator;
 
     function Lock: ILockToken;
+
+    // IThreadSafeCollection methods
+    function IsEmpty: Boolean;
+    
+    // IThreadSafeHashSet methods
+    function ToArray: specialize TArray<T>;
   end;
 
   { Specialized hash set types with predefined hash and equality functions }
@@ -300,30 +309,6 @@ begin
   end;
 end;
 
-procedure TThreadSafeHashSet.Clear;
-var
-  I: Integer;
-  Current, Next: PEntry;
-begin
-  FLock.Acquire;
-  try
-    for I := 0 to Length(FBuckets) - 1 do
-    begin
-      Current := FBuckets[I];
-      while Current <> nil do
-      begin
-        Next := Current^.Next;
-        Dispose(Current);
-        Current := Next;
-      end;
-      FBuckets[I] := nil;
-    end;
-    FCount := 0;
-  finally
-    FLock.Release;
-  end;
-end;
-
 function TThreadSafeHashSet.FindEntry(const Item: T; Hash: Cardinal; BucketIdx: Integer): PEntry;
 var
   Current: PEntry;
@@ -482,6 +467,75 @@ begin
   EqualityComparer := @RealEquals;
   HashFunc := @RealHash;
    inherited Create(EqualityComparer, HashFunc, AInitialCapacity);
+end;
+
+function TThreadSafeHashSet.GetCount: Integer;
+begin
+  FLock.Acquire;
+  try
+    Result := FCount;
+  finally
+    FLock.Release;
+  end;
+end;
+
+function TThreadSafeHashSet.IsEmpty: Boolean;
+begin
+  FLock.Acquire;
+  try
+    Result := FCount = 0;
+  finally
+    FLock.Release;
+  end;
+end;
+
+procedure TThreadSafeHashSet.Clear;
+var
+  I: Integer;
+  Current, Next: PEntry;
+begin
+  FLock.Acquire;
+  try
+    for I := 0 to Length(FBuckets) - 1 do
+    begin
+      Current := FBuckets[I];
+      while Current <> nil do
+      begin
+        Next := Current^.Next;
+        Dispose(Current);
+        Current := Next;
+      end;
+      FBuckets[I] := nil;
+    end;
+    FCount := 0;
+  finally
+    FLock.Release;
+  end;
+end;
+
+function TThreadSafeHashSet.ToArray: specialize TArray<T>;
+var
+  I: Integer;
+  Current: PEntry;
+  Index: Integer;
+begin
+  FLock.Acquire;
+  try
+    SetLength(Result, FCount);
+    Index := 0;
+    for I := 0 to Length(FBuckets) - 1 do
+    begin
+      Current := FBuckets[I];
+      while Current <> nil do
+      begin
+        Result[Index] := Current^.Value;
+        Inc(Index);
+        Current := Current^.Next;
+      end;
+    end;
+  finally
+    FLock.Release;
+  end;
 end;
 
 end.

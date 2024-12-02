@@ -10,7 +10,7 @@ uses
 
 type
   { TThreadSafeDeque }
-  generic TThreadSafeDeque<T> = class
+  generic TThreadSafeDeque<T> = class(TInterfacedObject, specialize IThreadSafeDeque<T>)
   private
     type
       TDequeNode = record
@@ -25,6 +25,7 @@ type
     FCount: Integer;
     
     procedure FreeNode(ANode: PNode);
+    function GetCount: Integer;
   public
     type
       // Enumerator Class
@@ -65,7 +66,7 @@ type
     procedure Clear;
     
     // Properties
-    property Count: Integer read FCount;
+    property Count: Integer read GetCount;
     
     // Iterator support
     function GetEnumerator: TEnumerator;
@@ -406,6 +407,16 @@ var
 begin
   for I := Low(AItems) to High(AItems) do
     PushFront(AItems[I]);
+end;
+
+function TThreadSafeDeque.GetCount: Integer;
+begin
+  FLock.Acquire;
+  try
+    Result := FCount;
+  finally
+    FLock.Release;
+  end;
 end;
 
 end.
