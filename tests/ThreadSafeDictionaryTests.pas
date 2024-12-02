@@ -56,52 +56,52 @@ type
     procedure TearDown; override;
   published
     // Basic functionality tests
-    procedure TestCreation;
-    procedure TestAdd;
-    procedure TestAddDuplicate;
-    procedure TestFind;
-    procedure TestRemove;
-    procedure TestReplace;
-    procedure TestClear;
-    procedure TestCount;
-    procedure TestFirstLast;
+    procedure Test1_Creation;
+    procedure Test2_Add;
+    procedure Test3_AddDuplicate;
+    procedure Test4_Find;
+    procedure Test5_Remove;
+    procedure Test6_Replace;
+    procedure Test7_Clear;
+    procedure Test8_Count;
+    procedure Test9_FirstLast;
 
     // Edge cases
-    procedure TestEmptyDictionary;
-    procedure TestLargeDataSet;
-    procedure TestNilValues;
-    procedure TestBoundaries;
+    procedure Test10_EmptyDictionary;
+    procedure Test11_LargeDataSet;
+    procedure Test12_NilValues;
+    procedure Test13_Boundaries;
 
     // Stress tests
-    procedure TestMultiThreadAccess;
-    procedure TestConcurrentOperations;
-    procedure TestHashCollisions;
+    procedure Test14_MultiThreadAccess;
+    procedure Test15_ConcurrentOperations;
+    procedure Test16_HashCollisions;
 
     // Performance tests
-    procedure TestLargeDataSetPerformance;
-    procedure TestHashingPerformance;
+    procedure Test17_LargeDataSetPerformance;
+    procedure Test18_HashingPerformance;
 
     // New tests for initial capacity and resize
-    procedure TestInitialCapacity;
-    procedure TestManualResize;
-    procedure TestResizeWithData;
-    procedure TestResizeUnderflow;
-    procedure TestBucketCount;
+    procedure Test19_InitialCapacity;
+    procedure Test20_ManualResize;
+    procedure Test21_ResizeWithData;
+    procedure Test22_ResizeUnderflow;
+    procedure Test23_BucketCount;
 
     // New iterator tests
-    procedure TestIteratorBasic;
-    procedure TestIteratorEmpty;
-    procedure TestIteratorModification;
-    procedure TestMultipleIterators;
-    procedure TestIteratorReset;
+    procedure Test24_IteratorBasic;
+    procedure Test25_IteratorEmpty;
+    procedure Test26_IteratorModification;
+    procedure Test27_MultipleIterators;
+    procedure Test28_IteratorReset;
 
     // RAII locking mechanism tests
-    procedure TestLockingMechanism;
+    procedure Test29_LockingMechanism;
 
     // New tests for compound keys and custom constructors
-    procedure TestCompoundKeyBasic;
-    procedure TestCompoundKeyIteration;
-    procedure TestCustomConstructors;
+    procedure Test30_CompoundKeyBasic;
+    procedure Test31_CompoundKeyIteration;
+    procedure Test32_CustomConstructors;
   end;
 
   // Add this type after other test thread types
@@ -269,7 +269,7 @@ begin
   FMixedDict.Free;
 end;
 
-procedure TThreadSafeDictionaryTest.TestCreation;
+procedure TThreadSafeDictionaryTest.Test1_Creation;
 begin
   WriteLn('Starting TestCreation');
   IncrementTestCounter;
@@ -278,7 +278,7 @@ begin
   WriteLn('Completed TestCreation');
 end;
 
-procedure TThreadSafeDictionaryTest.TestAdd;
+procedure TThreadSafeDictionaryTest.Test2_Add;
 begin
   WriteLn('Starting TestAdd');
   IncrementTestCounter;
@@ -296,7 +296,7 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestAddDuplicate;
+procedure TThreadSafeDictionaryTest.Test3_AddDuplicate;
 begin
   WriteLn('Starting TestAddDuplicate');
   IncrementTestCounter;
@@ -311,65 +311,11 @@ begin
   WriteLn('Completed TestAddDuplicate');
 end;
 
-procedure TThreadSafeDictionaryTest.TestLargeDataSetPerformance;
-const
-  TEST_SIZE = 100000;
-var
-  I: integer;
-  StartTick, EndTick: QWord;
-  Key: string;
-  HashFunc: specialize THashFunction<string>;
-  EqualityFunc: specialize TEqualityComparison<string>;
-begin
-  HashFunc := @HashString;
-  EqualityFunc := @CompareString;
-  FStrDict.Free;  // Free the old dictionary
-  FStrDict := TStringIntDictionary.Create(HashFunc, EqualityFunc);
-  
-  StartTick := GetTickCount64;
 
-  // Test adding large number of items
-  for I := 0 to TEST_SIZE - 1 do
-  begin
-    Key := 'Key' + IntToStr(I);
-    FStrDict.Add(Key, I);
-  end;
 
-  EndTick := GetTickCount64;
-  WriteLn(Format('Adding %d items took: %d ms', [TEST_SIZE, EndTick - StartTick]));
 
-  // Test finding items
-  StartTick := GetTickCount64;
-  for I := 0 to TEST_SIZE - 1 do
-  begin
-    Key := 'Key' + IntToStr(I);
-    AssertEquals('Value should match', I, FStrDict.Find(Key));
-  end;
-  EndTick := GetTickCount64;
-  WriteLn(Format('Finding %d items took: %d ms', [TEST_SIZE, EndTick - StartTick]));
-end;
 
-procedure TThreadSafeDictionaryTest.TestHashCollisions;
-var
-  I: integer;
-  CollisionKeys: array[0..9] of string;
-begin
-  // Create keys that will likely cause collisions
-  for I := 0 to 9 do
-    CollisionKeys[I] := 'Key' + IntToStr(I * 16);
-  // Using multiples of 16 to force collisions
-
-  // Add values
-  for I := 0 to 9 do
-    FStrDict.Add(CollisionKeys[I], I);
-
-  // Verify all values are still accessible
-  for I := 0 to 9 do
-    AssertEquals('Value should be retrievable after collision',
-      I, FStrDict.Find(CollisionKeys[I]));
-end;
-
-procedure TThreadSafeDictionaryTest.TestFind;
+procedure TThreadSafeDictionaryTest.Test4_Find;
 begin
   WriteLn('Starting TestFind');
   IncrementTestCounter;
@@ -397,7 +343,7 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestRemove;
+procedure TThreadSafeDictionaryTest.Test5_Remove;
 begin
   WriteLn('Starting TestRemove');
   IncrementTestCounter;
@@ -418,7 +364,7 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestReplace;
+procedure TThreadSafeDictionaryTest.Test6_Replace;
 begin
   WriteLn('Starting TestReplace');
   IncrementTestCounter;
@@ -445,7 +391,7 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestClear;
+procedure TThreadSafeDictionaryTest.Test7_Clear;
 begin
   WriteLn('Starting TestClear');
   IncrementTestCounter;
@@ -465,7 +411,7 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestCount;
+procedure TThreadSafeDictionaryTest.Test8_Count;
 begin
   WriteLn('Starting TestCount');
   IncrementTestCounter;
@@ -490,7 +436,7 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestFirstLast;
+procedure TThreadSafeDictionaryTest.Test9_FirstLast;
 var
   Key: string;
   Value: integer;
@@ -517,12 +463,12 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestEmptyDictionary;
+procedure TThreadSafeDictionaryTest.Test10_EmptyDictionary;
 var
   Key: string;
   Value: integer;
 begin
-  WriteLn('Starting TestEmptyDictionary');
+  WriteLn('Starting Test10_EmptyDictionary');
   IncrementTestCounter;
   try
 
@@ -553,7 +499,7 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestLargeDataSet;
+procedure TThreadSafeDictionaryTest.Test11_LargeDataSet;
 const
   TEST_SIZE = 20;
   LOGGING_ENABLED = False;
@@ -562,7 +508,7 @@ var
   Key: string;
   Hash: cardinal;
 begin
-  if LOGGING_ENABLED then WriteLn('Starting TestLargeDataSet');
+  if LOGGING_ENABLED then WriteLn('Starting Test11_LargeDataSet');
   IncrementTestCounter;
   try
     if LOGGING_ENABLED then WriteLn('Adding items...');
@@ -608,7 +554,7 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestNilValues;
+procedure TThreadSafeDictionaryTest.Test12_NilValues;
 var
   Obj: TObject;
 begin
@@ -627,7 +573,7 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestBoundaries;
+procedure TThreadSafeDictionaryTest.Test13_Boundaries;
 var
   I: integer;
   Key: string;
@@ -658,7 +604,7 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestMultiThreadAccess;
+procedure TThreadSafeDictionaryTest.Test14_MultiThreadAccess;
 const
   THREAD_COUNT = 10;
   TIMEOUT_MS = 5000; // 5 second timeout
@@ -667,7 +613,7 @@ var
   I: integer;
   StartTime: QWord;
 begin
-  WriteLn('Starting TestMultiThreadAccess');
+  WriteLn('Starting Test14_MultiThreadAccess');
   StartTime := GetTickCount64;
 
   // Create and start threads
@@ -694,7 +640,7 @@ begin
   WriteLn('TestMultiThreadAccess completed');
 end;
 
-procedure TThreadSafeDictionaryTest.TestConcurrentOperations;
+procedure TThreadSafeDictionaryTest.Test15_ConcurrentOperations;
 const
   ITERATIONS = 1000;
   TIMEOUT_MS = 5000;
@@ -703,7 +649,7 @@ var
   RemoverThread: TRemoverThread;
   StartTime: QWord;
 begin
-  WriteLn('Starting TestConcurrentOperations');
+  WriteLn('Starting Test15_ConcurrentOperations');
   StartTime := GetTickCount64;
 
   AdderThread := TAdderThread.Create(FStrDict, ITERATIONS);
@@ -725,7 +671,65 @@ begin
   WriteLn('TestConcurrentOperations completed');
 end;
 
-procedure TThreadSafeDictionaryTest.TestHashingPerformance;
+procedure TThreadSafeDictionaryTest.Test16_HashCollisions;
+var
+  I: integer;
+  CollisionKeys: array[0..9] of string;
+begin
+  // Create keys that will likely cause collisions
+  for I := 0 to 9 do
+    CollisionKeys[I] := 'Key' + IntToStr(I * 16);
+  // Using multiples of 16 to force collisions
+
+  // Add values
+  for I := 0 to 9 do
+    FStrDict.Add(CollisionKeys[I], I);
+
+  // Verify all values are still accessible
+  for I := 0 to 9 do
+    AssertEquals('Value should be retrievable after collision',
+      I, FStrDict.Find(CollisionKeys[I]));
+end;
+
+procedure TThreadSafeDictionaryTest.Test17_LargeDataSetPerformance;
+const
+  TEST_SIZE = 100000;
+var
+  I: integer;
+  StartTick, EndTick: QWord;
+  Key: string;
+  HashFunc: specialize THashFunction<string>;
+  EqualityFunc: specialize TEqualityComparison<string>;
+begin
+  HashFunc := @HashString;
+  EqualityFunc := @CompareString;
+  FStrDict.Free;  // Free the old dictionary
+  FStrDict := TStringIntDictionary.Create(HashFunc, EqualityFunc);
+  
+  StartTick := GetTickCount64;
+
+  // Test adding large number of items
+  for I := 0 to TEST_SIZE - 1 do
+  begin
+    Key := 'Key' + IntToStr(I);
+    FStrDict.Add(Key, I);
+  end;
+
+  EndTick := GetTickCount64;
+  WriteLn(Format('Adding %d items took: %d ms', [TEST_SIZE, EndTick - StartTick]));
+
+  // Test finding items
+  StartTick := GetTickCount64;
+  for I := 0 to TEST_SIZE - 1 do
+  begin
+    Key := 'Key' + IntToStr(I);
+    AssertEquals('Value should match', I, FStrDict.Find(Key));
+  end;
+  EndTick := GetTickCount64;
+  WriteLn(Format('Finding %d items took: %d ms', [TEST_SIZE, EndTick - StartTick]));
+end;
+
+procedure TThreadSafeDictionaryTest.Test18_HashingPerformance;
 const
   TEST_SIZE = 100000;
 var
@@ -756,11 +760,11 @@ begin
   WriteLn(Format('Finding %d items took: %d ms', [TEST_SIZE, EndTick - StartTick]));
 end;
 
-procedure TThreadSafeDictionaryTest.TestInitialCapacity;
+procedure TThreadSafeDictionaryTest.Test19_InitialCapacity;
 var
   CustomDict: TStringIntDictionary;
 begin
-  WriteLn('Starting TestInitialCapacity');
+  WriteLn('Starting Test19_InitialCapacity');
   IncrementTestCounter;
   try
     // Test with custom initial capacity
@@ -795,9 +799,9 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestManualResize;
+procedure TThreadSafeDictionaryTest.Test20_ManualResize;
 begin
-  WriteLn('Starting TestManualResize');
+  WriteLn('Starting Test20_ManualResize');
   IncrementTestCounter;
   try
     // Start with default size
@@ -821,14 +825,14 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestResizeWithData;
+procedure TThreadSafeDictionaryTest.Test21_ResizeWithData;
 var
   I: Integer;
   Key: string;
   HashFunc: specialize THashFunction<string>;
   EqualityFunc: specialize TEqualityComparison<string>;
 begin
-  WriteLn('Starting TestResizeWithData');
+  WriteLn('Starting Test21_ResizeWithData');
   IncrementTestCounter;
   try
     HashFunc := @HashString;
@@ -864,11 +868,11 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestResizeUnderflow;
+procedure TThreadSafeDictionaryTest.Test22_ResizeUnderflow;
 var
   I: Integer;
 begin
-  WriteLn('Starting TestResizeUnderflow');
+  WriteLn('Starting Test22_ResizeUnderflow');
   IncrementTestCounter;
   try
     // Add enough items to prevent small resize
@@ -894,11 +898,11 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestBucketCount;
+procedure TThreadSafeDictionaryTest.Test23_BucketCount;
 var
   I: Integer;
 begin
-  WriteLn('Starting TestBucketCount');
+  WriteLn('Starting Test23_BucketCount');
   IncrementTestCounter;
   try
     AssertEquals('Initial bucket count should be 16', 16, FStrDict.BucketCount);
@@ -920,13 +924,13 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestIteratorBasic;
+procedure TThreadSafeDictionaryTest.Test24_IteratorBasic;
 var
   Iterator: TStringIntDictionary.TEnumerator;
   ExpectedCount: Integer;
   Pair: TStringIntDictionaryPair;
 begin
-  WriteLn('Starting TestIteratorBasic');
+  WriteLn('Starting Test24_IteratorBasic');
   IncrementTestCounter;
   try
     // Add test data
@@ -958,11 +962,11 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestIteratorEmpty;
+procedure TThreadSafeDictionaryTest.Test25_IteratorEmpty;
 var
   Iterator: TStringIntDictionary.TEnumerator;
 begin
-  WriteLn('Starting TestIteratorEmpty');
+  WriteLn('Starting Test25_IteratorEmpty');
   IncrementTestCounter;
   try
     Iterator := FStrDict.GetEnumerator;
@@ -981,12 +985,12 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestIteratorModification;
+procedure TThreadSafeDictionaryTest.Test26_IteratorModification;
 var
   Iterator: TStringIntDictionary.TEnumerator;
   Pair: TStringIntDictionaryPair;
 begin
-  WriteLn('Starting TestIteratorModification');
+  WriteLn('Starting Test26_IteratorModification');
   IncrementTestCounter;
   try
     FStrDict.Add('one', 1);
@@ -1018,13 +1022,13 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestMultipleIterators;
+procedure TThreadSafeDictionaryTest.Test27_MultipleIterators;
 var
   Iterator1, Iterator2: TStringIntDictionary.TEnumerator;
   Pair1, Pair2: TStringIntDictionaryPair;
   Count1, Count2: Integer;
 begin
-  WriteLn('Starting TestMultipleIterators');
+  WriteLn('Starting Test27_MultipleIterators');
   IncrementTestCounter;
   try
     FStrDict.Add('one', 1);
@@ -1063,12 +1067,12 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestIteratorReset;
+procedure TThreadSafeDictionaryTest.Test28_IteratorReset;
 var
   Iterator: TStringIntDictionary.TEnumerator;
   FirstPair, CurrentPair: TStringIntDictionaryPair;
 begin
-  WriteLn('Starting TestIteratorReset');
+  WriteLn('Starting Test28_IteratorReset');
   IncrementTestCounter;
   try
     FStrDict.Add('one', 1);
@@ -1104,7 +1108,7 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestLockingMechanism;
+procedure TThreadSafeDictionaryTest.Test29_LockingMechanism;
 const
   THREAD_COUNT = 4;
   ITERATIONS = 1000;
@@ -1162,7 +1166,7 @@ begin
             (Left.LastName = Right.LastName);
 end;
 
-procedure TThreadSafeDictionaryTest.TestCompoundKeyBasic;
+procedure TThreadSafeDictionaryTest.Test30_CompoundKeyBasic;
 var
   Dict: TPersonDictionary;
   Person: TPersonKey;
@@ -1170,7 +1174,7 @@ var
   HashFunc: TPersonHashFunction;
   EqualityFunc: TPersonEqualityComparison;
 begin
-  WriteLn('Starting TestCompoundKeyBasic');
+  WriteLn('Starting Test30_CompoundKeyBasic');
   IncrementTestCounter;
   try
     HashFunc := @HashPerson;
@@ -1204,7 +1208,7 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestCompoundKeyIteration;
+procedure TThreadSafeDictionaryTest.Test31_CompoundKeyIteration;
 var
   Dict: TPersonDictionary;
   Person: TPersonKey;
@@ -1213,7 +1217,7 @@ var
   HashFunc: TPersonHashFunction;
   EqualityFunc: TPersonEqualityComparison;
 begin
-  WriteLn('Starting TestCompoundKeyIteration');
+  WriteLn('Starting Test31_CompoundKeyIteration');
   IncrementTestCounter;
   try
     HashFunc := @HashPerson;
@@ -1256,7 +1260,7 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.TestCustomConstructors;
+procedure TThreadSafeDictionaryTest.Test32_CustomConstructors;
 var
   Dict: TPersonDictionary;
   Person: TPersonKey;
@@ -1264,7 +1268,7 @@ var
   HashFunc: TPersonHashFunction;
   EqualityFunc: TPersonEqualityComparison;
 begin
-  WriteLn('Starting TestCustomConstructors');
+  WriteLn('Starting Test32_CustomConstructors');
   IncrementTestCounter;
   try
     HashFunc := @HashPerson;
