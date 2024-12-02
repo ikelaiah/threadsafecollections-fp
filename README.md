@@ -21,12 +21,20 @@ Current State:
    - Iterators use RAII-style locking through interface counting
    - Thread-safe iteration with automatic lock management
    - Each iterator maintains its own lock token
-- ❌ Limited bulk operations
+- ⚠️ Partial bulk operations support
+   - ✅ Implemented in Deque
+   - ❌ Not yet in List, Dictionary, HashSet
 - ❌ Performance not yet optimized
 
 Planned Features:
 - 🔄 Better naming conventions of methods
+   - Standardize Add/Remove vs Push/Pop terminology
+   - Align with FPC standard collections naming
+   - Consistent naming for bulk operations
+   - Consistent naming for existence checks (Contains vs Exists)
 - 🔄 Bulk operations
+   - ✅ Implemented for Deque
+   - ❌ Pending for List, Dictionary, and HashSet
 - 🔄 Performance optimizations
 - 🔄 More specialized types
 
