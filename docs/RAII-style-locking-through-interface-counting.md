@@ -52,7 +52,7 @@ It's a very neat solution that leverages Free Pascal's interface reference count
 
 ## More on TLockToken
 
-The RAII pattern is commonly used in C++, but you see this specific implementation in Free Pascal in Delphi/FPC codebases and documentation. The key insight is that Free Pascal's interfaces (IInterface) provide automatic reference counting and cleanup, similar to C++'s RAII.
+The RAII pattern is commonly used in C++, and this specific implementation is also seen in Free Pascal within Delphi/FPC codebases and documentation. The key insight is that Free Pascal's interfaces (IInterface) provide automatic reference counting and cleanup, similar to C++'s RAII mechanism.
 
 While the RAII pattern through interface counting is not commonly seen in Pascal codebases, it provides significant benefits:
 
@@ -63,6 +63,7 @@ While the RAII pattern through interface counting is not commonly seen in Pascal
 Our implementation in ThreadSafeCollections demonstrates these benefits, as shown by the test results across all collections.
 
 The beauty of using ILockToken for this purpose remains valid:
+
 - Reference counting is automatic
 - Cleanup is guaranteed even if an exception occurs
 - The scope of the lock is clear and explicit
