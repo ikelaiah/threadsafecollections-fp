@@ -313,6 +313,45 @@ type
           - A dynamic array of type T containing all items from the hash set.
     }
     function ToArray: specialize TArray<T>;
+
+    { 
+      AddRange: 
+        Adds a range of items to the hash set.
+        
+        This function adds multiple items to the hash set in a thread-safe manner.
+        
+        Parameters:
+          - Items: An array of items to be added to the hash set.
+    }
+    procedure AddRange(const Items: array of T);
+
+    { 
+      ExceptWith: 
+        Removes all items from the hash set that are also present in the specified other hash set.
+        
+        This function removes all items from the current hash set that are present in the specified other hash set.
+        
+        Parameters:
+          - Other: The other hash set to compare with the current hash set.
+        
+        Returns:
+          - True if the hash set was modified; False otherwise.
+    }
+    function ExceptWith(const Other: IThreadSafeHashSet<T>): Boolean;
+
+    { 
+      UnionWith: 
+        Adds all items from the specified other hash set to the current hash set.
+        
+        This function adds all items from the specified other hash set to the current hash set.
+        
+        Parameters:
+          - Other: The other hash set to add to the current hash set.
+        
+        Returns:
+          - True if the hash set was modified; False otherwise.
+    }
+    function UnionWith(const Other: IThreadSafeHashSet<T>): Boolean;
   end;
 
   { Specialized hash set types with predefined hash and equality functions }
@@ -745,6 +784,65 @@ begin
         Current := Current^.Next;
       end;
     end;
+  finally
+    FLock.Release;
+  end;
+end;
+
+procedure TThreadSafeHashSet.AddRange(const Items: array of T);
+var
+  I: Integer;
+begin
+  FLock.Acquire;
+  try
+    for I := 0 to High(Items) do
+      Add(Items[I]);  // Add will handle duplicates and resizing
+  finally
+    FLock.Release;
+  end;
+end;
+
+function TThreadSafeHashSet.ExceptWith(const Other: IThreadSafeHashSet<T>): Boolean;
+var
+  OtherArray: TArray<T>;
+  I: Integer;
+  Modified: Boolean;
+begin
+  if Other = nil then
+    Exit(False);
+
+  Modified := False;
+  OtherArray := Other.ToArray;
+  
+  FLock.Acquire;
+  try
+    for I := 0 to High(OtherArray) do
+      if Remove(OtherArray[I]) then
+        Modified := True;
+    Result := Modified;
+  finally
+    FLock.Release;
+  end;
+end;
+
+function TThreadSafeHashSet.UnionWith(const Other: IThreadSafeHashSet<T>): Boolean;
+var
+  OtherArray: TArray<T>;
+  I: Integer;
+  Modified: Boolean;
+begin
+  if Other = nil then
+    Exit(False);
+
+  Modified := False;
+  OtherArray := Other.ToArray;
+  
+  FLock.Acquire;
+  try
+    for I := 0 to High(OtherArray) do
+      if Add(OtherArray[I]) then
+        Modified := True;
+    Result := Modified;
   finally
     FLock.Release;
   end;

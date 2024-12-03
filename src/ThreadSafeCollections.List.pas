@@ -6,7 +6,7 @@ unit ThreadSafeCollections.List;
 interface
 
 uses
-  Classes, SysUtils, SyncObjs, ThreadSafeCollections.Interfaces;
+  Classes, SysUtils, SyncObjs, Generics.Defaults, ThreadSafeCollections.Interfaces;
 
 type
   // Generic comparer type
@@ -74,13 +74,6 @@ type
     //   Index: The position of the item to delete
     procedure Delete(Index: Integer);
 
-    // Finds the index of a specific item in the list
-    // Parameters:
-    //   Item: The item to search for
-    // Returns:
-    //   The index of the item if found; otherwise, -1
-    function Find(const Item: T): Integer;
-
     // Retrieves the first item in the list in a thread-safe manner
     // Returns:
     //   The first item in the list
@@ -94,18 +87,7 @@ type
     // Sorts the list using the provided comparer
     // Parameters:
     //   Ascending: Optional parameter to sort in ascending order (default is True)
-    procedure Sort(Ascending: Boolean = True);
-
-    // Checks if the list is currently sorted
-    // Returns:
-    //   True if the list is sorted; otherwise, False
-    function IsSorted: Boolean;
-
-    // Replaces an item at a specified index with a new item in a thread-safe manner
-    // Parameters:
-    //   Index: The position of the item to replace
-    //   Item: The new item to assign to the specified index
-    procedure Replace(Index: Integer; const Item: T);
+    procedure Sort(const Comparison: specialize TComparison<T> = nil);
 
     // Clears all items from the list in a thread-safe manner
     procedure Clear;
@@ -158,6 +140,40 @@ type
     // Returns:
     //   An ILockToken that manages the critical section lock
     function Lock: ILockToken;
+
+    // Inserts an item into the list at a specified index
+    // Parameters:
+    //   Index: The position to insert the item
+    //   Item: The item to insert
+    procedure Insert(Index: Integer; const Item: T);
+
+    // Removes the first occurrence of an item from the list
+    // Parameters:
+    //   Item: The item to remove
+    // Returns:
+    //   The index of the item if found; otherwise, -1
+    function Remove(const Item: T): Integer;
+
+    // Extracts the first occurrence of an item from the list
+    // Parameters:
+    //   Item: The item to extract
+    // Returns:
+    //   The extracted item
+    function Extract(const Item: T): T;
+
+    // Checks if the list contains a specific item
+    // Parameters:
+    //   Item: The item to check for
+    // Returns:
+    //   True if the item is found; otherwise, False
+    function Contains(const Item: T): Boolean;
+
+    // Finds the index of a specific item in the list
+    // Parameters:
+    //   Item: The item to search for
+    // Returns:
+    //   The index of the item if found; otherwise, -1
+    function IndexOf(const Item: T): Integer;
   end;
 
 // Basic comparers declarations
@@ -295,24 +311,6 @@ begin
   end;
 end;
 
-function TThreadSafeList.Find(const Item: T): Integer;
-var
-  I: Integer;
-begin
-  Result := -1;
-  FLock.Acquire;
-  try
-    for I := 0 to FCount - 1 do
-      if FComparer(FList[I], Item) = 0 then
-      begin
-        Result := I;
-        Break;
-      end;
-  finally
-    FLock.Release;
-  end;
-end;
-
 function TThreadSafeList.First: T;
 begin
   FLock.Acquire;
@@ -337,43 +335,28 @@ begin
   end;
 end;
 
-procedure TThreadSafeList.Sort(Ascending: Boolean);
+procedure TThreadSafeList.Sort(const Comparison: specialize TComparison<T> = nil);
+var
+  OldComparer: TComparer<T>;
 begin
   FLock.Acquire;
   try
     if FCount > 1 then
-      QuickSort(0, FCount - 1, Ascending);
-    FSorted := True;
-  finally
-    FLock.Release;
-  end;
-end;
-
-function TThreadSafeList.IsSorted: Boolean;
-begin
-  FLock.Acquire;
-  try
-    Result := FSorted;
-  finally
-    FLock.Release;
-  end;
-end;
-
-procedure TThreadSafeList.Replace(Index: Integer; const Item: T);
-begin
-  FLock.Acquire;
-  try
-    if (Index < 0) or (Index >= FCount) then
-      raise Exception.Create('Index out of bounds');
-    FList[Index] := Item;
-    
-    if FSorted then
     begin
-      if (Index > 0) and (FComparer(FList[Index-1], Item) > 0) then
-        FSorted := False
-      else if (Index < FCount-1) and (FComparer(Item, FList[Index+1]) > 0) then
-        FSorted := False;
+      if Assigned(Comparison) then
+      begin
+        OldComparer := FComparer;
+        FComparer := Comparison;
+        try
+          QuickSort(0, FCount - 1, True);
+        finally
+          FComparer := OldComparer;
+        end;
+      end
+      else
+        QuickSort(0, FCount - 1, True);
     end;
+    FSorted := True;
   finally
     FLock.Release;
   end;
@@ -393,7 +376,15 @@ end;
 
 procedure TThreadSafeList.SetItem(Index: Integer; const Value: T);
 begin
-  Replace(Index, Value);
+  FLock.Acquire;
+  try
+    if (Index < 0) or (Index >= FCount) then
+      raise Exception.Create('Index out of bounds');
+    FList[Index] := Value;
+    FSorted := False;  // Setting items directly invalidates sort order
+  finally
+    FLock.Release;
+  end;
 end;
 
 { TThreadSafeList.TEnumerator }
@@ -462,6 +453,94 @@ begin
   FLock.Acquire;
   try
     Result := FCount = 0;
+  finally
+    FLock.Release;
+  end;
+end;
+
+procedure TThreadSafeList.Insert(Index: Integer; const Item: T);
+begin
+  FLock.Acquire;
+  try
+    if (Index < 0) or (Index > FCount) then
+      raise Exception.Create('Index out of bounds');
+      
+    if FCount = FCapacity then
+      Grow;
+      
+    if Index < FCount then
+      Move(FList[Index], FList[Index + 1], (FCount - Index) * SizeOf(T));
+      
+    FList[Index] := Item;
+    Inc(FCount);
+    FSorted := False;
+  finally
+    FLock.Release;
+  end;
+end;
+
+function TThreadSafeList.Remove(const Item: T): Integer;
+begin
+  FLock.Acquire;
+  try
+    Result := IndexOf(Item);
+    if Result >= 0 then
+      Delete(Result);
+  finally
+    FLock.Release;
+  end;
+end;
+
+function TThreadSafeList.Extract(const Item: T): T;
+var
+  Index: Integer;
+begin
+  FLock.Acquire;
+  try
+    Index := IndexOf(Item);
+    if Index >= 0 then
+    begin
+      Result := FList[Index];
+      Delete(Index);
+    end
+    else
+      raise Exception.Create('Item not found');
+  finally
+    FLock.Release;
+  end;
+end;
+
+function TThreadSafeList.Contains(const Item: T): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  FLock.Acquire;
+  try
+    for I := 0 to FCount - 1 do
+      if FComparer(FList[I], Item) = 0 then
+      begin
+        Result := True;
+        Break;
+      end;
+  finally
+    FLock.Release;
+  end;
+end;
+
+function TThreadSafeList.IndexOf(const Item: T): Integer;
+var
+  I: Integer;
+begin
+  Result := -1;
+  FLock.Acquire;
+  try
+    for I := 0 to FCount - 1 do
+      if FComparer(FList[I], Item) = 0 then
+      begin
+        Result := I;
+        Break;
+      end;
   finally
     FLock.Release;
   end;

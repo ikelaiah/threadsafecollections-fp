@@ -6,7 +6,8 @@ unit ThreadSafeCollections.Dictionary;
 interface
 
 uses
-  SysUtils, Classes, SyncObjs, HashFunctions, TypInfo, ThreadSafeCollections.Interfaces;
+  SysUtils, Classes, SyncObjs, HashFunctions, TypInfo, 
+  Generics.Collections, ThreadSafeCollections.Interfaces;
 
 { 
   DEBUG_LOGGING: Global flag to control debug output
@@ -87,6 +88,8 @@ type
         property Current: specialize TDictionaryPair<TKey, TValue> read GetCurrent;
       end;
 
+      TKeyValuePair = specialize TPair<TKey, TValue>;
+
   private
     const
       INITIAL_BUCKET_COUNT = 16;   // Initial number of buckets in the hash table
@@ -158,9 +161,6 @@ type
     // Removes the key-value pair with the specified key from the dictionary
     function Remove(const Key: TKey): boolean;
 
-    // Replaces the value for the specified key with a new value
-    procedure Replace(const Key: TKey; const Value: TValue);
-
     // Retrieves the first key-value pair in the dictionary
     function First(out Key: TKey; out Value: TValue): boolean;
 
@@ -186,7 +186,7 @@ type
     property BucketCount: integer read GetBucketCount; 
 
     // Default property to access items by key, supports read and write operations
-    property Items[const Key: TKey]: TValue read Find write Replace; default;
+    property Items[const Key: TKey]: TValue read GetItem write SetItem; default;
 
     // Retrieves an enumerator to iterate over the dictionary's key-value pairs
     function GetEnumerator: TEnumerator;
@@ -196,6 +196,11 @@ type
 
     // IThreadSafeDictionary interface implementation
     function ContainsKey(const Key: TKey): Boolean;
+
+    // Add these new method declarations to public section:
+    function AddOrSetValue(const Key: TKey; const Value: TValue): Boolean;
+    function ContainsValue(const Value: TValue): Boolean;
+    procedure AddOrUpdateRange(const Items: array of TKeyValuePair);
   end;
 
 implementation
@@ -619,41 +624,6 @@ begin
 end;
 
 {
-  Replace: Updates value for existing key
-  - Thread-safe operation
-  - Does not change bucket structure
-  - Raises exception if key doesn't exist
-  
-  Parameters:
-  - Key: The key to update
-  - Value: New value to store
-  
-  Raises:
-  - Exception if key not found
-}
-procedure TThreadSafeDictionary.Replace(const Key: TKey; const Value: TValue);
-var
-  Hash: cardinal;
-  BucketIdx: integer;
-  Entry: PEntry;
-begin
-  FLock.Enter;
-  try
-    Hash := GetHashValue(Key);
-    BucketIdx := GetBucketIndex(Hash);
-    Entry := FindEntry(Key, Hash, BucketIdx);
-
-    if Entry = nil then
-      raise Exception.Create('Key not found')
-    else
-      Entry^.Value := Value;
-  finally
-    FLock.Leave;
-  end;
-end;
-
-
-{
   First: Retrieves first key-value pair in dictionary
   - Thread-safe operation
   - Traverses buckets from start
@@ -900,7 +870,7 @@ end;
 
 procedure TThreadSafeDictionary.SetItem(const Key: TKey; const Value: TValue);
 begin
-  Replace(Key, Value);
+  AddOrSetValue(Key, Value);
 end;
 
 function TThreadSafeDictionary.ContainsKey(const Key: TKey): Boolean;
@@ -913,6 +883,81 @@ begin
     Hash := GetHashValue(Key);
     BucketIdx := GetBucketIndex(Hash);
     Result := FindEntry(Key, Hash, BucketIdx) <> nil;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TThreadSafeDictionary.AddOrSetValue(const Key: TKey; const Value: TValue): Boolean;
+var
+  Hash: Cardinal;
+  BucketIdx: Integer;
+  Entry: PEntry;
+begin
+  FLock.Enter;
+  try
+    Hash := GetHashValue(Key);
+    BucketIdx := GetBucketIndex(Hash);
+    Entry := FindEntry(Key, Hash, BucketIdx);
+
+    if Entry <> nil then
+    begin
+      // Key exists, update value
+      Entry^.Value := Value;
+      Result := False; // Indicates value was updated
+    end
+    else
+    begin
+      // Key doesn't exist, add new entry
+      New(Entry);
+      Entry^.Key := Key;
+      Entry^.Value := Value;
+      Entry^.Hash := Hash;
+      Entry^.Next := FBuckets[BucketIdx];
+      FBuckets[BucketIdx] := Entry;
+      Inc(FCount);
+      CheckLoadFactor;
+      Result := True; // Indicates new key was added
+    end;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TThreadSafeDictionary.ContainsValue(const Value: TValue): Boolean;
+var
+  I: Integer;
+  Entry: PEntry;
+begin
+  Result := False;
+  FLock.Enter;
+  try
+    for I := 0 to Length(FBuckets) - 1 do
+    begin
+      Entry := FBuckets[I];
+      while Entry <> nil do
+      begin
+        if CompareByte(Entry^.Value, Value, SizeOf(TValue)) = 0 then
+        begin
+          Result := True;
+          Exit;
+        end;
+        Entry := Entry^.Next;
+      end;
+    end;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+procedure TThreadSafeDictionary.AddOrUpdateRange(const Items: array of TKeyValuePair);
+var
+  I: Integer;
+begin
+  FLock.Enter;
+  try
+    for I := 0 to High(Items) do
+      AddOrSetValue(Items[I].Key, Items[I].Value);
   finally
     FLock.Leave;
   end;

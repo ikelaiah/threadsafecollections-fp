@@ -6,15 +6,19 @@ unit ThreadSafeCollections.Interfaces;
 interface
 
 uses
-  Classes, SysUtils, SyncObjs;
+  Classes, SysUtils, SyncObjs, ThreadSafeCollections.Types, Generics.Collections;
 
 type
+  // Define the specialized pair type here
+  TKeyValuePair = specialize TPair<TKey, TValue>;
+
   { ILockToken - Interface for managing thread-safe access }
   ILockToken = interface
     ['{A8F9D6B3-C2E4-4F5D-9E8A-1B7D3F2C8A0D}']
     procedure Release;
   end;
 
+  // Collection interfaces
   { IThreadSafeCollection - Base interface for all collections }
   generic IThreadSafeCollection<T> = interface
     ['{D7E5C4B2-A1F3-4E2D-8B9C-0D6E5F4A3B2C}']
@@ -38,7 +42,7 @@ type
     function Contains(const Item: T): Boolean;
     function First: T;
     function Last: T;
-    procedure Sort(const Comparison: TComparison<T>);
+    procedure Sort(const Comparison: specialize TComparison<T>);
     function GetItem(Index: Integer): T;
     procedure SetItem(Index: Integer; const Value: T);
     
@@ -70,13 +74,15 @@ type
     function Contains(const Item: T): Boolean;
     function ToArray: specialize TArray<T>;
     procedure AddRange(const Items: array of T);
-    function ExceptWith(const Other: IThreadSafeHashSet<T>): Boolean;
-    function UnionWith(const Other: IThreadSafeHashSet<T>): Boolean;
+    function ExceptWith(const Other: specialize IThreadSafeHashSet<T>): Boolean;
+    function UnionWith(const Other: specialize IThreadSafeHashSet<T>): Boolean;
   end;
 
   { IThreadSafeDictionary - Interface for dictionary operations }
   generic IThreadSafeDictionary<TKey, TValue> = interface
     ['{F1E2D3C4-B5A6-4789-8901-23456789ABCD}']
+
+    
     procedure Add(const Key: TKey; const Value: TValue);
     function Remove(const Key: TKey): Boolean;
     function TryGetValue(const Key: TKey; out Value: TValue): Boolean;
@@ -88,7 +94,7 @@ type
     function GetCount: Integer;
     procedure Clear;
     function Lock: ILockToken;
-    procedure AddOrUpdateRange(const Items: array of TPair<TKey, TValue>);
+    procedure AddOrUpdateRange(const Items: array of TKeyValuePair);
     
     property Items[const Key: TKey]: TValue read GetItem write SetItem; default;
     property Count: Integer read GetCount;

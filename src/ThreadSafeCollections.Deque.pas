@@ -209,13 +209,13 @@ type
       Adds a range of items to the back of the deque in a single operation.
       This method enhances performance by reducing the overhead of multiple individual push operations.
     }
-    procedure PushRangeBack(const AItems: array of T);
+    procedure AddRange(const AItems: array of T);
 
     {
       Adds a range of items to the front of the deque in a single operation.
       This method enhances performance by reducing the overhead of multiple individual push operations.
     }
-    procedure PushRangeFront(const AItems: array of T);
+    procedure InsertRange(const AItems: array of T);
   end;
 
 implementation
@@ -525,7 +525,7 @@ begin
   end;
 end;
 
-procedure TThreadSafeDeque.PushRangeBack(const AItems: array of T);
+procedure TThreadSafeDeque.AddRange(const AItems: array of T);
 var
   I: Integer;
 begin
@@ -533,7 +533,7 @@ begin
     PushBack(AItems[I]);
 end;
 
-procedure TThreadSafeDeque.PushRangeFront(const AItems: array of T);
+procedure TThreadSafeDeque.InsertRange(const AItems: array of T);
 var
   I: Integer;
 begin
