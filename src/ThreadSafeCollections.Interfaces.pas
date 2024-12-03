@@ -75,7 +75,7 @@ type
     procedure Add(const Key: TKey; const Value: TValue);
     function Remove(const Key: TKey): Boolean;
     function TryGetValue(const Key: TKey; out Value: TValue): Boolean;
-    procedure Replace(const Key: TKey; const Value: TValue);
+    procedure AddOrSetValue(const Key: TKey; const Value: TValue);
     function ContainsKey(const Key: TKey): Boolean;
     function GetItem(const Key: TKey): TValue;
     procedure SetItem(const Key: TKey; const Value: TValue);

@@ -61,7 +61,7 @@ type
     procedure Test3_AddDuplicate;
     procedure Test4_Find;
     procedure Test5_Remove;
-    procedure Test6_Replace;
+    procedure Test6_AddOrSetValue;
     procedure Test7_Clear;
     procedure Test8_Count;
     procedure Test9_FirstLast;
@@ -364,28 +364,28 @@ begin
   end;
 end;
 
-procedure TThreadSafeDictionaryTest.Test6_Replace;
+procedure TThreadSafeDictionaryTest.Test6_AddOrSetValue;
 begin
   WriteLn('Starting TestReplace');
   IncrementTestCounter;
   try
     FStrDict.Add('test', 1);
-    FStrDict.Replace('test', 2);
+    FStrDict.AddOrSetValue('test', 2);
 
     AssertEquals('Value should be replaced', 2, FStrDict.Find('test'));
 
     try
-      FStrDict.Replace('nonexistent', 1);
+      FStrDict.AddOrSetValue('nonexistent', 1);
       Fail('Should raise exception for nonexistent key');
     except
       on E: Exception do
         AssertTrue('Correct exception raised', True);
     end;
-    WriteLn('Completed TestReplace');
+    WriteLn('Completed TestAddOrSetValue');
   except
     on E: Exception do
     begin
-      WriteLn('TestReplace failed: ', E.Message);
+      WriteLn('TestAddOrSetValue failed: ', E.Message);
       raise;
     end;
   end;
@@ -564,7 +564,7 @@ begin
     FMixedDict.TryGetValue('test', Obj));
   AssertNull('Should retrieve nil value', Obj);
 
-  FMixedDict.Replace('test', TObject.Create);
+  FMixedDict.AddOrSetValue('test', TObject.Create);
   try
     AssertNotNull('Should replace nil with object',
       FMixedDict.Find('test'));

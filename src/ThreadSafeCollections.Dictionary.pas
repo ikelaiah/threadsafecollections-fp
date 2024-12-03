@@ -73,6 +73,8 @@ type
 
         // Retrieves the current key-value pair
         function GetCurrent: specialize TDictionaryPair<TKey, TValue>;
+
+
       public
         // Constructor initializes the enumerator with a reference to the dictionary
         constructor Create(ADictionary: TThreadSafeDictionary);
@@ -130,6 +132,7 @@ type
     function GetItem(const Key: TKey): TValue;  // Add this for interface
     procedure SetItem(const Key: TKey; const Value: TValue);  // Add this for interface
 
+
   public
     // Default constructor initializes the dictionary with default settings
     constructor Create;
@@ -158,8 +161,8 @@ type
     // Removes the key-value pair with the specified key from the dictionary
     function Remove(const Key: TKey): boolean;
 
-    // Replaces the value for the specified key with a new value
-    procedure Replace(const Key: TKey; const Value: TValue);
+    // Adds or updates a key-value pair in the dictionary
+    procedure AddOrSetValue(const Key: TKey; const Value: TValue);
 
     // Retrieves the first key-value pair in the dictionary
     function First(out Key: TKey; out Value: TValue): boolean;
@@ -186,7 +189,7 @@ type
     property BucketCount: integer read GetBucketCount; 
 
     // Default property to access items by key, supports read and write operations
-    property Items[const Key: TKey]: TValue read Find write Replace; default;
+    property Items[const Key: TKey]: TValue read Find write AddOrSetValue; default;
 
     // Retrieves an enumerator to iterate over the dictionary's key-value pairs
     function GetEnumerator: TEnumerator;
@@ -199,6 +202,7 @@ type
   end;
 
 implementation
+
 
 { TThreadSafeDictionary implementation }
 
@@ -619,24 +623,28 @@ begin
 end;
 
 {
-  Replace: Updates value for existing key
+  AddOrSetValue: Adds or updates a key-value pair in the dictionary.
   - Thread-safe operation
   - Does not change bucket structure
-  - Raises exception if key doesn't exist
-  
+  - If the key exists, updates its value
+  - If the key does not exist, adds the key-value pair
+
   Parameters:
-  - Key: The key to update
-  - Value: New value to store
-  
+  - Key: The key to add or update (cannot be nil)
+  - Value: The value to assign to the key (can be nil)
+
   Raises:
-  - Exception if key not found
+  - Exception if Key is nil
 }
-procedure TThreadSafeDictionary.Replace(const Key: TKey; const Value: TValue);
+procedure TThreadSafeDictionary.AddOrSetValue(const Key: TKey; const Value: TValue);
 var
   Hash: cardinal;
   BucketIdx: integer;
   Entry: PEntry;
 begin
+  if FEqualityComparer(Key, Default(TKey)) then
+    raise EArgumentNilException.Create('Key cannot be nil');
+
   FLock.Enter;
   try
     Hash := GetHashValue(Key);
@@ -644,7 +652,7 @@ begin
     Entry := FindEntry(Key, Hash, BucketIdx);
 
     if Entry = nil then
-      raise Exception.Create('Key not found')
+      Add(Key, Value)
     else
       Entry^.Value := Value;
   finally
@@ -900,7 +908,7 @@ end;
 
 procedure TThreadSafeDictionary.SetItem(const Key: TKey; const Value: TValue);
 begin
-  Replace(Key, Value);
+  AddOrSetValue(Key, Value);
 end;
 
 function TThreadSafeDictionary.ContainsKey(const Key: TKey): Boolean;
