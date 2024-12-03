@@ -59,7 +59,7 @@ type
     procedure Test1_Creation;
     procedure Test2_Add;
     procedure Test3_AddDuplicate;
-    procedure Test4_Find;
+    procedure Test4_GetItem;
     procedure Test5_Remove;
     procedure Test6_AddOrSetValue;
     procedure Test7_Clear;
@@ -227,7 +227,7 @@ begin
       1: FDict.Remove(Key);
       2:
       try
-        FDict.Find(Key);
+        FDict.GetItem(Key);
       except
         // Ignore not found errors
       end;
@@ -285,7 +285,7 @@ begin
   try
     FStrDict.Add('test', 1);
     AssertEquals('Count should be 1', 1, FStrDict.Count);
-    AssertEquals('Value should be retrievable', 1, FStrDict.Find('test'));
+    AssertEquals('Value should be retrievable', 1, FStrDict.GetItem('test'));
     WriteLn('Completed TestAdd');
   except
     on E: Exception do
@@ -315,25 +315,25 @@ end;
 
 
 
-procedure TThreadSafeDictionaryTest.Test4_Find;
+procedure TThreadSafeDictionaryTest.Test4_GetItem;
 begin
-  WriteLn('Starting TestFind');
+  WriteLn('Starting TestGetItem');
   IncrementTestCounter;
   try
     FStrDict.Add('test1', 1);
     FStrDict.Add('test2', 2);
 
-    AssertEquals('Should find correct value', 1, FStrDict.Find('test1'));
-    AssertEquals('Should find correct value', 2, FStrDict.Find('test2'));
+    AssertEquals('Should find correct value', 1, FStrDict.GetItem('test1'));
+    AssertEquals('Should find correct value', 2, FStrDict.GetItem('test2'));
 
     try
-      FStrDict.Find('nonexistent');
+      FStrDict.GetItem('nonexistent');
       Fail('Should raise exception for nonexistent key');
     except
       on E: Exception do
         AssertTrue('Correct exception raised', True);
     end;
-    WriteLn('Completed TestFind');
+    WriteLn('Completed TestGetItem');
   except
     on E: Exception do
     begin
@@ -372,7 +372,7 @@ begin
     FStrDict.Add('test', 1);
     FStrDict.AddOrSetValue('test', 2);
 
-    AssertEquals('Value should be replaced', 2, FStrDict.Find('test'));
+    AssertEquals('Value should be replaced', 2, FStrDict.GetItem('test'));
 
     try
       FStrDict.AddOrSetValue('nonexistent', 1);
@@ -471,8 +471,6 @@ begin
   WriteLn('Starting Test10_EmptyDictionary');
   IncrementTestCounter;
   try
-
-
     AssertFalse('Remove should return false on empty dictionary',
       FStrDict.Remove('nonexistent'));
     AssertFalse('First should return false on empty dictionary',
@@ -483,7 +481,7 @@ begin
       FStrDict.TryGetValue('test', Value));
 
     try
-      FStrDict.Find('test');
+      FStrDict.GetItem('test');
       Fail('Find should raise exception on empty dictionary');
     except
       on E: Exception do
@@ -567,9 +565,9 @@ begin
   FMixedDict.AddOrSetValue('test', TObject.Create);
   try
     AssertNotNull('Should replace nil with object',
-      FMixedDict.Find('test'));
+      FMixedDict.GetItem('test'));
   finally
-    TObject(FMixedDict.Find('test')).Free;
+    TObject(FMixedDict.GetItem('test')).Free;
   end;
 end;
 
@@ -588,7 +586,7 @@ begin
   // Test with very long keys
   Key := StringOfChar('A', 1000);
   FStrDict.Add(Key, 1);
-  AssertEquals('Should handle long keys', 1, FStrDict.Find(Key));
+  AssertEquals('Should handle long keys', 1, FStrDict.GetItem(Key));
 
   // Test with many collisions
   for I := 0 to 100 do
@@ -600,7 +598,7 @@ begin
   for I := 0 to 100 do
   begin
     Key := 'Key' + IntToStr(I * 16);
-    AssertEquals('Should handle collisions', I, FStrDict.Find(Key));
+    AssertEquals('Should handle collisions', I, FStrDict.GetItem(Key));
   end;
 end;
 
@@ -688,7 +686,7 @@ begin
   // Verify all values are still accessible
   for I := 0 to 9 do
     AssertEquals('Value should be retrievable after collision',
-      I, FStrDict.Find(CollisionKeys[I]));
+      I, FStrDict.GetItem(CollisionKeys[I]));
 end;
 
 procedure TThreadSafeDictionaryTest.Test17_LargeDataSetPerformance;
@@ -723,7 +721,7 @@ begin
   for I := 0 to TEST_SIZE - 1 do
   begin
     Key := 'Key' + IntToStr(I);
-    AssertEquals('Value should match', I, FStrDict.Find(Key));
+    AssertEquals('Value should match', I, FStrDict.GetItem(Key));
   end;
   EndTick := GetTickCount64;
   WriteLn(Format('Finding %d items took: %d ms', [TEST_SIZE, EndTick - StartTick]));
@@ -754,7 +752,7 @@ begin
   // Test find performance
   StartTick := GetTickCount64;
   for I := 0 to TEST_SIZE - 1 do
-    FStrDict.Find(Keys[I]);
+    FStrDict.GetItem(Keys[I]);
   EndTick := GetTickCount64;
 
   WriteLn(Format('Finding %d items took: %d ms', [TEST_SIZE, EndTick - StartTick]));
@@ -776,7 +774,7 @@ begin
       // Verify functionality with custom capacity
       CustomDict.Add('test1', 1);
       CustomDict.Add('test2', 2);
-      AssertEquals('Should store values correctly', 1, CustomDict.Find('test1'));
+      AssertEquals('Should store values correctly', 1, CustomDict.GetItem('test1'));
     finally
       CustomDict.Free;
     end;
@@ -813,7 +811,7 @@ begin
     
     // Verify functionality after resize
     FStrDict.Add('test1', 1);
-    AssertEquals('Should work after resize', 1, FStrDict.Find('test1'));
+    AssertEquals('Should work after resize', 1, FStrDict.GetItem('test1'));
     
     WriteLn('Completed TestManualResize');
   except
@@ -855,7 +853,7 @@ begin
     for I := 1 to 10 do
     begin
       Key := 'Key' + IntToStr(I);
-      AssertEquals('Data should be preserved after resize', I, FStrDict.Find(Key));
+      AssertEquals('Data should be preserved after resize', I, FStrDict.GetItem(Key));
     end;
     
     WriteLn('Completed TestResizeWithData');

@@ -129,7 +129,7 @@ type
 
     // Private helper methods
     function GetCount: Integer;  // Add this for interface
-    function GetItem(const Key: TKey): TValue;  // Add this for interface
+
     procedure SetItem(const Key: TKey; const Value: TValue);  // Add this for interface
 
 
@@ -155,6 +155,9 @@ type
     // Adds a new key-value pair to the dictionary
     procedure Add(const Key: TKey; const Value: TValue);
 
+    // Retrieves the value associated with the specified key
+    function GetItem(const Key: TKey): TValue;
+
     // Tries to get the value associated with the specified key
     function TryGetValue(const Key: TKey; out Value: TValue): boolean;
 
@@ -169,9 +172,6 @@ type
 
     // Retrieves the last key-value pair in the dictionary
     function Last(out Key: TKey; out Value: TValue): boolean;
-
-    // Finds and returns the value associated with the specified key
-    function Find(const Key: TKey): TValue;
 
     // Clears all key-value pairs from the dictionary
     procedure Clear;
@@ -189,7 +189,7 @@ type
     property BucketCount: integer read GetBucketCount; 
 
     // Default property to access items by key, supports read and write operations
-    property Items[const Key: TKey]: TValue read Find write AddOrSetValue; default;
+    property Items[const Key: TKey]: TValue read GetItem write AddOrSetValue; default;
 
     // Retrieves an enumerator to iterate over the dictionary's key-value pairs
     function GetEnumerator: TEnumerator;
@@ -540,37 +540,6 @@ begin
     CheckLoadFactor;
   finally
     if DEBUG_LOGGING then WriteLn('Add: Releasing lock');
-    FLock.Leave;
-  end;
-end;
-
-
-{
-  Find: Retrieves value for given key
-  - Thread-safe operation
-  - Raises exception if key not found
-  
-  Returns: Value associated with key
-  
-  Raises:
-  - Exception if key not found
-}
-function TThreadSafeDictionary.Find(const Key: TKey): TValue;
-var
-  Hash: cardinal;
-  BucketIdx: integer;
-  Entry: PEntry;
-begin
-  FLock.Enter;
-  try
-    Hash := GetHashValue(Key);
-    BucketIdx := GetBucketIndex(Hash);
-    Entry := FindEntry(Key, Hash, BucketIdx);
-
-    if Entry = nil then
-      raise Exception.Create('Key not found');
-    Result := Entry^.Value;
-  finally
     FLock.Leave;
   end;
 end;

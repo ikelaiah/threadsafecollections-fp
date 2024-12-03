@@ -83,7 +83,7 @@ type
     procedure Clear;
     function Lock: ILockToken;
     
-    property Items[const Key: TKey]: TValue read GetItem write SetItem; default;
+    property Items[const Key: TKey]: TValue read GetItem write AddOrSetValue; default;
     property Count: Integer read GetCount;
   end;
 
