@@ -30,13 +30,15 @@ type
   generic IThreadSafeList<T> = interface(specialize IThreadSafeCollection<T>)
     ['{B1A2C3D4-E5F6-4A3B-8C7D-9E0F1A2B3C4D}']
     function Add(const Item: T): Integer;
+    procedure Insert(Index: Integer; const Item: T);
     procedure Delete(Index: Integer);
-    function Find(const Item: T): Integer;
+    function Remove(const Item: T): Integer;
+    function Extract(const Item: T): T;
+    function IndexOf(const Item: T): Integer;
+    function Contains(const Item: T): Boolean;
     function First: T;
     function Last: T;
-    procedure Sort(Ascending: Boolean = True);
-    function IsSorted: Boolean;
-    procedure Replace(Index: Integer; const Item: T);
+    procedure Sort(const Comparison: TComparison<T>);
     function GetItem(Index: Integer): T;
     procedure SetItem(Index: Integer; const Value: T);
     
@@ -56,8 +58,8 @@ type
     function PeekBack: T;
     function TryPeekFront(out Value: T): Boolean;
     function TryPeekBack(out Value: T): Boolean;
-    procedure PushRangeFront(const Items: array of T);
-    procedure PushRangeBack(const Items: array of T);
+    procedure AddRange(const Items: array of T);
+    procedure InsertRange(const Items: array of T);
   end;
 
   { IThreadSafeHashSet - Interface for set operations }
@@ -67,6 +69,9 @@ type
     function Remove(const Item: T): Boolean;
     function Contains(const Item: T): Boolean;
     function ToArray: specialize TArray<T>;
+    procedure AddRange(const Items: array of T);
+    function ExceptWith(const Other: IThreadSafeHashSet<T>): Boolean;
+    function UnionWith(const Other: IThreadSafeHashSet<T>): Boolean;
   end;
 
   { IThreadSafeDictionary - Interface for dictionary operations }
@@ -75,13 +80,15 @@ type
     procedure Add(const Key: TKey; const Value: TValue);
     function Remove(const Key: TKey): Boolean;
     function TryGetValue(const Key: TKey; out Value: TValue): Boolean;
-    procedure Replace(const Key: TKey; const Value: TValue);
+    function AddOrSetValue(const Key: TKey; const Value: TValue): Boolean;
     function ContainsKey(const Key: TKey): Boolean;
+    function ContainsValue(const Value: TValue): Boolean;
     function GetItem(const Key: TKey): TValue;
     procedure SetItem(const Key: TKey; const Value: TValue);
     function GetCount: Integer;
     procedure Clear;
     function Lock: ILockToken;
+    procedure AddOrUpdateRange(const Items: array of TPair<TKey, TValue>);
     
     property Items[const Key: TKey]: TValue read GetItem write SetItem; default;
     property Count: Integer read GetCount;
