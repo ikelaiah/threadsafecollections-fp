@@ -366,21 +366,19 @@ end;
 
 procedure TThreadSafeDictionaryTest.Test6_AddOrSetValue;
 begin
-  WriteLn('Starting TestReplace');
+  WriteLn('Starting TestAddOrSetValue');
   IncrementTestCounter;
   try
+    // Test updating existing key
     FStrDict.Add('test', 1);
     FStrDict.AddOrSetValue('test', 2);
-
     AssertEquals('Value should be replaced', 2, FStrDict.GetItem('test'));
 
-    try
-      FStrDict.AddOrSetValue('nonexistent', 1);
-      Fail('Should raise exception for nonexistent key');
-    except
-      on E: Exception do
-        AssertTrue('Correct exception raised', True);
-    end;
+    // Test adding new key
+    FStrDict.AddOrSetValue('new', 3);
+    AssertEquals('New key-value should be added', 3, FStrDict.GetItem('new'));
+    AssertEquals('Count should be 2', 2, FStrDict.Count);
+
     WriteLn('Completed TestAddOrSetValue');
   except
     on E: Exception do
@@ -556,16 +554,18 @@ procedure TThreadSafeDictionaryTest.Test12_NilValues;
 var
   Obj: TObject;
 begin
+  // Ensure FMixedDict is initialized
+  if not Assigned(FMixedDict) then
+    FMixedDict := specialize TThreadSafeDictionary<string, TObject>.Create;
+
   // Test with object dictionary
   FMixedDict.Add('test', nil);
-  AssertTrue('Should store nil value',
-    FMixedDict.TryGetValue('test', Obj));
+  AssertTrue('Should store nil value', FMixedDict.TryGetValue('test', Obj));
   AssertNull('Should retrieve nil value', Obj);
 
   FMixedDict.AddOrSetValue('test', TObject.Create);
   try
-    AssertNotNull('Should replace nil with object',
-      FMixedDict.GetItem('test'));
+    AssertNotNull('Should replace nil with object', FMixedDict.GetItem('test'));
   finally
     TObject(FMixedDict.GetItem('test')).Free;
   end;

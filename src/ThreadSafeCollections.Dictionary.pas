@@ -607,23 +607,19 @@ end;
 }
 procedure TThreadSafeDictionary.AddOrSetValue(const Key: TKey; const Value: TValue);
 var
-  Hash: cardinal;
-  BucketIdx: integer;
+  Hash: Cardinal;
+  BucketIdx: Integer;
   Entry: PEntry;
 begin
-  if FEqualityComparer(Key, Default(TKey)) then
-    raise EArgumentNilException.Create('Key cannot be nil');
-
   FLock.Enter;
   try
     Hash := GetHashValue(Key);
     BucketIdx := GetBucketIndex(Hash);
     Entry := FindEntry(Key, Hash, BucketIdx);
-
-    if Entry = nil then
-      Add(Key, Value)
+    if Entry <> nil then
+      Entry^.Value := Value
     else
-      Entry^.Value := Value;
+      Add(Key, Value);
   finally
     FLock.Leave;
   end;
@@ -870,9 +866,22 @@ begin
 end;
 
 function TThreadSafeDictionary.GetItem(const Key: TKey): TValue;
+var
+  Hash: Cardinal;
+  BucketIdx: Integer;
+  Entry: PEntry;
 begin
-  if not TryGetValue(Key, Result) then
-    raise EKeyNotFoundException.Create('Key not found');
+  FLock.Enter;
+  try
+    Hash := GetHashValue(Key);
+    BucketIdx := GetBucketIndex(Hash);
+    Entry := FindEntry(Key, Hash, BucketIdx);
+    if Entry = nil then
+      raise EKeyNotFoundException.Create('Key not found');
+    Result := Entry^.Value;
+  finally
+    FLock.Leave;
+  end;
 end;
 
 procedure TThreadSafeDictionary.SetItem(const Key: TKey; const Value: TValue);
