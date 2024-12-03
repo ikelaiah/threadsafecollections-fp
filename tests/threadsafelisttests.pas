@@ -50,7 +50,7 @@ type
     procedure TestAddInteger;
     procedure TestAddString;
     procedure TestDelete;
-    procedure TestFind;
+    procedure TestIndexOf;
     procedure TestFirstLast;
     procedure TestReplace;
     procedure TestSort;
@@ -108,7 +108,7 @@ var
 begin
   for I := 0 to FOperations - 1 do
   begin
-    Operation := Random(3); // 0: Add, 1: Delete, 2: Find
+    Operation := Random(3); // 0: Add, 1: Delete, 2: IndexOf
     case Operation of
       0: FList.Add(FStartValue + I);
       1: if FList.Count > 0 then
@@ -117,7 +117,7 @@ begin
          except
            // Ignore concurrent deletion errors
          end;
-      2: FList.Find(FStartValue + Random(I + 1));
+      2: FList.IndexOf(FStartValue + Random(I + 1));
     end;
   end;
 end;
@@ -318,7 +318,7 @@ begin
            Idx := Random(FIntList.Count);
            FIntList.Delete(Idx);
          end;
-      3: FIntList.Find(Random(1000));
+      3: FIntList.IndexOf(Random(1000));
     end;
   end;
 
@@ -326,14 +326,14 @@ begin
   AssertTrue('List should survive random operations', True);
 end;
 
-procedure TThreadSafeListTest.TestFind;
+procedure TThreadSafeListTest.TestIndexOf;
 begin
   FIntList.Add(1);
   FIntList.Add(2);
   FIntList.Add(3);
 
-  AssertEquals('Should find existing element', 1, FIntList.Find(2));
-  AssertEquals('Should return -1 for non-existing element', -1, FIntList.Find(5));
+  AssertEquals('Should find existing element', 1, FIntList.IndexOf(2));
+  AssertEquals('Should return -1 for non-existing element', -1, FIntList.IndexOf(5));
 end;
 
 procedure TThreadSafeListTest.TestFirstLast;
@@ -412,7 +412,7 @@ procedure TThreadSafeListTest.TestEmptyList;
 begin
   AssertEquals('Empty list count should be 0', 0, FIntList.Count);
   AssertTrue('Empty list should be sorted', FIntList.IsSorted);
-  AssertEquals('Find in empty list should return -1', -1, FIntList.Find(1));
+  AssertEquals('Find in empty list should return -1', -1, FIntList.IndexOf(1));
 end;
 
 procedure TThreadSafeListTest.TestSingleElement;
@@ -431,7 +431,7 @@ begin
 
   AssertEquals('Count should be 3', 3, FIntList.Count);
   AssertTrue('List with duplicates should be sorted', FIntList.IsSorted);
-  AssertEquals('Should find first occurrence', 0, FIntList.Find(1));
+  AssertEquals('Should find first occurrence', 0, FIntList.IndexOf(1));
 end;
 
 procedure TThreadSafeListTest.TestBoundaries;

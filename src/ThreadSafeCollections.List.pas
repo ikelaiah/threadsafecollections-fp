@@ -79,7 +79,7 @@ type
     //   Item: The item to search for
     // Returns:
     //   The index of the item if found; otherwise, -1
-    function Find(const Item: T): Integer;
+    function IndexOf(const Item: T): Integer;
 
     // Retrieves the first item in the list in a thread-safe manner
     // Returns:
@@ -295,7 +295,7 @@ begin
   end;
 end;
 
-function TThreadSafeList.Find(const Item: T): Integer;
+function TThreadSafeList.IndexOf(const Item: T): Integer;
 var
   I: Integer;
 begin

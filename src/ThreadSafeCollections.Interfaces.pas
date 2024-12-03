@@ -31,7 +31,7 @@ type
     ['{B1A2C3D4-E5F6-4A3B-8C7D-9E0F1A2B3C4D}']
     function Add(const Item: T): Integer;
     procedure Delete(Index: Integer);
-    function Find(const Item: T): Integer;
+    function IndexOf(const Item: T): Integer;
     function First: T;
     function Last: T;
     procedure Sort(Ascending: Boolean = True);
