@@ -31,7 +31,7 @@ type
     ['{B1A2C3D4-E5F6-4A3B-8C7D-9E0F1A2B3C4D}']
     function Add(const Item: T): Integer;
     procedure Delete(Index: Integer);
-    function Find(const Item: T): Integer;
+    function IndexOf(const Item: T): Integer;
     function First: T;
     function Last: T;
     procedure Sort(Ascending: Boolean = True);
@@ -75,7 +75,7 @@ type
     procedure Add(const Key: TKey; const Value: TValue);
     function Remove(const Key: TKey): Boolean;
     function TryGetValue(const Key: TKey; out Value: TValue): Boolean;
-    procedure Replace(const Key: TKey; const Value: TValue);
+    procedure AddOrSetValue(const Key: TKey; const Value: TValue);
     function ContainsKey(const Key: TKey): Boolean;
     function GetItem(const Key: TKey): TValue;
     procedure SetItem(const Key: TKey; const Value: TValue);
@@ -83,7 +83,7 @@ type
     procedure Clear;
     function Lock: ILockToken;
     
-    property Items[const Key: TKey]: TValue read GetItem write SetItem; default;
+    property Items[const Key: TKey]: TValue read GetItem write AddOrSetValue; default;
     property Count: Integer read GetCount;
   end;
 

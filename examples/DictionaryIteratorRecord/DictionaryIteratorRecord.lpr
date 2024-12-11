@@ -55,7 +55,7 @@ begin
     // Demonstrate update using properties
     Client := Clients[1];
     Client.Location := 'Los Angeles';  // Using property
-    Clients.Replace(1, Client);
+    Clients.AddOrSetValue(1, Client);
 
     WriteLn('After Update:');
     WriteLn('-------------------------');

@@ -150,7 +150,7 @@ classDiagram
         +Add(const Key: TKey, const Value: TValue)
         +Remove(const Key: TKey): Boolean
         +TryGetValue(const Key: TKey, out Value: TValue): Boolean
-        +Replace(const Key: TKey, const Value: TValue)
+        +AddOrSetValue(const Key: TKey, const Value: TValue)
         +ContainsKey(const Key: TKey): Boolean
         +GetItem(const Key: TKey): TValue
         +SetItem(const Key: TKey, const Value: TValue)
@@ -173,10 +173,10 @@ classDiagram
         +Create(InitialCapacity: integer, HashFunc: THashFunction~TKey~, EqualityComparer: TEqualityComparison~TKey~)
         +Destroy()
         +Add(const Key: TKey, const Value: TValue)
-        +Find(const Key: TKey): TValue
+        +GetItem(const Key: TKey): TValue
         +TryGetValue(const Key: TKey, out Value: TValue): Boolean
         +Remove(const Key: TKey): Boolean
-        +Replace(const Key: TKey, const Value: TValue)
+        +AddOrSetValue(const Key: TKey, const Value: TValue)
         +ContainsKey(const Key: TKey): Boolean
         +First(out Key: TKey, out Value: TValue): Boolean
         +Last(out Key: TKey, out Value: TValue): Boolean
@@ -326,10 +326,10 @@ Key Differences:
 | Method | Description | Return Type | Thread-Safe |
 |--------|-------------|-------------|-------------|
 | `Add(const Key: TKey; const Value: TValue)` | Adds new key-value pair | void | Yes |
-| `Find(const Key: TKey)` | Retrieves value for key (raises exception if not found) | TValue | Yes |
+| `GetItem(const Key: TKey)` | Retrieves value for key (raises exception if not found) | TValue | Yes |
 | `TryGetValue(const Key: TKey; out Value: TValue)` | Safe value retrieval | Boolean | Yes |
 | `Remove(const Key: TKey)` | Removes entry with given key | Boolean | Yes |
-| `Replace(const Key: TKey; const Value: TValue)` | Updates value for existing key (raises exception if not found) | void | Yes |
+| `AddOrSetValue(const Key: TKey; const Value: TValue)` | Updates value for existing key (raises exception if not found) | void | Yes |
 
 ### Iterator Support
 
@@ -447,7 +447,7 @@ begin
       WriteLn(Value);
       
     // Replace existing value
-    Dict.Replace('one', 100);
+    Dict.AddOrSetValue('one', 100);
     
     // Access via default property
     WriteLn(Dict['one']); // Outputs: 100
@@ -477,7 +477,7 @@ begin
     Dict.ResizeBuckets(2000);
 
     // Verify items still accessible
-    WriteLn(Dict.Find('one'));  // Outputs: 1
+    WriteLn(Dict.GetItem('one'));  // Outputs: 1
   finally
     Dict.Free;
   end;

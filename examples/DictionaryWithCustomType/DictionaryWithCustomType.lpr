@@ -58,5 +58,6 @@ begin
     Dict.Free;
   end;
 
+  WriteLn('Press enter to quit ...');
   ReadLn;
 end.

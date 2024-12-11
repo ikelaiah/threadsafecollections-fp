@@ -17,7 +17,7 @@ classDiagram
         <<interface>>
         +Add(Item: T): Integer
         +Delete(Index: Integer)
-        +Find(Item: T): Integer
+        +IndexOf(Item: T): Integer
         +First(): T
         +Last(): T
         +Sort(Ascending: Boolean)
@@ -41,7 +41,7 @@ classDiagram
         -QuickSort(Left, Right: Integer, Ascending: Boolean)
         +Add(Item: T): Integer
         +Delete(Index: Integer)
-        +Find(Item: T): Integer
+        +IndexOf(Item: T): Integer
         +Sort(Ascending: Boolean)
         +Replace(Index, Item)
         +First(): T
@@ -127,7 +127,7 @@ constructor Create(AComparer: specialize TComparer<T>);
 ```pascal
 function Add(const Item: T): Integer;
 procedure Delete(Index: Integer);
-function Find(const Item: T): Integer;
+function IndexOf(const Item: T): Integer;
 procedure Replace(Index: Integer; const Item: T);
 ```
 
@@ -295,7 +295,7 @@ end;
 - QuickSort implementation for sorting
 - Lock contention in multi-threaded scenarios
 - O(1) for Add (amortized)
-- O(n) for Find
+- O(n) for IndexOf
 - O(n log n) for Sort
 
 
@@ -334,7 +334,7 @@ end;
      * Lock-free operations
      * Higher concurrent throughput
 
-6. **Find Operation Performance**
+6. **IndexOf Operation Performance**
    - Linear search O(n) even when sorted
    - No binary search implementation
    - Consider alternative if frequent searches needed
