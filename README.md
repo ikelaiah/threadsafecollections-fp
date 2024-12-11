@@ -14,7 +14,7 @@ A thread-safe generic collections library for Free Pascal, designed for learning
 ## 🚧 Development Status
 
 Current State:
-- ✅ Basic operations working (Add, Remove, Find)
+- ✅ Basic operations working (Add, Remove, GetItem)
 - ✅ Thread safety verified through testing
 - ✅ Memory management stable
 - ✅ Thread-Safe Iterator Support
