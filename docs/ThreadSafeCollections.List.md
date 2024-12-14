@@ -62,18 +62,8 @@ classDiagram
         +Replace(Index: Integer, Item: T)
         +GetItem(Index: Integer): T
         +SetItem(Index: Integer, Value: T)
-        +Items[Index: Integer]: T
-    }
-
-    class TThreadSafeList~T~ {
-        -FList: array of T
-        -FCount: Integer
-        -FCapacity: Integer
-        -FLock: TCriticalSection
-        -FComparer: TComparer~T~
-        -FSorted: Boolean
-        +Create(AComparer)
-        +Destroy()
+        +GetCapacity(): Integer
+        +SetCapacity(Value: Integer)
         +ToArray(): TArray~T~
         +FromArray(Values: array of T)
         +AddRange(Values: array of T)
@@ -94,21 +84,66 @@ classDiagram
         +Extract(Item: T): T
         +ExtractAt(Index: Integer): T
         +TrimExcess()
+        +Items[Index: Integer]: T
+        +Capacity: Integer
+    }
+
+    class TItemArray~T~ {
+        <<array>>
+    }
+
+    class TThreadSafeList~T~ {
+        -FList: TItemArray~T~
+        -FCount: Integer
+        -FCapacity: Integer
+        -FLock: TCriticalSection
+        -FComparer: TComparer~T~
+        -FSorted: Boolean
         -Grow()
         -QuickSort(Left, Right: Integer, Ascending: Boolean)
+        -RaiseIfOutOfBounds(Index: Integer)
+        -GetItem(Index: Integer): T
+        -SetItem(Index: Integer, Value: T)
+        -GetCount(): Integer
+        -GetCapacity(): Integer
+        -SetCapacity(Value: Integer)
+        +Create(AComparer)
+        +Destroy()
         +Add(Item: T): Integer
         +Delete(Index: Integer)
         +IndexOf(Item: T): Integer
-        +Sort(Ascending: Boolean)
-        +Replace(Index, Item)
         +First(): T
         +Last(): T
+        +Sort(Ascending: Boolean)
         +IsSorted(): Boolean
+        +Replace(Index: Integer, Item: T)
         +Clear()
         +IsEmpty(): Boolean
-        +Items[Index: Integer]: T
+        +ToArray(): TItemArray~T~
+        +FromArray(Values: array of T)
+        +AddRange(Values: array of T)
+        +AddRange(Collection: IThreadSafeList~T~)
+        +InsertRange(Index: Integer, Values: array of T)
+        +InsertRange(Index: Integer, Collection: IThreadSafeList~T~)
+        +DeleteRange(AIndex, ACount: Integer)
+        +Contains(Value: T): Boolean
+        +IndexOfItem(Item: T, StartIndex: Integer): Integer
+        +IndexOfItem(Item: T, StartIndex, ACount: Integer): Integer
+        +LastIndexOf(Item: T): Integer
+        +LastIndexOf(Item: T, StartIndex: Integer): Integer
+        +LastIndexOf(Item: T, StartIndex, ACount: Integer): Integer
+        +Insert(Index: Integer, Item: T)
+        +Exchange(Index1, Index2: Integer)
+        +MoveItem(CurIndex, NewIndex: Integer)
+        +Reverse()
+        +Extract(Item: T): T
+        +ExtractAt(Index: Integer): T
+        +TrimExcess()
         +GetEnumerator(): TEnumerator
         +Lock(): ILockToken
+        +Items[Index: Integer]: T
+        +Count: Integer
+        +Capacity: Integer
     }
 
     class TEnumerator~T~ {
@@ -143,6 +178,7 @@ classDiagram
     IThreadSafeList~T~ <|.. TThreadSafeList~T~
     TThreadSafeList~T~ ..> TComparer~T~ : uses
     TThreadSafeList~T~ *-- TEnumerator~T~ : contains
+    TThreadSafeList~T~ --> TItemArray~T~ : uses
     TEnumerator~T~ --> ILockToken : uses
     TThreadSafeList~T~ --> ILockToken : creates
     ILockToken <|.. TLockToken : implements
