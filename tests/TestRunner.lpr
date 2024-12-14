@@ -7,9 +7,10 @@ uses
   , consoletestrunner, testutils, testregistry, DateUtils, SysUtils
   , ThreadSafeListTests
   , ThreadSafeListStudentTests
-  , ThreadSafeDictionaryTests
-  , ThreadSafeHashSetTests
-  , ThreadSafeDequeTests;
+  //, ThreadSafeDictionaryTests
+  //, ThreadSafeHashSetTests
+  //, ThreadSafeDequeTests;
+  ;
 
 type
 

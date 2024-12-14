@@ -40,7 +40,41 @@ type
     function GetItem(Index: Integer): T;
     procedure SetItem(Index: Integer; const Value: T);
     
+    // Capacity management
+    function GetCapacity: Integer;
+    procedure SetCapacity(const Value: Integer);
+    
+    // Array operations
+    function ToArray: specialize TArray<T>;
+    procedure FromArray(const Values: array of T);
+    
+    // Range operations
+    procedure AddRange(const Values: array of T); overload;
+    procedure AddRange(const Collection: specialize IThreadSafeList<T>); overload;
+    procedure InsertRange(Index: Integer; const Values: array of T); overload;
+    procedure InsertRange(Index: Integer; const Collection: specialize IThreadSafeList<T>); overload;
+    procedure DeleteRange(AIndex, ACount: Integer);
+    
+    // Search operations
+    function Contains(const Value: T): Boolean;
+    function IndexOfItem(const Item: T; StartIndex: Integer): Integer; overload;
+    function IndexOfItem(const Item: T; StartIndex, ACount: Integer): Integer; overload;
+    function LastIndexOf(const Item: T): Integer; overload;
+    function LastIndexOf(const Item: T; StartIndex: Integer): Integer; overload;
+    function LastIndexOf(const Item: T; StartIndex, ACount: Integer): Integer; overload;
+    
+    // Additional utility methods
+    procedure Insert(Index: Integer; const Item: T);
+    procedure Exchange(Index1, Index2: Integer);
+    procedure MoveItem(CurIndex, NewIndex: Integer);
+    procedure Reverse;
+    function Extract(const Item: T): T;
+    function ExtractAt(Index: Integer): T;
+    procedure TrimExcess;
+    
+    // Properties
     property Items[Index: Integer]: T read GetItem write SetItem; default;
+    property Capacity: Integer read GetCapacity write SetCapacity;
   end;
 
   { IThreadSafeDeque - Interface for double-ended queue operations }
