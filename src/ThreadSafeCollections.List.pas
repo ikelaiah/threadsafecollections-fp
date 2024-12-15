@@ -324,10 +324,10 @@ begin
   if not Assigned(AComparer) then
     raise Exception.Create('Comparer must be provided');
 
-  FLock := TCriticalSection.Create;       // Initialize the critical section for thread safety
+  FLock := TCriticalSection.Create;      // Initialize the critical section for thread safety
   FComparer := AComparer;                // Assign the comparer function
-  FCount := 0;                            // Initialize item count
-  FCapacity := 0;                         // Initialize capacity
+  FCount := 0;                           // Initialize item count
+  FCapacity := 0;                        // Initialize capacity
   FSorted := True;                       // Initially, the list is considered sorted
 end;
 
@@ -351,7 +351,7 @@ var
   I, J: Integer;
   P, Temp: T;
 begin
-  if Right <= Left then Exit;               // Base case: segment size <= 1
+  if Right <= Left then Exit;              // Base case: segment size <= 1
 
   I := Left;
   J := Right;
@@ -387,7 +387,7 @@ begin
   FLock.Acquire;                                     // Enter critical section
   try
     if FCount = FCapacity then
-      Grow;                                           // Grow the list if capacity is reached
+      Grow;                                          // Grow the list if capacity is reached
 
     FList[FCount] := Item;                           // Add the new item
     Result := FCount;
@@ -543,10 +543,10 @@ begin
   if FIndex < FList.FCount then
   begin
     FCurrent := FList.FList[FIndex];                    // Retrieve the current item
-    Result := True;                                       // Indicate that there is a next item
+    Result := True;                                     // Indicate that there is a next item
   end
   else
-    Result := False;                                      // No more items
+    Result := False;                                    // No more items
 end;
 
 function TThreadSafeList.GetEnumerator: TEnumerator;
@@ -563,7 +563,7 @@ function TThreadSafeList.GetCount: Integer;
 begin
   FLock.Acquire;                                           // Enter critical section
   try
-    Result := FCount;                                       // Return the count
+    Result := FCount;                                      // Return the count
   finally
     FLock.Release;                                         // Exit critical section
   end;
@@ -571,14 +571,14 @@ end;
 
 procedure TThreadSafeList.Clear;
 begin
-  FLock.Acquire;                                           // Enter critical section
+  FLock.Acquire;                                          // Enter critical section
   try
-    SetLength(FList, 0);                                    // Clear the internal array
-    FCount := 0;                                            // Reset count
-    FCapacity := 0;                                         // Reset capacity
-    FSorted := True;                                       // Reset sorted status
+    SetLength(FList, 0);                                  // Clear the internal array
+    FCount := 0;                                          // Reset count
+    FCapacity := 0;                                       // Reset capacity
+    FSorted := True;                                      // Reset sorted status
   finally
-    FLock.Release;                                         // Exit critical section
+    FLock.Release;                                        // Exit critical section
   end;
 end;
 
@@ -586,7 +586,7 @@ function TThreadSafeList.IsEmpty: Boolean;
 begin
   FLock.Acquire;                                           // Enter critical section
   try
-    Result := FCount = 0;                                   // Check if the list is empty
+    Result := FCount = 0;                                  // Check if the list is empty
   finally
     FLock.Release;                                         // Exit critical section
   end;
@@ -598,7 +598,7 @@ function TThreadSafeList.GetCapacity: Integer;
 begin
   FLock.Acquire;                                           // Enter critical section
   try
-    Result := FCapacity;                                     // Return current capacity
+    Result := FCapacity;                                   // Return current capacity
   finally
     FLock.Release;                                         // Exit critical section
   end;
@@ -613,8 +613,8 @@ begin
 
     if Value <> FCapacity then
     begin
-      SetLength(FList, Value);                              // Resize the internal array
-      FCapacity := Value;                                   // Update capacity
+      SetLength(FList, Value);                             // Resize the internal array
+      FCapacity := Value;                                  // Update capacity
     end;
   finally
     FLock.Release;                                         // Exit critical section
@@ -625,7 +625,7 @@ function TThreadSafeList.ToArray: specialize TArray<T>;
 begin
   FLock.Acquire;                                           // Enter critical section
   try
-    SetLength(Result, FCount);                              // Initialize the result array
+    SetLength(Result, FCount);                             // Initialize the result array
     if FCount > 0 then
       Move(FList[0], Result[0], FCount * SizeOf(T));       // Copy items to the result array
   finally
@@ -637,18 +637,18 @@ procedure TThreadSafeList.FromArray(const Values: array of T);
 var
   NewCount: Integer;
 begin
-  FLock.Acquire;                                           // Enter critical section
+  FLock.Acquire;                                            // Enter critical section
   try
     NewCount := Length(Values);
     if NewCount > FCapacity then
-      SetCapacity(NewCount);                                 // Ensure enough capacity
+      SetCapacity(NewCount);                                // Ensure enough capacity
 
     if NewCount > 0 then
       Move(Values[0], FList[0], NewCount * SizeOf(T));      // Copy items from the input array
     FCount := NewCount;                                     // Update the count
     FSorted := False;                                       // Reset sorted flag as order is unknown
   finally
-    FLock.Release;                                         // Exit critical section
+    FLock.Release;                                          // Exit critical section
   end;
 end;
 
@@ -658,12 +658,12 @@ procedure TThreadSafeList.AddRange(const Values: array of T);
 var
   I: Integer;
 begin
-  FLock.Acquire;                                           // Enter critical section
+  FLock.Acquire;                                   // Enter critical section
   try
     for I := 0 to High(Values) do
-      Add(Values[I]);                                       // Add each item to the list
+      Add(Values[I]);                              // Add each item to the list
   finally
-    FLock.Release;                                         // Exit critical section
+    FLock.Release;                                 // Exit critical section
   end;
 end;
 
@@ -672,11 +672,11 @@ var
   SourceArray: specialize TItemArray<T>;
 begin
   if Collection = nil then
-    Exit;                                                   // Exit if the collection is nil
+    Exit;                                           // Exit if the collection is nil
 
   // Get array from source collection
   SourceArray := Collection.ToArray;
-  AddRange(SourceArray);                                    // Add the range from the array
+  AddRange(SourceArray);                            // Add the range from the array
 end;
 
 procedure TThreadSafeList.InsertRange(Index: Integer; const Values: array of T);
@@ -705,7 +705,7 @@ begin
     Inc(FCount, InsertCount);                               // Update the count
     FSorted := False;                                       // List is no longer sorted
   finally
-    FLock.Release;                                         // Exit critical section
+    FLock.Release;                                          // Exit critical section
   end;
 end;
 
@@ -714,7 +714,7 @@ var
   SourceArray: specialize TItemArray<T>;
 begin
   if Collection = nil then
-    Exit;                                                   // Exit if the collection is nil
+    Exit;                                                  // Exit if the collection is nil
 
   SourceArray := Collection.ToArray;
   InsertRange(Index, SourceArray);                         // Insert the range from the array
@@ -774,7 +774,7 @@ begin
         Break;                                                  // Item found, exit loop
       end;
   finally
-    FLock.Release;                                               // Exit critical section
+    FLock.Release;                                              // Exit critical section
   end;
 end;
 
@@ -796,7 +796,7 @@ begin
   FLock.Acquire;                                               // Enter critical section
   try
     if (FCount = 0) or (StartIndex < 0) then
-      Exit;                                                     // Invalid conditions
+      Exit;                                                    // Invalid conditions
 
     StartIndex := Min(StartIndex, FCount - 1);                 // Adjust start index if out of bounds
     ACount := Min(ACount, StartIndex + 1);                     // Adjust count if it exceeds bounds
@@ -809,7 +809,7 @@ begin
         Break;                                                  // Item found, exit loop
       end;
   finally
-    FLock.Release;                                               // Exit critical section
+    FLock.Release;                                              // Exit critical section
   end;
 end;
 
@@ -839,7 +839,7 @@ begin
       FSorted := False;                                         // List is no longer sorted
     end;
   finally
-    FLock.Release;                                               // Exit critical section
+    FLock.Release;                                              // Exit critical section
   end;
 end;
 
@@ -859,17 +859,17 @@ begin
       raise EArgumentOutOfRangeException.Create('Index out of bounds');
 
     if FCount = FCapacity then
-      Grow;                                                     // Grow the list if capacity is reached
+      Grow;                                                   // Grow the list if capacity is reached
 
     if Index < FCount then
-      System.Move(FList[Index], FList[Index + 1], (FCount - Index) * SizeOf(T))
+      System.Move(FList[Index], FList[Index + 1], (FCount - Index) * SizeOf(T));
                                                               // Shift items to make space for the new item
 
-    FList[Index] := Item;                                      // Insert the new item
-    Inc(FCount);                                               // Update the count
+    FList[Index] := Item;                                     // Insert the new item
+    Inc(FCount);                                              // Update the count
     FSorted := False;                                         // List is no longer sorted
   finally
-    FLock.Release;                                               // Exit critical section
+    FLock.Release;                                            // Exit critical section
   end;
 end;
 
