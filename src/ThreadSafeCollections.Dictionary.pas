@@ -6,7 +6,8 @@ unit ThreadSafeCollections.Dictionary;
 interface
 
 uses
-  SysUtils, Classes, SyncObjs, HashFunctions, TypInfo, ThreadSafeCollections.Interfaces;
+  SysUtils, Classes, SyncObjs, HashFunctions, TypInfo, 
+  ThreadSafeCollections.Interfaces, Generics.Collections;
 
 { 
   DEBUG_LOGGING: Global flag to control debug output
@@ -31,12 +32,6 @@ type
     Value: TValue;
     Hash: cardinal;
     Next: ^TDictionaryEntry;
-  end;
-
-  // First declare TDictionaryPair
-  generic TDictionaryPair<TKey, TValue> = record
-    Key: TKey;
-    Value: TValue;
   end;
 
   // Then declare hash function types
@@ -72,7 +67,7 @@ type
         FLockToken: ILockToken;                      // Token for managing thread-safe access during enumeration
 
         // Retrieves the current key-value pair
-        function GetCurrent: specialize TDictionaryPair<TKey, TValue>;
+        function GetCurrent: specialize TPair<TKey, TValue>;
 
 
       public
@@ -86,7 +81,7 @@ type
         function MoveNext: Boolean;
 
         // Property to access the current key-value pair
-        property Current: specialize TDictionaryPair<TKey, TValue> read GetCurrent;
+        property Current: specialize TPair<TKey, TValue> read GetCurrent;
       end;
 
   private
@@ -132,6 +127,7 @@ type
 
     procedure SetItem(const Key: TKey; const Value: TValue);  // Add this for interface
 
+    function FindValue(const Value: TValue): Boolean;
 
   public
     // Default constructor initializes the dictionary with default settings
@@ -199,6 +195,15 @@ type
 
     // IThreadSafeDictionary interface implementation
     function ContainsKey(const Key: TKey): Boolean;
+
+    function GetKeys: specialize TKeyArray<TKey>;
+    function GetValues: specialize TValueArray<TValue>;
+    procedure TrimExcess;
+    function TryAdd(const Key: TKey; const Value: TValue): Boolean;
+    procedure AddRange(const ADictionary: specialize IThreadSafeDictionary<TKey, TValue>); overload;
+    procedure AddRange(const AArray: specialize TPairArray<TKey, TValue>); overload;
+    function ToArray: specialize TPairArray<TKey, TValue>;
+    function ContainsValue(const Value: TValue): Boolean;
   end;
 
 implementation
@@ -799,7 +804,7 @@ begin
   inherited;
 end;
 
-function TThreadSafeDictionary.TEnumerator.GetCurrent: specialize TDictionaryPair<TKey, TValue>;
+function TThreadSafeDictionary.TEnumerator.GetCurrent: specialize TPair<TKey, TValue>;
 begin
   if FCurrentEntry = nil then
     raise Exception.Create('Invalid enumerator position');
@@ -899,6 +904,190 @@ begin
     Hash := GetHashValue(Key);
     BucketIdx := GetBucketIndex(Hash);
     Result := FindEntry(Key, Hash, BucketIdx) <> nil;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TThreadSafeDictionary.GetKeys: specialize TKeyArray<TKey>;
+var
+  I: Integer;
+  Entry: PEntry;
+  Index: Integer;
+begin
+  FLock.Enter;
+  try
+    SetLength(Result, FCount);
+    Index := 0;
+    for I := 0 to Length(FBuckets) - 1 do
+    begin
+      Entry := FBuckets[I];
+      while Entry <> nil do
+      begin
+        Result[Index] := Entry^.Key;
+        Inc(Index);
+        Entry := Entry^.Next;
+      end;
+    end;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TThreadSafeDictionary.GetValues: specialize TValueArray<TValue>;
+var
+  I: Integer;
+  Entry: PEntry;
+  Index: Integer;
+begin
+  FLock.Enter;
+  try
+    SetLength(Result, FCount);
+    Index := 0;
+    for I := 0 to Length(FBuckets) - 1 do
+    begin
+      Entry := FBuckets[I];
+      while Entry <> nil do
+      begin
+        Result[Index] := Entry^.Value;
+        Inc(Index);
+        Entry := Entry^.Next;
+      end;
+    end;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+procedure TThreadSafeDictionary.TrimExcess;
+var
+  NewSize: Integer;
+begin
+  FLock.Enter;
+  try
+    NewSize := GetNextPowerOfTwo(Trunc(FCount / LOAD_FACTOR) + 1);
+    if NewSize < Length(FBuckets) then
+      Resize(NewSize);
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TThreadSafeDictionary.TryAdd(const Key: TKey; const Value: TValue): Boolean;
+var
+  Hash: Cardinal;
+  BucketIdx: Integer;
+  NewEntry: PEntry;
+begin
+  Result := False;
+  FLock.Enter;
+  try
+    Hash := GetHashValue(Key);
+    BucketIdx := GetBucketIndex(Hash);
+    
+    if FindEntry(Key, Hash, BucketIdx) <> nil then
+      Exit;
+      
+    New(NewEntry);
+    NewEntry^.Key := Key;
+    NewEntry^.Value := Value;
+    NewEntry^.Hash := Hash;
+    NewEntry^.Next := FBuckets[BucketIdx];
+    FBuckets[BucketIdx] := NewEntry;
+    
+    Inc(FCount);
+    CheckLoadFactor;
+    Result := True;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+procedure TThreadSafeDictionary.AddRange(const ADictionary: specialize IThreadSafeDictionary<TKey, TValue>);
+var
+  LockToken: ILockToken;
+  Keys: specialize TArray<TKey>;
+  I: Integer;
+  Value: TValue;
+begin
+  if ADictionary = nil then
+    Exit;
+    
+  LockToken := ADictionary.Lock;
+  try
+    Keys := ADictionary.GetKeys;
+    for I := 0 to Length(Keys) - 1 do
+    begin
+      if ADictionary.TryGetValue(Keys[I], Value) then
+        AddOrSetValue(Keys[I], Value);
+    end;
+  finally
+    LockToken := nil;
+  end;
+end;
+
+procedure TThreadSafeDictionary.AddRange(const AArray: specialize TPairArray<TKey, TValue>);
+var
+  I: Integer;
+begin
+  FLock.Enter;
+  try
+    for I := Low(AArray) to High(AArray) do
+      AddOrSetValue(AArray[I].Key, AArray[I].Value);
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TThreadSafeDictionary.ToArray: specialize TPairArray<TKey, TValue>;
+var
+  I: Integer;
+  Entry: PEntry;
+  Index: Integer;
+begin
+  FLock.Enter;
+  try
+    SetLength(Result, FCount);
+    Index := 0;
+    for I := 0 to Length(FBuckets) - 1 do
+    begin
+      Entry := FBuckets[I];
+      while Entry <> nil do
+      begin
+        Result[Index].Key := Entry^.Key;
+        Result[Index].Value := Entry^.Value;
+        Inc(Index);
+        Entry := Entry^.Next;
+      end;
+    end;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TThreadSafeDictionary.FindValue(const Value: TValue): Boolean;
+var
+  I: Integer;
+  Entry: PEntry;
+begin
+  Result := False;
+  for I := 0 to Length(FBuckets) - 1 do
+  begin
+    Entry := FBuckets[I];
+    while Entry <> nil do
+    begin
+      if CompareByte(Entry^.Value, Value, SizeOf(TValue)) = 0 then
+        Exit(True);
+      Entry := Entry^.Next;
+    end;
+  end;
+end;
+
+function TThreadSafeDictionary.ContainsValue(const Value: TValue): Boolean;
+begin
+  FLock.Enter;
+  try
+    Result := FindValue(Value);
   finally
     FLock.Leave;
   end;

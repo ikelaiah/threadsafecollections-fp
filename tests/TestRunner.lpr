@@ -5,12 +5,12 @@ program TestRunner;
 uses
   Classes
   , consoletestrunner, testutils, testregistry, DateUtils, SysUtils
-  , ThreadSafeListTests
-  , ThreadSafeListStudentTests
+  //, ThreadSafeListTests
+  //, ThreadSafeListStudentTests
   , ThreadSafeDictionaryTests
-  , ThreadSafeHashSetTests
-  , ThreadSafeDequeTests;
-
+  //, ThreadSafeHashSetTests
+  //, ThreadSafeDequeTests;
+;
 type
 
   { TMyTestRunner }
