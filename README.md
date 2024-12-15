@@ -21,20 +21,15 @@ Current State:
    - Iterators use RAII-style locking through interface counting
    - Thread-safe iteration with automatic lock management
    - Each iterator maintains its own lock token
-- ⚠️ Partial bulk operations support
-   - ✅ Implemented in Deque
-   - ❌ Not yet in List, Dictionary, HashSet
+- ✅ Bulk operations support
+   - ✅ Implemented in List and Deque
+   - ❌ Pending in Dictionary, HashSet
 - ❌ Performance not yet optimized
 
 Planned Features:
-- 🔄 Better naming conventions of methods
-   - Standardize Add/Remove vs Push/Pop terminology
-   - Align with FPC standard collections naming
-   - Consistent naming for bulk operations
-   - Consistent naming for existence checks (Contains vs Exists)
 - 🔄 Bulk operations
-   - ✅ Implemented for Deque
-   - ❌ Pending for List, Dictionary, and HashSet
+   - ✅ Implemented for List and Deque
+   - ❌ Pending for Dictionary, HashSet
 - 🔄 Performance optimizations
 - 🔄 More specialized types
 
@@ -513,7 +508,7 @@ end;
 | Collision Resolution     |  N/A |  N/A  |    ✅      |   ✅    |
 | Specialized Types        |  ✅  |  ❌   |    ❌      |   ✅    |
 | Custom Comparers         |  ✅  |  ❌   |    ✅      |   ✅    |
-| Bulk Operations          |  ❌  |  ✅   |    ❌      |   ❌    |
+| Bulk Operations          |  ✅  |  ✅   |    ❌      |   ❌    |
 
 ## 🧪 Testing
 
@@ -528,7 +523,7 @@ end;
 - [ThreadSafeCollections.Dictionary.md](docs/ThreadSafeCollections.Dictionary.md)
 - [ThreadSafeCollections.HashSet.md](docs/ThreadSafeCollections.HashSet.md)
 - [RAII-style locking through interface counting](docs/RAII-style-locking-through-interface-counting.md)
-- [Latest Test Output](docs/LatestTestOutput.md)
+- [Latest Test Output](docs/Latest-Test-Output.md)
 
 ## 📁 Examples
 

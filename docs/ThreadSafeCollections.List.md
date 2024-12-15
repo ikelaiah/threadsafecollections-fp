@@ -1,5 +1,42 @@
 # ThreadSafeCollections.List API Documentation
 
+# Table of Contents
+ 
+- [ThreadSafeCollections.List API Documentation](#threadsafecollectionslist-api-documentation)
+- [Table of Contents](#table-of-contents)
+  - [Component Diagram](#component-diagram)
+  - [Core Components](#core-components)
+    - [TComparer](#tcomparer)
+    - [TThreadSafeList](#tthreadsafelist)
+      - [Properties](#properties)
+  - [Thread Safety](#thread-safety)
+    - [Guarantees](#guarantees)
+    - [Implementation Details](#implementation-details)
+  - [Methods](#methods)
+    - [Constructor](#constructor)
+      - [Built-in Comparers](#built-in-comparers)
+    - [Basic Operations](#basic-operations)
+    - [Sorting and Order](#sorting-and-order)
+    - [Sort Order with Custom Types](#sort-order-with-custom-types)
+    - [Range Operations](#range-operations)
+    - [Search Operations](#search-operations)
+    - [Additional Utility Methods](#additional-utility-methods)
+    - [Array Operations](#array-operations)
+    - [Capacity Management](#capacity-management)
+  - [Iterator Support](#iterator-support)
+    - [Usage Example - Iterators](#usage-example---iterators)
+    - [Iterator Characteristics](#iterator-characteristics)
+  - [Performance](#performance)
+    - [Complexity Analysis](#complexity-analysis)
+    - [Memory Management](#memory-management)
+    - [Optimization Tips](#optimization-tips)
+  - [Usage Examples](#usage-examples)
+    - [Basic Integer List](#basic-integer-list)
+    - [Custom Type with Custom Comparer](#custom-type-with-custom-comparer)
+  - [Best Practices](#best-practices)
+  - [Known Limitations](#known-limitations)
+
+
 ## Component Diagram
 
 ```mermaid
@@ -25,33 +62,88 @@ classDiagram
         +Replace(Index: Integer, Item: T)
         +GetItem(Index: Integer): T
         +SetItem(Index: Integer, Value: T)
+        +GetCapacity(): Integer
+        +SetCapacity(Value: Integer)
+        +ToArray(): TArray~T~
+        +FromArray(Values: array of T)
+        +AddRange(Values: array of T)
+        +AddRange(Collection: IThreadSafeList~T~)
+        +InsertRange(Index: Integer, Values: array of T)
+        +InsertRange(Index: Integer, Collection: IThreadSafeList~T~)
+        +DeleteRange(AIndex, ACount: Integer)
+        +Contains(Value: T): Boolean
+        +IndexOfItem(Item: T, StartIndex: Integer): Integer
+        +IndexOfItem(Item: T, StartIndex, ACount: Integer): Integer
+        +LastIndexOf(Item: T): Integer
+        +LastIndexOf(Item: T, StartIndex: Integer): Integer
+        +LastIndexOf(Item: T, StartIndex, ACount: Integer): Integer
+        +Insert(Index: Integer, Item: T)
+        +Exchange(Index1, Index2: Integer)
+        +MoveItem(CurIndex, NewIndex: Integer)
+        +Reverse()
+        +Extract(Item: T): T
+        +ExtractAt(Index: Integer): T
+        +TrimExcess()
         +Items[Index: Integer]: T
+        +Capacity: Integer
+    }
+
+    class TItemArray~T~ {
+        <<array>>
     }
 
     class TThreadSafeList~T~ {
-        -FList: array of T
+        -FList: TItemArray~T~
         -FCount: Integer
         -FCapacity: Integer
         -FLock: TCriticalSection
         -FComparer: TComparer~T~
         -FSorted: Boolean
-        +Create(AComparer)
-        +Destroy()
         -Grow()
         -QuickSort(Left, Right: Integer, Ascending: Boolean)
+        -RaiseIfOutOfBounds(Index: Integer)
+        -GetItem(Index: Integer): T
+        -SetItem(Index: Integer, Value: T)
+        -GetCount(): Integer
+        -GetCapacity(): Integer
+        -SetCapacity(Value: Integer)
+        +Create(AComparer)
+        +Destroy()
         +Add(Item: T): Integer
         +Delete(Index: Integer)
         +IndexOf(Item: T): Integer
-        +Sort(Ascending: Boolean)
-        +Replace(Index, Item)
         +First(): T
         +Last(): T
+        +Sort(Ascending: Boolean)
         +IsSorted(): Boolean
+        +Replace(Index: Integer, Item: T)
         +Clear()
         +IsEmpty(): Boolean
-        +Items[Index: Integer]: T
+        +ToArray(): TItemArray~T~
+        +FromArray(Values: array of T)
+        +AddRange(Values: array of T)
+        +AddRange(Collection: IThreadSafeList~T~)
+        +InsertRange(Index: Integer, Values: array of T)
+        +InsertRange(Index: Integer, Collection: IThreadSafeList~T~)
+        +DeleteRange(AIndex, ACount: Integer)
+        +Contains(Value: T): Boolean
+        +IndexOfItem(Item: T, StartIndex: Integer): Integer
+        +IndexOfItem(Item: T, StartIndex, ACount: Integer): Integer
+        +LastIndexOf(Item: T): Integer
+        +LastIndexOf(Item: T, StartIndex: Integer): Integer
+        +LastIndexOf(Item: T, StartIndex, ACount: Integer): Integer
+        +Insert(Index: Integer, Item: T)
+        +Exchange(Index1, Index2: Integer)
+        +MoveItem(CurIndex, NewIndex: Integer)
+        +Reverse()
+        +Extract(Item: T): T
+        +ExtractAt(Index: Integer): T
+        +TrimExcess()
         +GetEnumerator(): TEnumerator
         +Lock(): ILockToken
+        +Items[Index: Integer]: T
+        +Count: Integer
+        +Capacity: Integer
     }
 
     class TEnumerator~T~ {
@@ -86,6 +178,7 @@ classDiagram
     IThreadSafeList~T~ <|.. TThreadSafeList~T~
     TThreadSafeList~T~ ..> TComparer~T~ : uses
     TThreadSafeList~T~ *-- TEnumerator~T~ : contains
+    TThreadSafeList~T~ --> TItemArray~T~ : uses
     TEnumerator~T~ --> ILockToken : uses
     TThreadSafeList~T~ --> ILockToken : creates
     ILockToken <|.. TLockToken : implements
@@ -106,14 +199,47 @@ Thread-safe generic list implementation with built-in synchronization.
 - `Count: Integer` - Number of elements in the list
 - `Items[Index: Integer]: T` - Default array property for access
 
-#### Thread Safety Features
-- All public methods are protected by `TCriticalSection`
+## Thread Safety
+
+### Guarantees
+The TThreadSafeList<T> provides comprehensive thread safety through TCriticalSection:
+
+1. **Atomic Operations**
+   - All public methods are atomic
+   - State consistency maintained across method calls
+   - No partial updates visible to other threads
+
+2. **Memory Visibility**
+   - Changes in one thread visible to other threads
+   - Memory barriers ensure proper synchronization
+   - No stale reads or writes
+
+3. **Exception Safety**
+   - Strong exception guarantee for most operations
+   - Basic exception guarantee for bulk operations
+   - Lock always released even if exception occurs
+
+4. **Deadlock Prevention**
+   - Single lock acquisition order
+   - No nested locks within implementation
+   - Safe for multi-threaded environments
+
+5. **Iterator Safety**
+   - Iterators hold lock during enumeration
+   - Other threads block until iteration completes
+   - No concurrent modifications during iteration
+
+### Implementation Details
+- All public methods protected by TCriticalSection
 - Automatic locking/unlocking for all operations
-- Exception-safe lock management
+- Exception-safe lock management through try-finally blocks
+- Lock acquisition order prevents deadlocks
+- Memory barriers ensure visibility across threads
+- Sorted status maintained consistently
 
-#### Methods
+## Methods
 
-##### Constructor
+### Constructor
 
 ```pascal
 constructor Create(AComparer: specialize TComparer<T>);
@@ -122,7 +248,16 @@ constructor Create(AComparer: specialize TComparer<T>);
 - Creates new list with specified comparer
 - Throws exception if comparer is nil
 
-##### Basic Operations
+#### Built-in Comparers
+
+```pascal
+function IntegerComparer(const A, B: Integer): Integer;
+function StringComparer(const A, B: string): Integer;
+function BooleanComparer(const A, B: Boolean): Integer;
+function RealComparer(const A, B: Real): Integer;
+```
+
+### Basic Operations
 
 ```pascal
 function Add(const Item: T): Integer;
@@ -132,7 +267,7 @@ procedure Replace(Index: Integer; const Item: T);
 ```
 
 
-##### Sorting and Order
+### Sorting and Order
 
 ```pascal
 procedure Sort(Ascending: Boolean = True);
@@ -158,7 +293,7 @@ List.Sort(False);
 // [5, 4, 3, 2, 1]
 ```
 
-##### Sort Order with Custom Types
+### Sort Order with Custom Types
 When using custom comparers, the sort order follows the comparer's logic:
 
 ```pascal
@@ -190,7 +325,206 @@ begin
 end;
 ```
 
-### Iterator Support
+### Range Operations
+
+```pascal
+procedure AddRange(const Values: array of T);
+procedure AddRange(const Collection: specialize IThreadSafeList<T>);
+procedure InsertRange(Index: Integer; const Values: array of T);
+procedure InsertRange(Index: Integer; const Collection: specialize IThreadSafeList<T>);
+procedure DeleteRange(AIndex, ACount: Integer);
+```
+
+Provides bulk operations for adding, inserting, and deleting multiple elements:
+- Thread-safe operations with single lock acquisition
+- Efficient memory management for bulk changes
+- Maintains internal array consistency
+
+Examples:
+```pascal
+var
+  List1, List2: specialize TThreadSafeList<Integer>;
+begin
+  List1 := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  List2 := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  try
+    // Add multiple items at once
+    List1.AddRange([1, 2, 3, 4, 5]);
+    
+    // Add items from another thread-safe list
+    List2.AddRange(List1);
+    
+    // Insert items at specific position
+    List1.InsertRange(2, [10, 11, 12]);
+    
+    // Delete multiple items
+    List1.DeleteRange(1, 3); // Removes 3 items starting at index 1
+  finally
+    List1.Free;
+    List2.Free;
+  end;
+end;
+```
+
+### Search Operations
+
+```pascal
+function Contains(const Value: T): Boolean;
+function IndexOfItem(const Item: T; StartIndex: Integer): Integer;
+function IndexOfItem(const Item: T; StartIndex, ACount: Integer): Integer;
+function LastIndexOf(const Item: T): Integer;
+function LastIndexOf(const Item: T; StartIndex: Integer): Integer;
+function LastIndexOf(const Item: T; StartIndex, ACount: Integer): Integer;
+```
+
+Provides various search capabilities:
+- Thread-safe search operations
+- Forward and backward searching
+- Range-limited searches
+- Uses the provided comparer for equality checks
+
+Examples:
+```pascal
+var
+  List: specialize TThreadSafeList<Integer>;
+  Index: Integer;
+begin
+  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  try
+    List.AddRange([1, 2, 3, 2, 4, 2, 5]);
+    
+    // Check if value exists
+    if List.Contains(2) then
+      WriteLn('Found 2');
+    
+    // Find first occurrence after index 2
+    Index := List.IndexOfItem(2, 2);
+    
+    // Find last occurrence
+    Index := List.LastIndexOf(2);
+    
+    // Find last occurrence before index 4
+    Index := List.LastIndexOf(2, 4);
+  finally
+    List.Free;
+  end;
+end;
+```
+
+### Additional Utility Methods
+
+```pascal
+procedure Insert(Index: Integer; const Item: T);
+procedure Exchange(Index1, Index2: Integer);
+procedure MoveItem(CurIndex, NewIndex: Integer);
+procedure Reverse;
+function Extract(const Item: T): T;
+function ExtractAt(Index: Integer): T;
+procedure TrimExcess;
+```
+
+Provides additional list manipulation capabilities:
+- Thread-safe operations
+- Position-based insertions
+- Item extraction
+- List reversal
+- Memory optimization
+
+Examples:
+```pascal
+var
+  List: specialize TThreadSafeList<Integer>;
+  Value: Integer;
+begin
+  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  try
+    List.AddRange([1, 2, 3, 4, 5]);
+    
+    // Insert at specific position
+    List.Insert(2, 10);  // [1, 2, 10, 3, 4, 5]
+    
+    // Swap two elements
+    List.Exchange(1, 4); // [1, 4, 10, 3, 2, 5]
+    
+    // Move element to new position
+    List.MoveItem(2, 5); // [1, 4, 3, 2, 5, 10]
+    
+    // Reverse the entire list
+    List.Reverse;        // [10, 5, 2, 3, 4, 1]
+    
+    // Extract and remove item
+    Value := List.Extract(5); // Removes and returns 5
+    
+    // Optimize memory usage
+    List.TrimExcess;
+  finally
+    List.Free;
+  end;
+end;
+```
+
+### Array Operations
+
+```pascal
+function ToArray: specialize TArray<T>;
+procedure FromArray(const Values: array of T);
+```
+
+Provides conversion between list and array:
+- Thread-safe conversion operations
+- Efficient memory copying
+- Maintains data consistency
+
+Examples:
+```pascal
+var
+  List: specialize TThreadSafeList<Integer>;
+  Arr: specialize TArray<Integer>;
+begin
+  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  try
+    // Convert array to list
+    List.FromArray([1, 2, 3, 4, 5]);
+    
+    // Convert list to array
+    Arr := List.ToArray;
+  finally
+    List.Free;
+  end;
+end;
+```
+
+### Capacity Management
+
+```pascal
+property Capacity: Integer read GetCapacity write SetCapacity;
+procedure TrimExcess;
+```
+
+Provides control over internal array capacity:
+- Get/Set the current capacity
+- Optimize memory usage
+- Thread-safe capacity modifications
+ 
+```pascal
+var
+  List: specialize TThreadSafeList<Integer>;
+
+begin
+  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  try
+    // Pre-allocate space for 1000 items
+    List.Capacity := 1000;
+    // ... use list ...
+    // Trim unused capacity
+    List.TrimExcess;
+  finally
+    List.Free;
+  end;
+end;
+```
+
+## Iterator Support
 
 ```pascal
 type
@@ -204,7 +538,7 @@ type
 function GetEnumerator: TIterator;
 ```
 
-#### Usage Example
+### Usage Example - Iterators
 ```pascal
 var
   List: specialize TThreadSafeList<Integer>;
@@ -225,7 +559,7 @@ begin
 end;
 ```
 
-#### Iterator Characteristics
+### Iterator Characteristics
 - Thread-safe through RAII locking
 - Automatic lock acquisition and release
 - Exception-safe lock management
@@ -233,14 +567,66 @@ end;
 - Protected from modifications during iteration (via RAII lock)
 - Other threads must wait for iteration to complete before modifying
 
-## Built-in Comparers
 
-```pascal
-function IntegerComparer(const A, B: Integer): Integer;
-function StringComparer(const A, B: string): Integer;
-function BooleanComparer(const A, B: Boolean): Integer;
-function RealComparer(const A, B: Real): Integer;
-```
+## Performance
+
+### Complexity Analysis
+- Add: O(1) amortized
+- Delete: O(n)
+- IndexOf: O(n)
+- Sort: O(n log n)
+- Range operations: O(n) with single lock acquisition
+- Search operations: O(n) in unsorted lists
+- Extract operations: O(n) combining find and remove in single lock
+
+### Memory Management
+- Growing strategy: Double capacity when full (4, 8, 16, etc.)
+- Memory moves optimized for bulk operations
+- TrimExcess optimizes memory usage after removals
+
+### Optimization Tips
+1. **Use Bulk Operations**
+   ```pascal
+   // Instead of:
+   for I := 0 to High(Values) do
+     List.Add(Values[I]);
+   
+   // Use:
+   List.AddRange(Values);
+   ```
+
+2. **Manage Capacity**
+   ```pascal
+   // Pre-allocate if size is known
+   List.Capacity := ExpectedSize;
+   
+   // Trim after bulk removals
+   List.DeleteRange(0, RemoveCount);
+   List.TrimExcess;
+   ```
+
+3. **Optimize Searches**
+   ```pascal
+   // For frequent searches, keep list sorted
+   List.Sort;
+   ```
+
+4. **Minimize Lock Contention**
+   ```pascal
+   // Use Lock() for multiple operations
+   var
+     Token: ILockToken;
+   begin
+     Token := List.Lock;
+     try
+       // Multiple operations here
+     finally
+       Token := nil; // Release lock
+     end;
+   end;
+   ```
+
+
 
 ## Usage Examples
 
@@ -289,14 +675,26 @@ begin
 end;
 ```
 
-## Performance Considerations
 
-- Growing strategy: Double capacity when full
-- QuickSort implementation for sorting
-- Lock contention in multi-threaded scenarios
-- O(1) for Add (amortized)
-- O(n) for IndexOf
-- O(n log n) for Sort
+
+## Best Practices
+
+1. **Memory Management**
+   - Use TrimExcess periodically in long-running applications
+   - Consider initial capacity when known
+   - Use bulk operations instead of multiple single operations
+
+2. **Search Operations**
+   - Use Contains for simple existence checks
+   - Use IndexOfItem for forward searches
+   - Use LastIndexOf for backward searches
+   - Consider sorting for better search performance
+
+3. **Range Operations**
+   - Prefer AddRange over multiple Add calls
+   - Use InsertRange for bulk insertions
+   - Use DeleteRange for bulk deletions
+   - Check bounds before range operations
 
 
 ## Known Limitations
@@ -306,45 +704,7 @@ end;
    - No concurrent modification detection
    - Must wait for iteration to complete before modifying
 
-2. **No Bulk Operations**
-   - No batch Add/Delete operations
-   - Each operation requires separate lock acquisition
-   - Performance impact when modifying multiple items
-
-3. **Sorting Limitations**
-   - Sort operation blocks all other access
-   - No parallel sorting implementation
-   - FSorted flag may cause unnecessary sorts
-
-4. **Memory Management**
-   - Only grows, never shrinks
-   - No manual capacity reduction
-   - May hold excess memory after many deletions
-
-5. **Concurrent Access Characteristics**
-   - Uses TCriticalSection for guaranteed thread safety
-   - Single lock strategy (simple but potentially less concurrent)
-   - All operations are mutually exclusive
-   
-   Performance Considerations:
-   - Multiple threads may wait when concurrent access occurs
-   - Best performance when contention is low
-   - Consider alternative collections if you need:
-     * Reader/writer separation
-     * Lock-free operations
-     * Higher concurrent throughput
-
-6. **IndexOf Operation Performance**
-   - Linear search O(n) even when sorted
-   - No binary search implementation
-   - Consider alternative if frequent searches needed
-
-7. **Exception Handling**
-   - Throws exceptions for invalid indices
-   - No try-get pattern for safe access
-   - Must handle exceptions in client code
-
-8. **Capacity Management**
-   - Initial capacity starts at 0
-   - Grows by doubling (4, 8, 16, etc.)
-   - No way to preset optimal capacity
+2. **Bulk Operation Characteristics**
+   - Single lock acquisition per bulk operation
+   - Memory allocation may grow in steps
+   - No parallel processing of bulk operations
