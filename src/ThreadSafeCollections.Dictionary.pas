@@ -3,7 +3,7 @@
 {       Thread-safe Dictionary Implementation           }
 {                                                       }
 {       Copyright (C) 2024                              }
-{       Version: 1.0                                    }
+{       Version: 0.5                                    }
 {                                                       }
 {*******************************************************}
 

@@ -1,6 +1,65 @@
 # ThreadSafeDictionary Documentation
 
-A thread-safe, generic dictionary implementation in Free Pascal using separate chaining for collision resolution.
+## Table of Contents
+
+- [ThreadSafeDictionary Documentation](#threadsafedictionary-documentation)
+  - [Table of Contents](#table-of-contents)
+  - [Dependencies and Features](#dependencies-and-features)
+    - [Dependencies](#dependencies)
+    - [Features](#features)
+  - [Quick Start](#quick-start)
+    - [Basic Types (string, integer)](#basic-types-string-integer)
+    - [Custom/Compound Types](#customcompound-types)
+  - [Architecture and Design](#architecture-and-design)
+    - [Class Diagram](#class-diagram)
+    - [Collision Resolution](#collision-resolution)
+      - [Separate Chaining (What We Use)](#separate-chaining-what-we-use)
+      - [Double Hashing (Alternative)](#double-hashing-alternative)
+  - [API Reference](#api-reference)
+    - [Constructors](#constructors)
+    - [Core Operations](#core-operations)
+    - [Bulk Operations](#bulk-operations)
+    - [Navigation Methods](#navigation-methods)
+    - [Iterator Support](#iterator-support)
+      - [Usage Example](#usage-example)
+      - [Iterator Characteristics](#iterator-characteristics)
+    - [Maintenance Methods](#maintenance-methods)
+    - [Constants](#constants)
+  - [Implementation Details](#implementation-details)
+    - [Built-in Hash Functions](#built-in-hash-functions)
+    - [Thread Safety](#thread-safety)
+    - [Load Factor and Resizing](#load-factor-and-resizing)
+  - [Performance](#performance)
+    - [Complexity Analysis](#complexity-analysis)
+    - [Performance Characteristics](#performance-characteristics)
+  - [Usage Examples](#usage-examples)
+    - [Basic Usage](#basic-usage)
+    - [Custom Types](#custom-types)
+    - [Initial Capacity](#initial-capacity)
+    - [Bulk Operations](#bulk-operations-1)
+    - [Iterator Usage](#iterator-usage)
+  - [Best Practices](#best-practices)
+  - [Known Limitations](#known-limitations)
+  - [Debugging](#debugging)
+
+
+## Dependencies and Features
+
+### Dependencies
+This implementation requires:
+- Free Pascal 3.2.2 or later
+- Generics.Collections unit (for TPair support)
+- SyncObjs unit (for thread synchronization)
+
+### Features
+- Thread-safe operations using critical sections
+- Separate chaining for collision resolution
+- Automatic resizing when load factor exceeds 0.75
+- Support for custom hash functions and equality comparers
+- Compatible with Delphi's TDictionary interface
+- RAII-style locking mechanism
+- Bulk operations support
+- Iterator support with RAII locking
 
 ## Quick Start
 
@@ -57,82 +116,9 @@ begin
 end;
 ```
 
-## Constructors
+## Architecture and Design
 
-The dictionary provides four constructors for different use cases:
-
-1. Default Constructor - For basic types (string, integer)
-```pascal
-constructor Create;
-```
-- Uses built-in hash functions
-- Default initial capacity (16 buckets)
-- Perfect for string, integer keys
-
-2. Capacity Constructor - For basic types with known size
-```pascal
-constructor Create(InitialCapacity: integer);
-```
-- Uses built-in hash functions
-- Custom initial capacity
-- Good for performance optimization
-
-3. Custom Hash Constructor - For compound/custom types
-```pascal
-constructor Create(const AHashFunc: THashFunction<TKey>;
-                  const AEqualityComparer: TEqualityComparison<TKey>);
-```
-- Requires both hash and equality functions
-- Default initial capacity
-- Required for custom record types
-
-4. Full Constructor - Complete control
-```pascal
-constructor Create(InitialCapacity: integer;
-                  const AHashFunc: THashFunction<TKey>;
-                  const AEqualityComparer: TEqualityComparison<TKey>);
-```
-- Custom initial capacity
-- Custom hash and equality functions
-- Maximum flexibility
-
-## Built-in Hash Functions
-
-The dictionary includes efficient built-in hash functions for common types:
-
-| Type | Hash Function | When to Use |
-|------|--------------|-------------|
-| string | XXHash32 | Default for string keys |
-| integer | MultiplicativeHash | Default for integer keys |
-| other basic types | DefaultHash | Default for other types |
-
-For basic types, just use `Create` or `Create(capacity)` - no need to provide hash functions.
-
-## Custom Hash Functions
-
-For compound or custom types, you must provide:
-1. A hash function: `function(const Key: T): Cardinal`
-2. An equality comparison function: `function(const Left, Right: T): Boolean`
-
-Example:
-```pascal
-// Hash function for a record type
-function HashMyRecord(const Key: TMyRecord): Cardinal;
-begin
-  Result := XXHash32(Key.Field1 + '|' + Key.Field2);
-end;
-
-// Equality comparison for a record type
-function CompareMyRecord(const Left, Right: TMyRecord): Boolean;
-begin
-  Result := (Left.Field1 = Right.Field1) and (Left.Field2 = Right.Field2);
-end;
-
-// Create dictionary with custom functions (both required)
-Dict := TThreadSafeDictionary.Create(@HashMyRecord, @CompareMyRecord);
-```
-
-## Architecture Diagram
+### Class Diagram
 
 ```mermaid
 classDiagram
@@ -203,7 +189,7 @@ classDiagram
         +Next: ^TDictionaryEntry
     }
 
-    class TDictionaryPair~TKey,TValue~ {
+    class TPair~TKey,TValue~ {
         +Key: TKey
         +Value: TValue
     }
@@ -216,7 +202,7 @@ classDiagram
         +Create(ADictionary: TThreadSafeDictionary)
         +Destroy()
         +MoveNext(): Boolean
-        +Current: TDictionaryPair~TKey,TValue~
+        +Current: TPair~TKey,TValue~
     }
 
     class ILockToken {
@@ -235,15 +221,15 @@ classDiagram
     TThreadSafeDictionary ..|> IThreadSafeDictionary
     TThreadSafeDictionary *-- TEnumerator : contains
     TThreadSafeDictionary *-- TDictionaryEntry : uses internally
-    TThreadSafeDictionary *-- TDictionaryPair : returns in enumerator
+    TThreadSafeDictionary --> TPair : returns in enumerator
     TEnumerator --> ILockToken : uses
     TThreadSafeDictionary --> ILockToken : creates
     TLockToken ..|> ILockToken
 ```
 
-## Collision Resolution Strategies
+### Collision Resolution
 
-### Separate Chaining (What We Use)
+#### Separate Chaining (What We Use)
 
 ```
 ┌─────────────┐
@@ -264,7 +250,7 @@ classDiagram
 - Memory usage grows with collisions
 - Our implementation uses this approach
 
-### Double Hashing (Alternative)
+#### Double Hashing (Alternative)
 
 ```
 ┌─────────────┐
@@ -317,7 +303,7 @@ Key Differences:
 
 ## API Reference
 
-### Constructor/Destructor
+### Constructors
 - `Create`: Creates a new dictionary with default bucket size (16)
 - `Create(InitialCapacity: integer)`: Creates dictionary with specified initial capacity (adjusted to power of 2)
 - `Destroy`: Cleans up all entries and frees resources
@@ -330,6 +316,24 @@ Key Differences:
 | `TryGetValue(const Key: TKey; out Value: TValue)` | Safe value retrieval | Boolean | Yes |
 | `Remove(const Key: TKey)` | Removes entry with given key | Boolean | Yes |
 | `AddOrSetValue(const Key: TKey; const Value: TValue)` | Updates value for existing key (raises exception if not found) | void | Yes |
+
+### Bulk Operations
+| Method | Description | Return Type | Thread-Safe |
+|--------|-------------|-------------|-------------|
+| `GetKeys` | Returns array of all keys | TKeyArray<TKey> | Yes |
+| `GetValues` | Returns array of all values | TValueArray<TValue> | Yes |
+| `TrimExcess` | Reduces internal capacity to match count | void | Yes |
+| `TryAdd` | Adds key-value pair if key doesn't exist | Boolean | Yes |
+| `AddRange(ADictionary)` | Adds all pairs from another dictionary | void | Yes |
+| `AddRange(AArray)` | Adds all pairs from TPair array | void | Yes |
+| `ToArray` | Converts dictionary to array of TPairs | TPairArray<TKey,TValue> | Yes |
+| `ContainsValue` | Checks if value exists in dictionary | Boolean | Yes |
+
+### Navigation Methods
+| Method | Description | Return Type | Thread-Safe |
+|--------|-------------|-------------|-------------|
+| `First(out Key: TKey; out Value: TValue)` | Gets first entry in first non-empty bucket | Boolean | Yes |
+| `Last(out Key: TKey; out Value: TValue)` | Gets first entry in last non-empty bucket | Boolean | Yes |
 
 ### Iterator Support
 
@@ -386,13 +390,7 @@ end;
 - Protected from modifications during iteration (via RAII lock)
 - Other threads must wait for iteration to complete before modifying
 
-### Navigation
-| Method | Description | Return Type | Thread-Safe |
-|--------|-------------|-------------|-------------|
-| `First(out Key: TKey; out Value: TValue)` | Gets first entry in first non-empty bucket | Boolean | Yes |
-| `Last(out Key: TKey; out Value: TValue)` | Gets first entry in last non-empty bucket | Boolean | Yes |
-
-### Maintenance
+### Maintenance Methods
 | Method/Property | Description | Type | Thread-Safe |
 |----------------|-------------|------|-------------|
 | `Clear` | Removes all entries | void | Yes |
@@ -410,74 +408,191 @@ const
   MIN_BUCKET_COUNT = 4;         // Minimum bucket count
 ```
 
-### Implementation Details
-- Uses `TCriticalSection` for thread synchronization
-- Separate chaining for collision resolution
-- Automatic resizing when load factor exceeds 0.75
-- Bucket count always power of 2 for efficient indexing
-- Hash values cached in entries for efficient resizing
+## Implementation Details
+
+### Built-in Hash Functions
+
+The dictionary includes efficient built-in hash functions for common types:
+
+| Type | Hash Function | When to Use |
+|------|--------------|-------------|
+| string | XXHash32 | Default for string keys |
+| integer | MultiplicativeHash | Default for integer keys |
+| other basic types | DefaultHash | Default for other types |
+
+For basic types, just use `Create` or `Create(capacity)` - no need to provide hash functions.
+
+### Thread Safety
+- Uses TCriticalSection for synchronization
+- RAII-style locking with ILockToken
+- All public methods are thread-safe
+- Automatic lock management during iteration
+
+### Load Factor and Resizing
+- Load factor threshold: 0.75
+- Automatic resizing when threshold exceeded
+- Bucket count always power of 2
+- Minimum bucket count: 4
+- Hash values cached for efficient resizing
+
+## Performance
+
+### Complexity Analysis
+- Add/TryAdd: O(1)
+- Find/TryGetValue: O(1)
+- Remove: O(1)
+- Replace: O(1)
+- First/Last: O(n) worst case
+- Clear: O(n)
+- Resize: O(n)
+- GetKeys/GetValues: O(n)
+- ContainsValue: O(n)
+- ToArray: O(n)
+- AddRange: O(n) where n is size of source
+- TrimExcess: O(n)
 
 ### Performance Characteristics
-- Average case complexity:
-  - Add: O(1)
-  - Find/TryGetValue: O(1)
-  - Remove: O(1)
-  - Replace: O(1)
-  - First/Last: O(n) worst case
-  - Clear: O(n)
-  - Resize: O(n)
+- Separate chaining minimizes collision impact
+- Hash caching improves resize performance
+- Load factor balances memory vs performance
+- Thread synchronization adds minimal overhead
 
-### Usage Example
+## Usage Examples
 
+### Basic Usage
 ```pascal
 var
   Dict: specialize TThreadSafeDictionary<string, integer>;
 begin
-  Dict := TThreadSafeDictionary.Create;
+  Dict := specialize TThreadSafeDictionary<string, integer>.Create;
   try
-    // Add items
     Dict.Add('one', 1);
-    
-    // Access via default property
-    Dict['two'] := 2;
-    
-    // Safe value retrieval
-    var Value: Integer;
-    if Dict.TryGetValue('one', Value) then
-      WriteLn(Value);
-      
-    // Replace existing value
-    Dict.AddOrSetValue('one', 100);
-    
-    // Access via default property
-    WriteLn(Dict['one']); // Outputs: 100
+    Dict.Add('two', 2);
   finally
     Dict.Free;
   end;
 end;
 ```
 
-### Usage Example with Initial Capacity
+### Custom Types
+```pascal
+type
+  TPersonKey = record
+    FirstName: string;
+    LastName: string;
+  end;
 
+// Define hash function
+function HashPerson(const Key: TPersonKey): Cardinal;
+begin
+  Result := XXHash32(Key.FirstName + '|' + Key.LastName);
+end;
+
+// Define equality comparison
+function ComparePerson(const Left, Right: TPersonKey): Boolean;
+begin
+  Result := (Left.FirstName = Right.FirstName) and 
+            (Left.LastName = Right.LastName);
+end;
+
+var
+  Dict: specialize TThreadSafeDictionary<TPersonKey, integer>;
+begin
+  // Create with custom hash and equality functions (both required for custom types)
+  Dict := specialize TThreadSafeDictionary<TPersonKey, integer>.Create(@HashPerson, @ComparePerson);
+  try
+    var Person: TPersonKey;
+    Person.FirstName := 'John';
+    Person.LastName := 'Doe';
+    Dict.Add(Person, 42);
+  finally
+    Dict.Free;
+  end;
+end;
+```
+
+### Initial Capacity
 ```pascal
 var
   Dict: specialize TThreadSafeDictionary<string, integer>;
 begin
-  // Create with custom initial capacity (will be adjusted to 1024)
-  Dict := TThreadSafeDictionary.Create(1000);
+  Dict := specialize TThreadSafeDictionary<string, integer>.Create(100);
   try
-    // Add items
     Dict.Add('one', 1);
     Dict.Add('two', 2);
+  finally
+    Dict.Free;
+  end;
+end;
+```
 
-    // Check current bucket count
-    WriteLn(Format('Bucket count: %d', [Dict.BucketCount]));
+### Bulk Operations
+```pascal
+var
+  Dict1, Dict2: specialize TThreadSafeDictionary<string, integer>;
+  Keys: specialize TKeyArray<string>;
+  Values: specialize TValueArray<integer>;
+  Pairs: array[0..2] of specialize TPair<string, integer>;
+begin
+  Dict1 := TThreadSafeDictionary.Create;
+  Dict2 := TThreadSafeDictionary.Create;
+  try
+    // Add some initial data
+    Dict1.Add('one', 1);
+    Dict1.Add('two', 2);
+    Dict1.Add('three', 3);
 
-    // Manually resize if needed (will be adjusted to next power of 2)
-    Dict.ResizeBuckets(2000);
+    // Get all keys and values
+    Keys := Dict1.GetKeys;
+    Values := Dict1.GetValues;
+    WriteLn('Keys count: ', Length(Keys));    // Outputs: 3
+    WriteLn('Values count: ', Length(Values)); // Outputs: 3
 
-    // Verify items still accessible
-    WriteLn(Dict.GetItem('one'));  // Outputs: 1
+    // Add range from another dictionary
+    Dict2.AddRange(Dict1);
+    WriteLn('Dict2 count: ', Dict2.Count);    // Outputs: 3
+
+    // Add range from array of pairs
+    Pairs[0] := TPair<string, integer>.Create('four', 4);
+    Pairs[1] := TPair<string, integer>.Create('five', 5);
+    Pairs[2] := TPair<string, integer>.Create('six', 6);
+    Dict1.AddRange(Pairs);
+    WriteLn('Dict1 count after AddRange: ', Dict1.Count); // Outputs: 6
+
+    // Convert to array of pairs
+    Pairs := Dict1.ToArray;
+    
+    // Optimize memory usage
+    Dict1.TrimExcess;
+
+    // Try to add (won't raise exception if exists)
+    if Dict1.TryAdd('seven', 7) then
+      WriteLn('Added new pair');
+
+    // Check for specific value
+    if Dict1.ContainsValue(5) then
+      WriteLn('Found value 5');
+  finally
+    Dict1.Free;
+    Dict2.Free;
+  end;
+end;
+```
+
+### Iterator Usage
+```pascal
+var
+  Dict: specialize TThreadSafeDictionary<string, integer>;
+  Pair: specialize TPair<string, integer>;
+begin
+  Dict := specialize TThreadSafeDictionary<string, integer>.Create;
+  try
+    Dict.Add('one', 1);
+    Dict.Add('two', 2);
+    
+    // Using iterator
+    for Pair in Dict do
+      WriteLn(Format('%s: %d', [Pair.Key, Pair.Value]));
   finally
     Dict.Free;
   end;
@@ -510,8 +625,8 @@ end;
 ## Known Limitations
 
 1. First/Last operations are not order-preserving
-2. No bulk operations
-3. No concurrent iteration support
+2. No concurrent iteration support
+3. ContainsValue performs full dictionary scan
 
 ## Debugging
 
