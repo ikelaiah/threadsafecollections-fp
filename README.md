@@ -22,8 +22,8 @@ Current State:
    - Thread-safe iteration with automatic lock management
    - Each iterator maintains its own lock token
 - ✅ Bulk operations support
-   - ✅ Implemented in List and Deque
-   - ❌ Pending in Dictionary, HashSet
+   - ✅ Implemented in List, Dictionary and Deque
+   - ❌ Pending in HashSet
 - ❌ Performance not yet optimized
 
 Planned Features:
@@ -508,7 +508,7 @@ end;
 | Collision Resolution     |  N/A |  N/A  |    ✅      |   ✅    |
 | Specialized Types        |  ✅  |  ❌   |    ❌      |   ✅    |
 | Custom Comparers         |  ✅  |  ❌   |    ✅      |   ✅    |
-| Bulk Operations          |  ✅  |  ✅   |    ❌      |   ❌    |
+| Bulk Operations          |  ✅  |  ✅   |    ✅      |   ❌    |
 
 ## 🧪 Testing
 

@@ -12,7 +12,7 @@ type
   TIntStringDictionary = specialize TThreadSafeDictionary<integer, string>;
   TStringIntDictionary = specialize TThreadSafeDictionary<string, integer>;
   TStringObjectDictionary = specialize TThreadSafeDictionary<string, TObject>;
-  TStringIntDictionaryPair = specialize TDictionaryPair<string, integer>;
+  TStringIntPair = specialize TPair<string, Integer>;
 
   TAdderThread = class(TThread)
   private
@@ -44,7 +44,7 @@ type
     procedure Execute; override;
   end;
 
-  TStringIntPair = specialize TPair<string, Integer>;
+
 
   TThreadSafeDictionaryTest = class(TTestCase)
   private
@@ -102,6 +102,15 @@ type
     procedure Test30_CompoundKeyBasic;
     procedure Test31_CompoundKeyIteration;
     procedure Test32_CustomConstructors;
+
+    // Add these test methods to the TThreadSafeDictionaryTest class
+
+    procedure Test33_GetKeysAndValues;
+    procedure Test34_TrimExcess;
+    procedure Test35_TryAdd;
+    procedure Test36_AddRange;
+    procedure Test37_ToArray;
+    procedure Test38_ContainsValue;
   end;
 
   // Add this type after other test thread types
@@ -926,7 +935,7 @@ procedure TThreadSafeDictionaryTest.Test24_IteratorBasic;
 var
   Iterator: TStringIntDictionary.TEnumerator;
   ExpectedCount: Integer;
-  Pair: TStringIntDictionaryPair;
+  Pair: TStringIntPair;
 begin
   WriteLn('Starting Test24_IteratorBasic');
   IncrementTestCounter;
@@ -986,7 +995,7 @@ end;
 procedure TThreadSafeDictionaryTest.Test26_IteratorModification;
 var
   Iterator: TStringIntDictionary.TEnumerator;
-  Pair: TStringIntDictionaryPair;
+  Pair: TStringIntPair;
 begin
   WriteLn('Starting Test26_IteratorModification');
   IncrementTestCounter;
@@ -1023,7 +1032,7 @@ end;
 procedure TThreadSafeDictionaryTest.Test27_MultipleIterators;
 var
   Iterator1, Iterator2: TStringIntDictionary.TEnumerator;
-  Pair1, Pair2: TStringIntDictionaryPair;
+  Pair1, Pair2: TStringIntPair;
   Count1, Count2: Integer;
 begin
   WriteLn('Starting Test27_MultipleIterators');
@@ -1068,7 +1077,7 @@ end;
 procedure TThreadSafeDictionaryTest.Test28_IteratorReset;
 var
   Iterator: TStringIntDictionary.TEnumerator;
-  FirstPair, CurrentPair: TStringIntDictionaryPair;
+  FirstPair, CurrentPair: TStringIntPair;
 begin
   WriteLn('Starting Test28_IteratorReset');
   IncrementTestCounter;
@@ -1149,7 +1158,7 @@ type
   end;
 
   TPersonDictionary = specialize TThreadSafeDictionary<TPersonKey, Integer>;
-  TPersonDictionaryPair = specialize TDictionaryPair<TPersonKey, Integer>;
+  TPersonPair = specialize TPair<TPersonKey, Integer>;
   TPersonHashFunction = specialize THashFunction<TPersonKey>;
   TPersonEqualityComparison = specialize TEqualityComparison<TPersonKey>;
 
@@ -1210,7 +1219,7 @@ procedure TThreadSafeDictionaryTest.Test31_CompoundKeyIteration;
 var
   Dict: TPersonDictionary;
   Person: TPersonKey;
-  Pair: TPersonDictionaryPair;
+  Pair: TPersonPair;
   Count: Integer;
   HashFunc: TPersonHashFunction;
   EqualityFunc: TPersonEqualityComparison;
@@ -1307,6 +1316,212 @@ begin
     on E: Exception do
     begin
       WriteLn('TestCustomConstructors failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.Test33_GetKeysAndValues;
+var
+  Keys: specialize TArray<string>;
+  Values: specialize TArray<Integer>;
+  I: Integer;
+begin
+  WriteLn('Starting Test33_GetKeysAndValues');
+  IncrementTestCounter;
+  try
+    // Add test data
+    for I := 1 to 5 do
+      FStrDict.Add('Key' + IntToStr(I), I);
+
+    // Test GetKeys
+    Keys := FStrDict.GetKeys;
+    AssertEquals('Keys array length should match count', 5, Length(Keys));
+    for I := 0 to High(Keys) do
+      AssertTrue('Key should exist', Keys[I].StartsWith('Key'));
+
+    // Test GetValues
+    Values := FStrDict.GetValues;
+    AssertEquals('Values array length should match count', 5, Length(Values));
+    for I := 0 to High(Values) do
+      AssertTrue('Value should be between 1 and 5', (Values[I] >= 1) and (Values[I] <= 5));
+
+    WriteLn('TestGetKeysAndValues completed');
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestGetKeysAndValues failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.Test34_TrimExcess;
+var
+  InitialBucketCount: Integer;
+begin
+  WriteLn('Starting Test34_TrimExcess');
+  IncrementTestCounter;
+  try
+    // Add some items and force resize
+    FStrDict.ResizeBuckets(64);
+    InitialBucketCount := FStrDict.BucketCount;
+    
+    FStrDict.Add('test1', 1);
+    FStrDict.Add('test2', 2);
+    
+    // Trim excess
+    FStrDict.TrimExcess;
+    
+    AssertTrue('Bucket count should decrease after trim', 
+      FStrDict.BucketCount < InitialBucketCount);
+    AssertTrue('Should maintain minimum bucket count',
+      FStrDict.BucketCount >= 4);
+      
+    // Verify functionality after trim
+    AssertEquals('Values should be accessible after trim',
+      1, FStrDict.GetItem('test1'));
+      
+    WriteLn('TestTrimExcess completed');
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestTrimExcess failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.Test35_TryAdd;
+var
+  Added: Boolean;
+  Value: Integer;
+begin
+  WriteLn('Starting Test35_TryAdd');
+  IncrementTestCounter;
+  try
+    // Test adding new key
+    Added := FStrDict.TryAdd('test1', 1);
+    AssertTrue('Should successfully add new key', Added);
+    AssertEquals('Value should be stored', 1, FStrDict.GetItem('test1'));
+    
+    // Test adding duplicate key
+    Added := FStrDict.TryAdd('test1', 2);
+    AssertFalse('Should fail to add duplicate key', Added);
+    AssertEquals('Original value should remain', 1, FStrDict.GetItem('test1'));
+    
+    WriteLn('TestTryAdd completed');
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestTryAdd failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.Test36_AddRange;
+var
+  OtherDict: TStringIntDictionary;
+  Pairs: array[0..2] of specialize TPair<string, Integer>;
+  Value: Integer;
+begin
+  WriteLn('Starting Test36_AddRange');
+  IncrementTestCounter;
+  try
+    // Test AddRange with dictionary
+    OtherDict := TStringIntDictionary.Create;
+    try
+      OtherDict.Add('other1', 1);
+      OtherDict.Add('other2', 2);
+      
+      FStrDict.AddRange(OtherDict);
+      
+      AssertTrue('Should copy first item', FStrDict.TryGetValue('other1', Value));
+      AssertEquals('First value should match', 1, Value);
+      AssertTrue('Should copy second item', FStrDict.TryGetValue('other2', Value));
+      AssertEquals('Second value should match', 2, Value);
+    finally
+      OtherDict.Free;
+    end;
+    
+    // Test AddRange with array
+    FStrDict.Clear;
+    Pairs[0].Key := 'pair1';
+    Pairs[0].Value := 10;
+    Pairs[1].Key := 'pair2';
+    Pairs[1].Value := 20;
+    Pairs[2].Key := 'pair3';
+    Pairs[2].Value := 30;
+    
+    FStrDict.AddRange(Pairs);
+    
+    AssertEquals('Should add all pairs', 3, FStrDict.Count);
+    AssertEquals('Values should match', 20, FStrDict.GetItem('pair2'));
+    
+    WriteLn('TestAddRange completed');
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestAddRange failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.Test37_ToArray;
+var
+  Arr: specialize TArray<specialize TPair<string, Integer>>;
+  I: Integer;
+begin
+  WriteLn('Starting Test37_ToArray');
+  IncrementTestCounter;
+  try
+    // Add test data
+    for I := 1 to 3 do
+      FStrDict.Add('Key' + IntToStr(I), I);
+      
+    // Convert to array
+    Arr := FStrDict.ToArray;
+    
+    AssertEquals('Array length should match dictionary count', 
+      FStrDict.Count, Length(Arr));
+      
+    // Verify array contents
+    for I := 0 to High(Arr) do
+    begin
+      AssertTrue('Key should exist', Arr[I].Key.StartsWith('Key'));
+      AssertTrue('Value should be between 1 and 3', 
+        (Arr[I].Value >= 1) and (Arr[I].Value <= 3));
+    end;
+    
+    WriteLn('TestToArray completed');
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestToArray failed: ', E.Message);
+      raise;
+    end;
+  end;
+end;
+
+procedure TThreadSafeDictionaryTest.Test38_ContainsValue;
+begin
+  WriteLn('Starting Test38_ContainsValue');
+  IncrementTestCounter;
+  try
+    FStrDict.Add('test1', 42);
+    FStrDict.Add('test2', 100);
+    
+    AssertTrue('Should find existing value', FStrDict.ContainsValue(42));
+    AssertTrue('Should find another existing value', FStrDict.ContainsValue(100));
+    AssertFalse('Should not find non-existent value', FStrDict.ContainsValue(999));
+    
+    WriteLn('TestContainsValue completed');
+  except
+    on E: Exception do
+    begin
+      WriteLn('TestContainsValue failed: ', E.Message);
       raise;
     end;
   end;

@@ -1,3 +1,45 @@
+{*******************************************************}
+{                                                       }
+{       Thread-safe Dictionary Implementation           }
+{                                                       }
+{       Copyright (C) 2024                              }
+{       Version: 0.5                                    }
+{                                                       }
+{*******************************************************}
+
+{
+  This unit provides a thread-safe implementation of a generic dictionary
+  that can be used in multi-threaded applications. It uses a hash table
+  with separate chaining for collision resolution and provides automatic
+  resizing when the load factor threshold is reached.
+
+  Features:
+  - Thread-safe operations using critical sections
+  - Separate chaining for collision handling
+  - Automatic resizing when load factor exceeds 0.75
+  - Support for custom hash functions and equality comparers
+  - Compatible with Delphi's TDictionary interface
+  - RAII-style locking mechanism
+
+  Usage example:
+    var
+      Dict: specialize TThreadSafeDictionary<string, integer>;
+      Pair: specialize TPair<string, integer>;
+    begin
+      Dict := TThreadSafeDictionary<string, integer>.Create;
+      try
+        Dict.Add('one', 1);
+        Dict.AddOrSetValue('two', 2);
+        
+        // Using TPair from Generics.Collections
+        for Pair in Dict do
+          WriteLn(Format('%s: %d', [Pair.Key, Pair.Value]));
+      finally
+        Dict.Free;
+      end;
+    end;
+}
+
 unit ThreadSafeCollections.Dictionary;
 
 {$mode objfpc}{$H+}
@@ -6,7 +48,8 @@ unit ThreadSafeCollections.Dictionary;
 interface
 
 uses
-  SysUtils, Classes, SyncObjs, HashFunctions, TypInfo, ThreadSafeCollections.Interfaces;
+  SysUtils, Classes, SyncObjs, HashFunctions, TypInfo, 
+  ThreadSafeCollections.Interfaces, Generics.Collections;
 
 { 
   DEBUG_LOGGING: Global flag to control debug output
@@ -17,15 +60,22 @@ const
   DEBUG_LOGGING = False;
 
 type
+  { EKeyNotFoundException
+    Custom exception raised when attempting to access a non-existent key }
   EKeyNotFoundException = class(Exception);
 
-  { 
-    TDictionaryEntry: Generic record representing a key-value pair in the hash table
-    - Key: The lookup key
-    - Value: The stored value
-    - Hash: Cached hash value to avoid recalculation during resize
-    - Next: Pointer to next entry (for handling collisions via chaining)
-  }
+  { TDictionaryEntry
+    Internal record representing a key-value pair in the hash table
+
+    Parameters:
+      TKey - The type of the dictionary keys
+      TValue - The type of the dictionary values
+
+    Fields:
+      Key: The lookup key
+      Value: The stored value
+      Hash: Cached hash value to avoid recalculation during resize
+      Next: Pointer to next entry (for handling collisions via chaining) }
   generic TDictionaryEntry<TKey, TValue> = record
     Key: TKey;
     Value: TValue;
@@ -33,23 +83,37 @@ type
     Next: ^TDictionaryEntry;
   end;
 
-  // First declare TDictionaryPair
-  generic TDictionaryPair<TKey, TValue> = record
-    Key: TKey;
-    Value: TValue;
-  end;
+  { THashFunction
+    Function type for custom key hashing
 
-  // Then declare hash function types
+    Parameters:
+      T - The type of the key to hash
+    Returns:
+      Cardinal - The hash value for the key }
   generic THashFunction<T> = function(const Key: T): Cardinal;
+
+  { TEqualityComparison
+    Function type for custom key comparison
+
+    Parameters:
+      T - The type of the keys to compare
+      Left, Right - The keys to compare
+    Returns:
+      Boolean - True if keys are equal, False otherwise }
   generic TEqualityComparison<T> = function(const Left, Right: T): Boolean;
 
-  {
-    TThreadSafeDictionary: Thread-safe generic dictionary implementation
-    - Uses critical section for thread safety
-    - Implements separate chaining for collision resolution
-    - Automatic resizing when load factor threshold is reached
-  }
-  generic TThreadSafeDictionary<TKey, TValue> = class(TInterfacedObject, specialize IThreadSafeDictionary<TKey, TValue>)
+  { TThreadSafeDictionary
+    Thread-safe implementation of a generic dictionary
+
+    Parameters:
+      TKey - The type of the dictionary keys
+      TValue - The type of the dictionary values
+
+    Thread Safety:
+      All public methods are thread-safe using a critical section
+      The Lock method provides RAII-style locking for bulk operations }
+  generic TThreadSafeDictionary<TKey, TValue> = class(TInterfacedObject, 
+    specialize IThreadSafeDictionary<TKey, TValue>)
   private
     type
       // PEntry is a pointer to a TEntry record, representing a single entry in the hash table
@@ -72,7 +136,7 @@ type
         FLockToken: ILockToken;                      // Token for managing thread-safe access during enumeration
 
         // Retrieves the current key-value pair
-        function GetCurrent: specialize TDictionaryPair<TKey, TValue>;
+        function GetCurrent: specialize TPair<TKey, TValue>;
 
 
       public
@@ -86,7 +150,7 @@ type
         function MoveNext: Boolean;
 
         // Property to access the current key-value pair
-        property Current: specialize TDictionaryPair<TKey, TValue> read GetCurrent;
+        property Current: specialize TPair<TKey, TValue> read GetCurrent;
       end;
 
   private
@@ -106,20 +170,85 @@ type
       Internal methods for hash table operations 
     }
 
-    // Computes the hash value for a given key using the hash function
+    { GetHashValue
+      Computes the hash value for a given key
+      
+      Parameters:
+        Key: The key to hash
+      
+      Returns:
+        A positive cardinal value representing the hash
+      
+      Notes:
+        - Uses custom hash function if provided
+        - Falls back to type-specific hash for basic types
+        - Ensures result is always positive }
     function GetHashValue(const Key: TKey): cardinal;
 
-    // Determines the bucket index for a given hash value
+    { GetBucketIndex
+      Maps a hash value to a bucket index
+      
+      Parameters:
+        Hash: The hash value to map
+      
+      Returns:
+        Index of the bucket for this hash
+      
+      Notes:
+        - Uses bitwise AND for efficient modulo operation
+        - Requires bucket count to be power of 2 }
     function GetBucketIndex(Hash: cardinal): integer; inline;
 
-    // Resizes the hash table to the new specified size
+    { Resize
+      Resizes the hash table and rehashes all entries
+      
+      Parameters:
+        NewSize: The new size for the bucket array
+      
+      Notes:
+        - Must be called within a lock
+        - Preserves all existing entries
+        - Maintains collision chains }
     procedure Resize(NewSize: integer);
 
-    // Checks if the current load factor exceeds the threshold and triggers resizing if necessary
+    { CheckLoadFactor
+      Monitors and maintains hash table efficiency
+      
+      Notes:
+        - Called after each Add operation
+        - Triggers resize when load > LOAD_FACTOR
+        - Must be called within a lock }
     procedure CheckLoadFactor;
 
-    // Finds the entry for a given key within the specified bucket
+    { FindEntry
+      Locates an entry in a specific bucket
+      
+      Parameters:
+        Key: The key to find
+        Hash: Pre-calculated hash value
+        BucketIdx: Pre-calculated bucket index
+      
+      Returns:
+        Pointer to found entry or nil if not found
+      
+      Notes:
+        - Must be called within a lock
+        - Uses cached hash for optimization }
     function FindEntry(const Key: TKey; Hash: cardinal; BucketIdx: integer): PEntry;
+
+    { FindValue
+      Searches for a specific value in the dictionary
+      
+      Parameters:
+        Value: The value to find
+      
+      Returns:
+        True if value exists, False otherwise
+      
+      Notes:
+        - Must be called within a lock
+        - Performs byte-by-byte comparison }
+    function FindValue(const Value: TValue): Boolean;
 
     // Calculates the next power of two greater than or equal to the provided value
     function GetNextPowerOfTwo(Value: integer): integer;
@@ -132,57 +261,213 @@ type
 
     procedure SetItem(const Key: TKey; const Value: TValue);  // Add this for interface
 
-
   public
-    // Default constructor initializes the dictionary with default settings
+    { Create
+      Creates a new dictionary with default settings
+      
+      The default constructor initializes the dictionary with:
+      - Initial capacity of 16 buckets
+      - Default hash function based on key type
+      - Default equality comparison based on key type }
     constructor Create;
 
-    // Constructor with specified initial capacity
+    { Create
+      Creates a new dictionary with specified initial capacity
+      
+      Parameters:
+        InitialCapacity: Desired initial bucket count (will be rounded up to next power of 2)
+      
+      Notes:
+        Actual capacity will be at least MIN_BUCKET_COUNT (4) }
     constructor Create(InitialCapacity: integer);
 
-    // Constructor with custom hash and equality functions
+    { Create
+      Creates a new dictionary with custom hash and equality functions
+      
+      Parameters:
+        AHashFunc: Custom function to compute hash values for keys
+        AEqualityComparer: Custom function to compare keys for equality
+      
+      Use this constructor when working with compound keys or when
+      custom hash/equality behavior is needed }
     constructor Create(const AHashFunc: specialize THashFunction<TKey>;
                       const AEqualityComparer: specialize TEqualityComparison<TKey>);
 
-    // Constructor with specified initial capacity and custom hash and equality functions
+    { Create
+      Creates a new dictionary with specified capacity and custom functions
+      
+      Parameters:
+        InitialCapacity: Desired initial bucket count (will be rounded up to next power of 2)
+        AHashFunc: Custom function to compute hash values for keys
+        AEqualityComparer: Custom function to compare keys for equality
+      
+      This is the most flexible constructor, allowing full customization of both
+      initial capacity and key handling behavior }
     constructor Create(InitialCapacity: integer;
                       const AHashFunc: specialize THashFunction<TKey>;
                       const AEqualityComparer: specialize TEqualityComparison<TKey>);
 
-    // Destructor releases all resources used by the dictionary
+    { Destroy
+      Cleans up all resources used by the dictionary
+      
+      Notes:
+        - Automatically called when the dictionary is freed
+        - Releases all memory used by entries
+        - Releases the critical section }
     destructor Destroy; override;
 
-    // Adds a new key-value pair to the dictionary
+    { Add
+      Adds a new key-value pair to the dictionary
+      
+      Parameters:
+        Key: The key to add
+        Value: The value to associate with the key
+      
+      Raises:
+        Exception if the key already exists
+      
+      Thread Safety:
+        Method is thread-safe }
     procedure Add(const Key: TKey; const Value: TValue);
 
-    // Retrieves the value associated with the specified key
+    { GetItem
+      Retrieves the value associated with a key
+      
+      Parameters:
+        Key: The key to look up
+      
+      Returns:
+        The value associated with the key
+      
+      Raises:
+        EKeyNotFoundException if the key doesn't exist
+      
+      Thread Safety:
+        Method is thread-safe }
     function GetItem(const Key: TKey): TValue;
 
-    // Tries to get the value associated with the specified key
+    { TryGetValue
+      Attempts to retrieve a value for the specified key
+      
+      Parameters:
+        Key: The key to look up
+        Value: Output parameter that receives the found value
+      
+      Returns:
+        True if the key was found, False otherwise
+      
+      Thread Safety:
+        Method is thread-safe }
     function TryGetValue(const Key: TKey; out Value: TValue): boolean;
 
-    // Removes the key-value pair with the specified key from the dictionary
+    { Remove
+      Removes a key-value pair from the dictionary
+      
+      Parameters:
+        Key: The key to remove
+      
+      Returns:
+        True if the key was found and removed
+        False if the key wasn't found
+      
+      Thread Safety:
+        Method is thread-safe }
     function Remove(const Key: TKey): boolean;
 
-    // Adds or updates a key-value pair in the dictionary
+    { AddOrSetValue
+      Adds a new key-value pair or updates an existing one
+      
+      Parameters:
+        Key: The key to add or update
+        Value: The value to store
+      
+      Notes:
+        - If the key exists, its value is updated
+        - If the key doesn't exist, a new pair is added
+      
+      Thread Safety:
+        Method is thread-safe }
     procedure AddOrSetValue(const Key: TKey; const Value: TValue);
 
-    // Retrieves the first key-value pair in the dictionary
+    { First
+      Retrieves the first key-value pair in the dictionary
+      
+      Parameters:
+        Key: Output parameter that receives the first key
+        Value: Output parameter that receives the first value
+      
+      Returns:
+        True if the dictionary is not empty and a pair was retrieved
+        False if the dictionary is empty
+      
+      Notes:
+        - The "first" pair is implementation-dependent
+        - Don't rely on any specific ordering
+      
+      Thread Safety:
+        Method is thread-safe }
     function First(out Key: TKey; out Value: TValue): boolean;
 
-    // Retrieves the last key-value pair in the dictionary
+    { Last
+      Retrieves the last key-value pair in the dictionary
+      
+      Parameters:
+        Key: Output parameter that receives the last key
+        Value: Output parameter that receives the last value
+      
+      Returns:
+        True if the dictionary is not empty and a pair was retrieved
+        False if the dictionary is empty
+      
+      Notes:
+        - The "last" pair is implementation-dependent
+        - Don't rely on any specific ordering
+      
+      Thread Safety:
+        Method is thread-safe }
     function Last(out Key: TKey; out Value: TValue): boolean;
 
-    // Clears all key-value pairs from the dictionary
+    { Clear
+      Removes all key-value pairs from the dictionary
+      
+      Notes:
+        - Maintains the current bucket count
+        - Properly disposes of all entries
+        - Resets count to 0
+      
+      Thread Safety:
+        Method is thread-safe }
     procedure Clear;
 
     // Returns the number of key-value pairs currently stored in the dictionary
     function Count: integer; 
 
-    // Resizes the internal buckets to the new specified size
+    { ResizeBuckets
+      Manually resizes the internal bucket array
+      
+      Parameters:
+        NewSize: Desired new bucket count
+      
+      Notes:
+        - Size will be adjusted to next power of 2
+        - Won't resize smaller than minimum bucket count
+        - Won't resize smaller than needed for current items
+      
+      Raises:
+        Exception if new size is too small for current items
+      
+      Thread Safety:
+        Method is thread-safe }
     procedure ResizeBuckets(NewSize: integer);
 
-    // Retrieves the current number of buckets in the hash table
+    { GetBucketCount
+      Returns the current number of buckets in the hash table
+      
+      Returns:
+        The current number of buckets (always a power of 2)
+      
+      Thread Safety:
+        Method is thread-safe }
     function GetBucketCount: integer; 
 
     // Property to access the number of buckets
@@ -191,14 +476,155 @@ type
     // Default property to access items by key, supports read and write operations
     property Items[const Key: TKey]: TValue read GetItem write AddOrSetValue; default;
 
-    // Retrieves an enumerator to iterate over the dictionary's key-value pairs
+    { GetEnumerator
+      Creates an enumerator for iterating over the dictionary
+      
+      Returns:
+        A new TEnumerator instance
+      
+      Notes:
+        - Enumerator maintains a lock during iteration
+        - Remember to free the enumerator when done
+      
+      Thread Safety:
+        Iteration is thread-safe }
     function GetEnumerator: TEnumerator;
 
-    // Locks the dictionary for thread-safe operations and returns a lock token
+    { Lock
+      Acquires a lock on the dictionary using RAII pattern
+      
+      Returns:
+        An ILockToken that automatically releases the lock when freed
+      
+      Usage:
+        var
+          LockToken: ILockToken;
+        begin
+          LockToken := Dict.Lock;  // Lock acquired here
+          try
+            // Multiple thread-safe operations
+            Dict.Add('one', 1);
+            Dict.Remove('two');
+            Dict.AddOrSetValue('three', 3);
+          finally
+            LockToken := nil;  // Lock released here
+          end;
+        end;
+      
+      Thread Safety:
+        Core mechanism for atomic multi-operation sequences }
     function Lock: ILockToken;
 
-    // IThreadSafeDictionary interface implementation
+    { ContainsKey
+      Checks if the dictionary contains the specified key
+      
+      Parameters:
+        Key: The key to check for
+        
+      Returns:
+        True if the key exists, False otherwise
+        
+      Thread Safety:
+        Method is thread-safe }
     function ContainsKey(const Key: TKey): Boolean;
+
+    { GetKeys
+      Returns an array containing all keys in the dictionary
+      
+      Returns:
+        Array of TKey containing all dictionary keys
+        
+      Thread Safety:
+        Method is thread-safe }
+    function GetKeys: specialize TKeyArray<TKey>;
+
+    { GetValues 
+      Returns an array containing all values in the dictionary
+      
+      Returns:
+        Array of TValue containing all dictionary values
+        
+      Thread Safety:
+        Method is thread-safe }
+    function GetValues: specialize TValueArray<TValue>;
+
+    { TrimExcess
+      Reduces the internal capacity to match the actual item count
+      
+      Notes:
+        - Only trims if significant memory can be saved
+        - May take longer with large dictionaries
+        
+      Thread Safety:
+        Method is thread-safe }
+    procedure TrimExcess;
+
+    { TryAdd
+      Attempts to add a key-value pair if the key doesn't exist
+      
+      Parameters:
+        Key: The key to add
+        Value: The value to associate with the key
+        
+      Returns:
+        True if added successfully, False if key already exists
+        
+      Thread Safety:
+        Method is thread-safe }
+    function TryAdd(const Key: TKey; const Value: TValue): Boolean;
+
+    { AddRange
+      Adds all key-value pairs from another dictionary
+      
+      Parameters:
+        ADictionary: Source dictionary to copy from
+        
+      Notes:
+        - Skips if source dictionary is nil
+        - Updates existing keys using AddOrSetValue
+        - Thread-safe on both dictionaries
+        
+      Thread Safety:
+        - Method is thread-safe
+        - Locks both source and destination dictionaries }
+    procedure AddRange(const ADictionary: specialize IThreadSafeDictionary<TKey, TValue>); overload;
+
+    { AddRange
+      Adds all key-value pairs from an array
+      
+      Parameters:
+        AArray: Array of key-value pairs to add
+        
+      Thread Safety:
+        Method is thread-safe }
+    procedure AddRange(const AArray: specialize TPairArray<TKey, TValue>); overload;
+
+    { ToArray
+      Converts the dictionary contents to an array of key-value pairs
+      
+      Returns:
+        Array of TPair containing all dictionary entries
+        
+      Thread Safety:
+        Method is thread-safe }
+    function ToArray: specialize TPairArray<TKey, TValue>;
+
+    { ContainsValue
+      Checks if the dictionary contains the specified value
+      
+      Parameters:
+        Value: The value to search for
+        
+      Returns:
+        True if value exists, False otherwise
+        
+      Notes:
+        - This operation requires scanning all entries
+        - May be slow for large dictionaries
+        
+      Thread Safety:
+        Method is thread-safe }
+    function ContainsValue(const Value: TValue): Boolean;
   end;
 
 implementation
@@ -206,11 +632,6 @@ implementation
 
 { TThreadSafeDictionary implementation }
 
-{
-  GetNextPowerOfTwo: Returns the next power of 2 >= Value
-  - Ensures bucket count is always a power of 2
-  - Required for efficient hash distribution
-}
 function TThreadSafeDictionary.GetNextPowerOfTwo(Value: integer): integer;
 begin
   Result := MIN_BUCKET_COUNT;
@@ -218,57 +639,23 @@ begin
     Result := Result * 2;
 end;
 
-
-{
-  Create: Default constructor
-  - Initializes with DEFAULT_BUCKET_COUNT buckets
-  - Uses built-in hash functions for basic types
-}
 constructor TThreadSafeDictionary.Create;
 begin
   Create(INITIAL_BUCKET_COUNT, nil, nil);  // Pass nil for hash and equality functions
 end;
 
-{
-  Create: Constructor with initial capacity
-  - Adjusts capacity to next power of 2
-  - Ensures minimum bucket count
-  - Uses built-in hash functions for basic types
-  
-  Parameters:
-  - InitialCapacity: Desired initial bucket count
-}
 constructor TThreadSafeDictionary.Create(InitialCapacity: integer);
 begin
   Create(InitialCapacity, nil, nil);  // Pass nil for hash and equality functions
 end;
 
-{
-  Create: Constructor with custom hash and equality functions
-  - Uses default bucket count
-  - Required for compound/custom types
-  
-  Parameters:
-  - AHashFunc: Custom hash function for the key type
-  - AEqualityComparer: Custom equality comparison for the key type
-}
+
 constructor TThreadSafeDictionary.Create(const AHashFunc: specialize THashFunction<TKey>;
                                        const AEqualityComparer: specialize TEqualityComparison<TKey>);
 begin
   Create(INITIAL_BUCKET_COUNT, AHashFunc, AEqualityComparer);
 end;
 
-{
-  Create: Full constructor with all options
-  - Adjusts capacity to next power of 2
-  - Ensures minimum bucket count
-  - Can use custom hash and equality functions
-  
-  Parameters:
-  - InitialCapacity: Desired initial bucket count (will be rounded up to power of 2)
-  - AHashFunc: Custom hash function (nil uses built-in hash)
-  - AEqualityComparer: Custom equality comparison (nil uses built-in comparison)
-}
 constructor TThreadSafeDictionary.Create(InitialCapacity: integer;
                                        const AHashFunc: specialize THashFunction<TKey>;
                                        const AEqualityComparer: specialize TEqualityComparison<TKey>);
@@ -296,11 +683,6 @@ begin
   inherited Destroy;
 end;
 
-{
-  GetBucketCount: Returns the current number of buckets (not key-value pairs)
-  - Thread-safe operation
-  - Accesses FBuckets directly
-}
 function TThreadSafeDictionary.GetBucketCount: integer;
 begin
   FLock.Enter;
@@ -311,19 +693,7 @@ begin
   end;
 end;
 
-{
-  ResizeBuckets: Public method to manually resize bucket array
-  - Thread-safe operation
-  - Adjusts size to next power of 2
-  - Won't resize smaller than minimum bucket count
-  - Won't resize smaller than needed for current items
-  
-  Parameters:
-  - NewSize: Desired new bucket count
-  
-  Raises:
-  - Exception if new size too small for current items
-}
+
 procedure TThreadSafeDictionary.ResizeBuckets(NewSize: integer);
 var
   MinRequired: integer;
@@ -354,13 +724,7 @@ begin
   end;
 end;
 
-{
-  GetHashValue: Calculates hash for different key types
-  - Uses XXHash32 for strings (good distribution)
-  - Uses MultiplicativeHash for integers
-  - Falls back to DefaultHash for other types
-  - Always returns a positive value (masked with $7FFFFFFF)
-}
+
 function TThreadSafeDictionary.GetHashValue(const Key: TKey): cardinal;
 begin
   // Use custom hash function if provided
@@ -380,12 +744,7 @@ begin
   Result := Result and $7FFFFFFF; // Ensure positive
 end;
 
-{
-  GetBucketIndex: Maps hash value to bucket index
-  - Uses bitwise AND with (bucket_count - 1)
-  - Requires bucket count to be power of 2
-  - Provides fast modulo operation
-}
+
 function TThreadSafeDictionary.GetBucketIndex(Hash: cardinal): integer;
 begin
   if DEBUG_LOGGING then WriteLn(
@@ -395,14 +754,7 @@ begin
   if DEBUG_LOGGING then WriteLn(Format('DEBUG: GetBucketIndex - Result: %d', [Result]));
 end;
 
-{
-  CheckLoadFactor: Monitors and maintains hash table efficiency
-  - Calculates current load (items/buckets)
-  - Triggers resize when load > 0.75
-  - Doubles bucket count on resize
-  
-  Note: Called after each Add operation
-}
+
 procedure TThreadSafeDictionary.CheckLoadFactor;
 begin
   if DEBUG_LOGGING then WriteLn(Format('CheckLoadFactor: Current ratio: %f',
@@ -415,15 +767,7 @@ begin
   end;
 end;
 
-{
-  Resize: Doubles the hash table size and rehashes all entries
-  - Creates new bucket array
-  - Rehashes existing entries to new positions
-  - Maintains linked lists for collision chains
-  - Uses cached hash values to avoid recalculation
-  
-  Important: Must be called within a lock
-}
+
 procedure TThreadSafeDictionary.Resize(NewSize: integer);
 var
   OldBuckets: array of PEntry;
@@ -463,19 +807,7 @@ begin
   if DEBUG_LOGGING then WriteLn('Resize: Complete');
 end;
 
-{
-  FindEntry: Internal method to locate an entry in a specific bucket
-  - Uses cached hash value for initial comparison (optimization)
-  - Traverses collision chain if needed
-  - Returns nil if key not found
-  
-  Parameters:
-  - Key: The key to find
-  - Hash: Pre-calculated hash value
-  - BucketIdx: Pre-calculated bucket index
-  
-  Note: Caller must hold lock
-}
+
 function TThreadSafeDictionary.FindEntry(const Key: TKey; Hash: cardinal;
   BucketIdx: integer): PEntry;
 var
@@ -491,16 +823,7 @@ begin
   Result := nil;
 end;
 
-{
-  Add: Inserts a new key-value pair
-  - Thread-safe operation (uses lock)
-  - Checks for duplicate keys
-  - Handles collision chaining
-  - Triggers resize if needed
-  
-  Raises:
-  - Exception if key already exists
-}
+
 procedure TThreadSafeDictionary.Add(const Key: TKey; const Value: TValue);
 var
   Hash: cardinal;
@@ -544,16 +867,6 @@ begin
   end;
 end;
 
-{
-  Remove: Deletes entry with given key
-  - Thread-safe operation
-  - Handles linked list maintenance
-  - Updates count
-  
-  Returns:
-  - True if key found and removed
-  - False if key not found
-}
 function TThreadSafeDictionary.Remove(const Key: TKey): boolean;
 var
   Hash: cardinal;
@@ -591,20 +904,6 @@ begin
   end;
 end;
 
-{
-  AddOrSetValue: Adds or updates a key-value pair in the dictionary.
-  - Thread-safe operation
-  - Does not change bucket structure
-  - If the key exists, updates its value
-  - If the key does not exist, adds the key-value pair
-
-  Parameters:
-  - Key: The key to add or update (cannot be nil)
-  - Value: The value to assign to the key (can be nil)
-
-  Raises:
-  - Exception if Key is nil
-}
 procedure TThreadSafeDictionary.AddOrSetValue(const Key: TKey; const Value: TValue);
 var
   Hash: Cardinal;
@@ -626,20 +925,6 @@ begin
 end;
 
 
-{
-  First: Retrieves first key-value pair in dictionary
-  - Thread-safe operation
-  - Traverses buckets from start
-  - Returns first non-empty bucket's first entry
-  
-  Parameters:
-  - Key: Output parameter for found key
-  - Value: Output parameter for found value
-  
-  Returns:
-  - True if dictionary not empty and pair found
-  - False if dictionary empty
-}
 function TThreadSafeDictionary.First(out Key: TKey; out Value: TValue): boolean;
 var
   I: integer;
@@ -660,20 +945,6 @@ begin
   end;
 end;
 
-{
-  Last: Retrieves last key-value pair in dictionary
-  - Thread-safe operation
-  - Traverses buckets from end
-  - Returns last non-empty bucket's first entry
-  
-  Parameters:
-  - Key: Output parameter for found key
-  - Value: Output parameter for found value
-  
-  Returns:
-  - True if dictionary not empty and pair found
-  - False if dictionary empty
-}
 function TThreadSafeDictionary.Last(out Key: TKey; out Value: TValue): boolean;
 var
   I: integer;
@@ -694,15 +965,6 @@ begin
   end;
 end;
 
-{
-  Clear: Removes all entries from dictionary
-  - Thread-safe operation
-  - Properly disposes of all entries
-  - Maintains bucket array but empties it
-  - Resets count to 0
-  
-  Note: Bucket array size remains unchanged
-}
 procedure TThreadSafeDictionary.Clear;
 var
   I: integer;
@@ -727,14 +989,7 @@ begin
   end;
 end;
 
-{
-  Count: Returns current number of items
-  - Thread-safe operation
-  - Simple accessor for FCount
-  
-  Returns:
-  - Current number of key-value pairs in dictionary
-}
+
 function TThreadSafeDictionary.Count: integer;
 begin
   FLock.Enter;
@@ -745,19 +1000,7 @@ begin
   end;
 end;
 
-{
-  TryGetValue: Attempts to retrieve value for key
-  - Thread-safe operation
-  - Non-throwing alternative to Find
-  
-  Parameters:
-  - Key: The key to look up
-  - Value: Output parameter for found value
-  
-  Returns:
-  - True if key found and value retrieved
-  - False if key not found
-}
+
 function TThreadSafeDictionary.TryGetValue(const Key: TKey; out Value: TValue): boolean;
 var
   Hash: cardinal;
@@ -799,7 +1042,7 @@ begin
   inherited;
 end;
 
-function TThreadSafeDictionary.TEnumerator.GetCurrent: specialize TDictionaryPair<TKey, TValue>;
+function TThreadSafeDictionary.TEnumerator.GetCurrent: specialize TPair<TKey, TValue>;
 begin
   if FCurrentEntry = nil then
     raise Exception.Create('Invalid enumerator position');
@@ -899,6 +1142,190 @@ begin
     Hash := GetHashValue(Key);
     BucketIdx := GetBucketIndex(Hash);
     Result := FindEntry(Key, Hash, BucketIdx) <> nil;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TThreadSafeDictionary.GetKeys: specialize TKeyArray<TKey>;
+var
+  I: Integer;
+  Entry: PEntry;
+  Index: Integer;
+begin
+  FLock.Enter;
+  try
+    SetLength(Result, FCount);
+    Index := 0;
+    for I := 0 to Length(FBuckets) - 1 do
+    begin
+      Entry := FBuckets[I];
+      while Entry <> nil do
+      begin
+        Result[Index] := Entry^.Key;
+        Inc(Index);
+        Entry := Entry^.Next;
+      end;
+    end;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TThreadSafeDictionary.GetValues: specialize TValueArray<TValue>;
+var
+  I: Integer;
+  Entry: PEntry;
+  Index: Integer;
+begin
+  FLock.Enter;
+  try
+    SetLength(Result, FCount);
+    Index := 0;
+    for I := 0 to Length(FBuckets) - 1 do
+    begin
+      Entry := FBuckets[I];
+      while Entry <> nil do
+      begin
+        Result[Index] := Entry^.Value;
+        Inc(Index);
+        Entry := Entry^.Next;
+      end;
+    end;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+procedure TThreadSafeDictionary.TrimExcess;
+var
+  NewSize: Integer;
+begin
+  FLock.Enter;
+  try
+    NewSize := GetNextPowerOfTwo(Trunc(FCount / LOAD_FACTOR) + 1);
+    if NewSize < Length(FBuckets) then
+      Resize(NewSize);
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TThreadSafeDictionary.TryAdd(const Key: TKey; const Value: TValue): Boolean;
+var
+  Hash: Cardinal;
+  BucketIdx: Integer;
+  NewEntry: PEntry;
+begin
+  Result := False;
+  FLock.Enter;
+  try
+    Hash := GetHashValue(Key);
+    BucketIdx := GetBucketIndex(Hash);
+    
+    if FindEntry(Key, Hash, BucketIdx) <> nil then
+      Exit;
+      
+    New(NewEntry);
+    NewEntry^.Key := Key;
+    NewEntry^.Value := Value;
+    NewEntry^.Hash := Hash;
+    NewEntry^.Next := FBuckets[BucketIdx];
+    FBuckets[BucketIdx] := NewEntry;
+    
+    Inc(FCount);
+    CheckLoadFactor;
+    Result := True;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+procedure TThreadSafeDictionary.AddRange(const ADictionary: specialize IThreadSafeDictionary<TKey, TValue>);
+var
+  LockToken: ILockToken;
+  Keys: specialize TArray<TKey>;
+  I: Integer;
+  Value: TValue;
+begin
+  if ADictionary = nil then
+    Exit;
+    
+  LockToken := ADictionary.Lock;
+  try
+    Keys := ADictionary.GetKeys;
+    for I := 0 to Length(Keys) - 1 do
+    begin
+      if ADictionary.TryGetValue(Keys[I], Value) then
+        AddOrSetValue(Keys[I], Value);
+    end;
+  finally
+    LockToken := nil;
+  end;
+end;
+
+procedure TThreadSafeDictionary.AddRange(const AArray: specialize TPairArray<TKey, TValue>);
+var
+  I: Integer;
+begin
+  FLock.Enter;
+  try
+    for I := Low(AArray) to High(AArray) do
+      AddOrSetValue(AArray[I].Key, AArray[I].Value);
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TThreadSafeDictionary.ToArray: specialize TPairArray<TKey, TValue>;
+var
+  I: Integer;
+  Entry: PEntry;
+  Index: Integer;
+begin
+  FLock.Enter;
+  try
+    SetLength(Result, FCount);
+    Index := 0;
+    for I := 0 to Length(FBuckets) - 1 do
+    begin
+      Entry := FBuckets[I];
+      while Entry <> nil do
+      begin
+        Result[Index].Key := Entry^.Key;
+        Result[Index].Value := Entry^.Value;
+        Inc(Index);
+        Entry := Entry^.Next;
+      end;
+    end;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TThreadSafeDictionary.FindValue(const Value: TValue): Boolean;
+var
+  I: Integer;
+  Entry: PEntry;
+begin
+  Result := False;
+  for I := 0 to Length(FBuckets) - 1 do
+  begin
+    Entry := FBuckets[I];
+    while Entry <> nil do
+    begin
+      if CompareByte(Entry^.Value, Value, SizeOf(TValue)) = 0 then
+        Exit(True);
+      Entry := Entry^.Next;
+    end;
+  end;
+end;
+
+function TThreadSafeDictionary.ContainsValue(const Value: TValue): Boolean;
+begin
+  FLock.Enter;
+  try
+    Result := FindValue(Value);
   finally
     FLock.Leave;
   end;

@@ -1,9 +1,128 @@
-# ThreadSafeHashSet Documentation
+# ThreadSafeCollections.HashSet Documentation
 
-## Overview
-ThreadSafeHashSet is a generic, thread-safe implementation of a hash set in Free Pascal. It provides concurrent access safety while maintaining high performance through separate chaining for collision resolution.
+## Table of Contents
 
-## Class Diagram
+- [ThreadSafeCollections.HashSet Documentation](#threadsafecollectionshashset-documentation)
+  - [Table of Contents](#table-of-contents)
+  - [Dependencies and Features](#dependencies-and-features)
+    - [Dependencies](#dependencies)
+    - [Features](#features)
+  - [Quick Start](#quick-start)
+    - [Basic Types (integer, string)](#basic-types-integer-string)
+    - [Custom Types](#custom-types)
+  - [Architecture and Design](#architecture-and-design)
+    - [Class Diagram](#class-diagram)
+    - [Core Components](#core-components)
+    - [Iterator Support](#iterator-support)
+      - [Usage Example](#usage-example)
+      - [Iterator Characteristics](#iterator-characteristics)
+  - [API Reference](#api-reference)
+    - [Generic TThreadSafeHashSet](#generic-tthreadsafehashset)
+      - [Constructor](#constructor)
+      - [Methods](#methods)
+      - [Properties](#properties)
+    - [Specialized Types](#specialized-types)
+      - [TThreadSafeHashSetInteger](#tthreadsafehashsetinteger)
+      - [TThreadSafeHashSetString](#tthreadsafehashsetstring)
+      - [TThreadSafeHashSetBoolean](#tthreadsafehashsetboolean)
+      - [TThreadSafeHashSetReal](#tthreadsafehashsetreal)
+    - [Custom Types Usage](#custom-types-usage)
+  - [Performance](#performance)
+    - [Complexity Analysis](#complexity-analysis)
+    - [Memory Management](#memory-management)
+    - [Lock Contention](#lock-contention)
+  - [Usage Examples](#usage-examples)
+    - [Basic Usage](#basic-usage)
+    - [Custom Types](#custom-types-1)
+    - [Testing Support](#testing-support)
+  - [Best Practices](#best-practices)
+  - [Known Limitations](#known-limitations)
+  - [Debugging](#debugging)
+
+## Dependencies and Features
+
+### Dependencies
+This implementation requires:
+- Free Pascal 3.2.2 or later
+- SyncObjs unit (for thread synchronization)
+- HashFunctions unit (for built-in hash functions)
+
+### Features
+- Thread-safe operations using critical sections
+- Separate chaining for collision resolution
+- Automatic resizing when load factor exceeds 75%
+- Support for custom hash functions and equality comparers
+- Specialized implementations for common types
+- RAII-style locking mechanism
+- Thread-safe iteration support
+
+## Quick Start
+
+### Basic Types (integer, string)
+```pascal
+var
+  IntSet: TThreadSafeHashSetInteger;
+  StrSet: TThreadSafeHashSetString;
+begin
+  // Integer set
+  IntSet := TThreadSafeHashSetInteger.Create;
+  try
+    IntSet.Add(1);
+    IntSet.Add(2);
+    WriteLn(IntSet.Contains(1)); // True
+  finally
+    IntSet.Free;
+  end;
+  
+  // String set
+  StrSet := TThreadSafeHashSetString.Create;
+  try
+    StrSet.Add('one');
+    StrSet.Add('two');
+    WriteLn(StrSet.Contains('one')); // True
+  finally
+    StrSet.Free;
+  end;
+end;
+```
+
+### Custom Types
+```pascal
+type
+  TCustomer = record
+    ID: Integer;
+    Name: string;
+  end;
+
+function CustomerEquals(const A, B: TCustomer): Boolean;
+begin
+  Result := (A.ID = B.ID) and (A.Name = B.Name);
+end;
+
+function CustomerHash(const Value: TCustomer): Cardinal;
+begin
+  Result := XXHash32(Value.Name) xor MultiplicativeHash(Cardinal(Value.ID));
+end;
+
+var
+  Set: specialize TThreadSafeHashSet<TCustomer>;
+  Customer: TCustomer;
+begin
+  Set := specialize TThreadSafeHashSet<TCustomer>.Create(@CustomerEquals, @CustomerHash);
+  try
+    Customer.ID := 1;
+    Customer.Name := 'John';
+    Set.Add(Customer);
+    WriteLn(Set.Contains(Customer)); // True
+  finally
+    Set.Free;
+  end;
+end;
+```
+
+## Architecture and Design
+
+### Class Diagram
 
 ```mermaid
 classDiagram
@@ -80,11 +199,10 @@ classDiagram
     TThreadSafeHashSet~T~ --> ILockToken : creates
 ```
 
-
-## Core Features
+### Core Components
 - Thread-safe operations
 - Automatic resizing when load factor exceeds 75%
-- Separate chaining for collision handling
+- Separate chaining for collision resolution
 - Generic implementation with specialized versions for common types
 - Custom hash function support (especially for testing)
 - RAII-style locking through interface counting
@@ -264,22 +382,91 @@ end;
 ```
 
 
-## Thread Safety
-All public methods are protected by a critical section, ensuring thread-safe operations:
-- Multiple threads can safely add/remove items concurrently
-- Automatic resizing is thread-safe
-- Count property access is thread-safe
+## Performance
 
-## Performance Characteristics
+### Complexity Analysis
 - Average case O(1) for Add/Remove/Contains
 - Worst case O(n) when all items hash to same bucket
 - Automatic resizing keeps operations efficient
 - Load factor of 0.75 balances memory usage and performance
 
-## Testing Support
+### Memory Management
+- Separate chaining can use more memory than open addressing
+- Each entry requires additional pointer overhead
+- No automatic bucket count reduction when items removed
+
+### Lock Contention
+- Uses `TCriticalSection` for guaranteed thread safety
+- Single lock strategy (simple but potentially less concurrent)
+- All operations are mutually exclusive
+  
+  Performance Considerations:
+  - Multiple threads may wait when concurrent access occurs
+  - Best performance when contention is low
+  - Consider alternative collections if you need:
+    * Reader/writer separation
+    * Lock-free operations
+    * Higher concurrent throughput
+
+## Usage Examples
+
+### Basic Usage
+```pascal
+var
+  Set: TThreadSafeHashSetString;
+  Item: string;
+begin
+  Set := TThreadSafeHashSetString.Create;
+  try
+    Set.Add('one');
+    Set.Add('two');
+    
+    // Using iterator
+    for Item in Set do
+      WriteLn(Item);
+  finally
+    Set.Free;
+  end;
+end;
+```
+
+### Custom Types
+```pascal
+type
+  TCustomer = record
+    ID: Integer;
+    Name: string;
+  end;
+
+function CustomerEquals(const A, B: TCustomer): Boolean;
+begin
+  Result := (A.ID = B.ID) and (A.Name = B.Name);
+end;
+
+function CustomerHash(const Value: TCustomer): Cardinal;
+begin
+  Result := XXHash32(Value.Name) xor MultiplicativeHash(Cardinal(Value.ID));
+end;
+
+var
+  Set: specialize TThreadSafeHashSet<TCustomer>;
+  Customer: TCustomer;
+begin
+  Set := specialize TThreadSafeHashSet<TCustomer>.Create(@CustomerEquals, @CustomerHash);
+  try
+    Customer.ID := 1;
+    Customer.Name := 'John';
+    Set.Add(Customer);
+    WriteLn(Set.Contains(Customer)); // True
+  finally
+    Set.Free;
+  end;
+end;
+```
+
+### Testing Support
 
 Special constructor in TThreadSafeHashSetString supports custom hash functions for testing:
-
 
 ```pascal
 var
@@ -295,13 +482,12 @@ begin
 end;
 ```
 
-
-## Implementation Details
-The implementation uses:
-- Separate chaining for collision resolution
-- Critical sections for thread synchronization
-- Cached hash codes for better performance
-- Power-of-two bucket counts for efficient indexing
+## Best Practices
+- Use `TThreadSafeHashSet` for thread-safe collections
+- Consider alternative collections if you need:
+  * Reader/writer separation
+  * Lock-free operations
+  * Higher concurrent throughput
 
 ## Known Limitations
 
@@ -347,3 +533,10 @@ The implementation uses:
    - Only grows, never shrinks
    - No way to manually reduce capacity
    - May hold more memory than needed after many removals
+
+## Debugging
+
+Set `DEBUG_LOGGING := True` for detailed operation logging:
+```pascal
+const
+  DEBUG_LOGGING = True;  // Enable debug output

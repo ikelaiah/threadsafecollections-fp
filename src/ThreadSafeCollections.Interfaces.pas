@@ -6,9 +6,14 @@ unit ThreadSafeCollections.Interfaces;
 interface
 
 uses
-  Classes, SysUtils, SyncObjs;
+  Classes, SysUtils, SyncObjs, Generics.Collections;
 
 type
+  // Define our array types
+  generic TKeyArray<T> = array of T;
+  generic TValueArray<T> = array of T;
+  generic TPairArray<TKey, TValue> = array of specialize TPair<TKey, TValue>;
+
   { ILockToken - Interface for managing thread-safe access }
   ILockToken = interface
     ['{A8F9D6B3-C2E4-4F5D-9E8A-1B7D3F2C8A0D}']
@@ -117,7 +122,16 @@ type
     procedure Clear;
     function Lock: ILockToken;
     
-    property Items[const Key: TKey]: TValue read GetItem write AddOrSetValue; default;
+    function GetKeys: specialize TKeyArray<TKey>;
+    function GetValues: specialize TValueArray<TValue>;
+    procedure TrimExcess;
+    function TryAdd(const Key: TKey; const Value: TValue): Boolean;
+    procedure AddRange(const ADictionary: specialize IThreadSafeDictionary<TKey, TValue>); overload;
+    procedure AddRange(const AArray: specialize TPairArray<TKey, TValue>); overload;
+    function ToArray: specialize TPairArray<TKey, TValue>;
+    function ContainsValue(const Value: TValue): Boolean;
+    
+    property Items[const Key: TKey]: TValue read GetItem write SetItem; default;
     property Count: Integer read GetCount;
   end;
 
