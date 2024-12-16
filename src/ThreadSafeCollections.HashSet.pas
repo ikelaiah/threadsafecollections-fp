@@ -313,6 +313,19 @@ type
           - A dynamic array of type T containing all items from the hash set.
     }
     function ToArray: specialize TArray<T>;
+
+    // Add these methods to the TThreadSafeHashSet class
+
+    procedure AddRange(const Items: array of T);
+    procedure AddRange(const Collection: specialize IThreadSafeHashSet<T>);
+    function RemoveRange(const Items: array of T): Integer;
+    function RemoveRange(const Collection: specialize IThreadSafeHashSet<T>): Integer;
+    function TryGetValue(const Item: T; out Value: T): Boolean;
+    procedure IntersectWith(const Collection: specialize IThreadSafeHashSet<T>);
+    procedure UnionWith(const Collection: specialize IThreadSafeHashSet<T>);
+    procedure ExceptWith(const Collection: specialize IThreadSafeHashSet<T>);
+    function Overlaps(const Collection: specialize IThreadSafeHashSet<T>): Boolean;
+    function SetEquals(const Collection: specialize IThreadSafeHashSet<T>): Boolean;
   end;
 
   { Specialized hash set types with predefined hash and equality functions }
@@ -748,6 +761,177 @@ begin
   finally
     FLock.Release;
   end;
+end;
+
+procedure TThreadSafeHashSet.AddRange(const Items: array of T);
+var
+  I: Integer;
+begin
+  if Length(Items) = 0 then
+    Exit;
+    
+  FLock.Acquire;
+  try
+    for I := Low(Items) to High(Items) do
+    begin
+      Add(Items[I]); // Add will handle duplicates
+    end;
+  finally
+    FLock.Release;
+  end;
+end;
+
+procedure TThreadSafeHashSet.AddRange(const Collection: specialize IThreadSafeHashSet<T>);
+var
+  LockToken: ILockToken;
+  Items: specialize TArray<T>;
+begin
+  if Collection = nil then
+    Exit;
+    
+  // Get items from source collection under its lock
+  LockToken := Collection.Lock;
+  Items := Collection.ToArray;
+  LockToken := nil; // Release source lock
+  
+  // Add items to our collection
+  AddRange(Items);
+end;
+
+function TThreadSafeHashSet.RemoveRange(const Items: array of T): Integer;
+var
+  I: Integer;
+begin
+  Result := 0;
+  if Length(Items) = 0 then
+    Exit;
+    
+  FLock.Acquire;
+  try
+    for I := Low(Items) to High(Items) do
+      if Remove(Items[I]) then
+        Inc(Result);
+  finally
+    FLock.Release;
+  end;
+end;
+
+function TThreadSafeHashSet.RemoveRange(const Collection: specialize IThreadSafeHashSet<T>): Integer;
+var
+  LockToken: ILockToken;
+  Items: specialize TArray<T>;
+begin
+  if Collection = nil then
+    Exit(0);
+    
+  LockToken := Collection.Lock;
+  Items := Collection.ToArray;
+  LockToken := nil;
+  
+  Result := RemoveRange(Items);
+end;
+
+function TThreadSafeHashSet.TryGetValue(const Item: T; out Value: T): Boolean;
+var
+  Hash: Cardinal;
+  BucketIdx: Integer;
+  Entry: PEntry;
+begin
+  FLock.Acquire;
+  try
+    Hash := FHashFunction(Item);
+    BucketIdx := GetBucketIndex(Hash);
+    Entry := FindEntry(Item, Hash, BucketIdx);
+    Result := Entry <> nil;
+    if Result then
+      Value := Entry^.Value;
+  finally
+    FLock.Release;
+  end;
+end;
+
+procedure TThreadSafeHashSet.IntersectWith(const Collection: specialize IThreadSafeHashSet<T>);
+var
+  ToRemove: specialize TArray<T>;
+  I: Integer;
+  CurrentArray: specialize TArray<T>;
+begin
+  if Collection = nil then
+  begin
+    Clear;
+    Exit;
+  end;
+
+  FLock.Acquire;
+  try
+    CurrentArray := ToArray;
+    SetLength(ToRemove, Length(CurrentArray));
+    
+    // Find items to remove (those not in other collection)
+    for I := 0 to Length(CurrentArray) - 1 do
+      if not Collection.Contains(CurrentArray[I]) then
+        ToRemove[I] := CurrentArray[I];
+        
+    // Remove items not in intersection
+    RemoveRange(ToRemove);
+  finally
+    FLock.Release;
+  end;
+end;
+
+procedure TThreadSafeHashSet.UnionWith(const Collection: specialize IThreadSafeHashSet<T>);
+begin
+  if Collection = nil then
+    Exit;
+    
+  AddRange(Collection);
+end;
+
+procedure TThreadSafeHashSet.ExceptWith(const Collection: specialize IThreadSafeHashSet<T>);
+var
+  Items: specialize TArray<T>;
+begin
+  if Collection = nil then
+    Exit;
+    
+  Items := Collection.ToArray;
+  RemoveRange(Items);
+end;
+
+function TThreadSafeHashSet.Overlaps(const Collection: specialize IThreadSafeHashSet<T>): Boolean;
+var
+  Items: specialize TArray<T>;
+  I: Integer;
+begin
+  Result := False;
+  if (Collection = nil) or IsEmpty or Collection.IsEmpty then
+    Exit;
+    
+  Items := Collection.ToArray;
+  for I := 0 to Length(Items) - 1 do
+    if Contains(Items[I]) then
+      Exit(True);
+end;
+
+function TThreadSafeHashSet.SetEquals(const Collection: specialize IThreadSafeHashSet<T>): Boolean;
+var
+  OtherItems: specialize TArray<T>;
+  I: Integer;
+begin
+  Result := False;
+  
+  if Collection = nil then
+    Exit;
+    
+  if Count <> Collection.Count then
+    Exit;
+    
+  OtherItems := Collection.ToArray;
+  for I := 0 to Length(OtherItems) - 1 do
+    if not Contains(OtherItems[I]) then
+      Exit;
+      
+  Result := True;
 end;
 
 end.

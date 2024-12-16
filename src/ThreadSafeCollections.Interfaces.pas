@@ -106,6 +106,20 @@ type
     function Remove(const Item: T): Boolean;
     function Contains(const Item: T): Boolean;
     function ToArray: specialize TArray<T>;
+    
+    // New bulk operations
+    procedure AddRange(const Items: array of T); overload;
+    procedure AddRange(const Collection: specialize IThreadSafeHashSet<T>); overload;
+    function RemoveRange(const Items: array of T): Integer; overload;
+    function RemoveRange(const Collection: specialize IThreadSafeHashSet<T>): Integer; overload;
+    
+    // Additional utility methods
+    function TryGetValue(const Item: T; out Value: T): Boolean;
+    procedure IntersectWith(const Collection: specialize IThreadSafeHashSet<T>);
+    procedure UnionWith(const Collection: specialize IThreadSafeHashSet<T>);
+    procedure ExceptWith(const Collection: specialize IThreadSafeHashSet<T>);
+    function Overlaps(const Collection: specialize IThreadSafeHashSet<T>): Boolean;
+    function SetEquals(const Collection: specialize IThreadSafeHashSet<T>): Boolean;
   end;
 
   { IThreadSafeDictionary - Interface for dictionary operations }
