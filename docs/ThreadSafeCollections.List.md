@@ -1,30 +1,36 @@
-# ThreadSafeCollections.List API Documentation
+# ThreadSafeCollections.List Documentation
 
-# Table of Contents
- 
-- [ThreadSafeCollections.List API Documentation](#threadsafecollectionslist-api-documentation)
-- [Table of Contents](#table-of-contents)
-  - [Component Diagram](#component-diagram)
-  - [Core Components](#core-components)
-    - [TComparer](#tcomparer)
-    - [TThreadSafeList](#tthreadsafelist)
-      - [Properties](#properties)
+## Table of Contents
+
+- [ThreadSafeCollections.List Documentation](#threadsafecollectionslist-documentation)
+  - [Table of Contents](#table-of-contents)
+  - [Dependencies and Features](#dependencies-and-features)
+    - [Dependencies](#dependencies)
+    - [Features](#features)
+  - [Quick Start](#quick-start)
+    - [Basic Types (integer)](#basic-types-integer)
+    - [Custom Types](#custom-types)
+  - [Architecture and Design](#architecture-and-design)
+    - [Class Diagram](#class-diagram)
+    - [Core Components](#core-components)
+      - [TComparer](#tcomparer)
+      - [TThreadSafeList](#tthreadsafelist)
+        - [Properties](#properties)
   - [Thread Safety](#thread-safety)
     - [Guarantees](#guarantees)
     - [Implementation Details](#implementation-details)
-  - [Methods](#methods)
-    - [Constructor](#constructor)
+  - [API Reference](#api-reference)
+    - [Constructors](#constructors)
       - [Built-in Comparers](#built-in-comparers)
     - [Basic Operations](#basic-operations)
     - [Sorting and Order](#sorting-and-order)
-    - [Sort Order with Custom Types](#sort-order-with-custom-types)
     - [Range Operations](#range-operations)
     - [Search Operations](#search-operations)
     - [Additional Utility Methods](#additional-utility-methods)
     - [Array Operations](#array-operations)
     - [Capacity Management](#capacity-management)
   - [Iterator Support](#iterator-support)
-    - [Usage Example - Iterators](#usage-example---iterators)
+    - [Usage Example](#usage-example)
     - [Iterator Characteristics](#iterator-characteristics)
   - [Performance](#performance)
     - [Complexity Analysis](#complexity-analysis)
@@ -35,9 +41,75 @@
     - [Custom Type with Custom Comparer](#custom-type-with-custom-comparer)
   - [Best Practices](#best-practices)
   - [Known Limitations](#known-limitations)
+  - [Debugging](#debugging)
 
+## Dependencies and Features
 
-## Component Diagram
+### Dependencies
+This implementation requires:
+- Free Pascal 3.2.2 or later
+- SyncObjs unit (for thread synchronization)
+
+### Features
+- Thread-safe operations using critical sections
+- Dynamic array-based storage with automatic resizing
+- Support for custom comparers
+- Sorting capabilities with custom ordering
+- Bulk operations support
+- Iterator support with RAII locking
+- Range-based operations
+- Memory optimization features
+
+## Quick Start
+
+### Basic Types (integer)
+```pascal
+var
+  List: specialize TThreadSafeList<Integer>;
+begin
+  // Simple creation with default integer comparer
+  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  try
+    List.Add(1);
+    List.Add(2);
+    List.Sort;  // Automatically sorted using IntegerComparer
+  finally
+    List.Free;
+  end;
+end;
+```
+
+### Custom Types
+```pascal
+type
+  TStudent = record
+    Name: string;
+    ID: Integer;
+  end;
+
+function StudentComparer(const A, B: TStudent): Integer;
+begin
+  Result := CompareStr(A.Name, B.Name);
+end;
+
+var
+  List: specialize TThreadSafeList<TStudent>;
+begin
+  List := specialize TThreadSafeList<TStudent>.Create(@StudentComparer);
+  try
+    var Student: TStudent;
+    Student.Name := 'John';
+    Student.ID := 1;
+    List.Add(Student);
+  finally
+    List.Free;
+  end;
+end;
+```
+
+## Architecture and Design
+
+### Class Diagram
 
 ```mermaid
 classDiagram
@@ -183,19 +255,19 @@ classDiagram
     TThreadSafeList~T~ --> ILockToken : creates
     ILockToken <|.. TLockToken : implements
 ```
-    
-## Core Components
 
-### TComparer<T>
+### Core Components
+
+#### TComparer<T>
 Generic function type for comparing elements:
 - Input: Two elements of type T (A and B)
 - Returns: Integer (-1, 0, or 1)
 - Usage: Determines element ordering for sorting and finding
 
-### TThreadSafeList<T>
+#### TThreadSafeList<T>
 Thread-safe generic list implementation with built-in synchronization.
 
-#### Properties
+##### Properties
 - `Count: Integer` - Number of elements in the list
 - `Items[Index: Integer]: T` - Default array property for access
 
@@ -237,9 +309,9 @@ The TThreadSafeList<T> provides comprehensive thread safety through TCriticalSec
 - Memory barriers ensure visibility across threads
 - Sorted status maintained consistently
 
-## Methods
+## API Reference
 
-### Constructor
+### Constructors
 
 ```pascal
 constructor Create(AComparer: specialize TComparer<T>);
@@ -266,7 +338,6 @@ function IndexOf(const Item: T): Integer;
 procedure Replace(Index: Integer; const Item: T);
 ```
 
-
 ### Sorting and Order
 
 ```pascal
@@ -291,38 +362,6 @@ List.Sort;  // or List.Sort(True);
 // Descending order
 List.Sort(False);
 // [5, 4, 3, 2, 1]
-```
-
-### Sort Order with Custom Types
-When using custom comparers, the sort order follows the comparer's logic:
-
-```pascal
-// Custom student record sorting
-type
-  TStudent = record
-    Name: string;
-    ID: Integer;
-  end;
-
-// Sort by name
-function StudentNameComparer(const A, B: TStudent): Integer;
-begin
-  Result := CompareStr(A.Name, B.Name);
-end;
-
-var
-  Students: specialize TThreadSafeList<TStudent>;
-begin
-  Students := specialize TThreadSafeList<TStudent>.Create(@StudentNameComparer);
-  try
-    // ... add students ...
-    
-    Students.Sort;      // A to Z order
-    Students.Sort(False); // Z to A order
-  finally
-    Students.Free;
-  end;
-end;
 ```
 
 ### Range Operations
@@ -538,7 +577,7 @@ type
 function GetEnumerator: TIterator;
 ```
 
-### Usage Example - Iterators
+### Usage Example
 ```pascal
 var
   List: specialize TThreadSafeList<Integer>;
@@ -566,7 +605,6 @@ end;
 - Forward-only iteration
 - Protected from modifications during iteration (via RAII lock)
 - Other threads must wait for iteration to complete before modifying
-
 
 ## Performance
 
@@ -626,56 +664,50 @@ end;
    end;
    ```
 
-
-
 ## Usage Examples
 
 ### Basic Integer List
 
 ```pascal
 var
-    List: specialize TThreadSafeList<Integer>;
-
+  List: specialize TThreadSafeList<Integer>;
 begin
-    List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
-    try
-        List.Add(42);
-        List.Add(17);
-        List.Sort;
-    finally
-        List.Free;
-    end;
+  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  try
+    List.Add(42);
+    List.Add(17);
+    List.Sort;
+  finally
+    List.Free;
+  end;
 end;
 ```
 
 ### Custom Type with Custom Comparer
 
-
 ```pascal
 type
-    TStudent = record
+  TStudent = record
     Name: string;
     ID: Integer;
-end;
+  end;
 
 function StudentNameComparer(const A, B: TStudent): Integer;
 begin
-    Result := CompareStr(A.Name, B.Name);
+  Result := CompareStr(A.Name, B.Name);
 end;
 
 var
-    Students: specialize TThreadSafeList<TStudent>;
-
+  Students: specialize TThreadSafeList<TStudent>;
 begin
-    Students := specialize TThreadSafeList<TStudent>.Create(@StudentNameComparer);
-    try 
-        // Use the list...
-    finally
+  Students := specialize TThreadSafeList<TStudent>.Create(@StudentNameComparer);
+  try
+    // Use the list...
+  finally
     Students.Free;
+  end;
 end;
 ```
-
-
 
 ## Best Practices
 
@@ -696,7 +728,6 @@ end;
    - Use DeleteRange for bulk deletions
    - Check bounds before range operations
 
-
 ## Known Limitations
 
 1. **Iterator Limitations**
@@ -708,3 +739,10 @@ end;
    - Single lock acquisition per bulk operation
    - Memory allocation may grow in steps
    - No parallel processing of bulk operations
+
+## Debugging
+
+Set `DEBUG_LOGGING := True` for detailed operation logging:
+```pascal
+const
+  DEBUG_LOGGING = True;  // Enable debug output
