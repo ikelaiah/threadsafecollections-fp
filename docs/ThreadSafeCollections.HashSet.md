@@ -1,7 +1,6 @@
 # ThreadSafeCollections.HashSet Documentation
 
 ## Table of Contents
-
 - [ThreadSafeCollections.HashSet Documentation](#threadsafecollectionshashset-documentation)
   - [Table of Contents](#table-of-contents)
   - [Dependencies and Features](#dependencies-and-features)
@@ -12,29 +11,32 @@
     - [Custom Types](#custom-types)
   - [Architecture and Design](#architecture-and-design)
     - [Class Diagram](#class-diagram)
-    - [Core Components](#core-components)
+    - [Collision Resolution](#collision-resolution)
+      - [Separate Chaining (What We Use)](#separate-chaining-what-we-use)
+  - [API Reference](#api-reference)
+    - [Constructors](#constructors)
+    - [Core Operations](#core-operations)
+    - [Bulk Operations](#bulk-operations)
+    - [Set Operations](#set-operations)
     - [Iterator Support](#iterator-support)
       - [Usage Example](#usage-example)
       - [Iterator Characteristics](#iterator-characteristics)
-  - [API Reference](#api-reference)
-    - [Generic TThreadSafeHashSet](#generic-tthreadsafehashset)
-      - [Constructor](#constructor)
-      - [Methods](#methods)
-      - [Properties](#properties)
-    - [Specialized Types](#specialized-types)
-      - [TThreadSafeHashSetInteger](#tthreadsafehashsetinteger)
-      - [TThreadSafeHashSetString](#tthreadsafehashsetstring)
-      - [TThreadSafeHashSetBoolean](#tthreadsafehashsetboolean)
-      - [TThreadSafeHashSetReal](#tthreadsafehashsetreal)
-    - [Custom Types Usage](#custom-types-usage)
+    - [Utility Methods](#utility-methods)
+    - [Properties](#properties)
+    - [Constants](#constants)
+  - [Implementation Details](#implementation-details)
+    - [Built-in Hash Functions](#built-in-hash-functions)
+    - [Thread Safety](#thread-safety)
+    - [Load Factor and Resizing](#load-factor-and-resizing)
   - [Performance](#performance)
     - [Complexity Analysis](#complexity-analysis)
-    - [Memory Management](#memory-management)
-    - [Lock Contention](#lock-contention)
+    - [Performance Characteristics](#performance-characteristics)
   - [Usage Examples](#usage-examples)
     - [Basic Usage](#basic-usage)
     - [Custom Types](#custom-types-1)
-    - [Testing Support](#testing-support)
+    - [Set Operations](#set-operations-1)
+    - [Bulk Operations](#bulk-operations-1)
+    - [Iterator Usage](#iterator-usage)
   - [Best Practices](#best-practices)
   - [Known Limitations](#known-limitations)
   - [Debugging](#debugging)
@@ -42,7 +44,6 @@
 ## Dependencies and Features
 
 ### Dependencies
-This implementation requires:
 - Free Pascal 3.2.2 or later
 - SyncObjs unit (for thread synchronization)
 - HashFunctions unit (for built-in hash functions)
@@ -67,9 +68,8 @@ begin
   // Integer set
   IntSet := TThreadSafeHashSetInteger.Create;
   try
-    IntSet.Add(1);
-    IntSet.Add(2);
-    WriteLn(IntSet.Contains(1)); // True
+    IntSet.Add(42);
+    WriteLn(IntSet.Contains(42)); // True
   finally
     IntSet.Free;
   end;
@@ -77,9 +77,8 @@ begin
   // String set
   StrSet := TThreadSafeHashSetString.Create;
   try
-    StrSet.Add('one');
-    StrSet.Add('two');
-    WriteLn(StrSet.Contains('one')); // True
+    StrSet.Add('test');
+    WriteLn(StrSet.Contains('test')); // True
   finally
     StrSet.Free;
   end;
@@ -89,33 +88,28 @@ end;
 ### Custom Types
 ```pascal
 type
-  TCustomer = record
-    ID: Integer;
-    Name: string;
+  TPoint = record
+    X, Y: Integer;
   end;
 
-function CustomerEquals(const A, B: TCustomer): Boolean;
+function PointEquals(const A, B: TPoint): Boolean;
 begin
-  Result := (A.ID = B.ID) and (A.Name = B.Name);
+  Result := (A.X = B.X) and (A.Y = B.Y);
 end;
 
-function CustomerHash(const Value: TCustomer): Cardinal;
+function PointHash(const Value: TPoint): Cardinal;
 begin
-  Result := XXHash32(Value.Name) xor MultiplicativeHash(Cardinal(Value.ID));
+  Result := Cardinal(Value.X xor Value.Y);
 end;
 
 var
-  Set: specialize TThreadSafeHashSet<TCustomer>;
-  Customer: TCustomer;
+  Points: specialize TThreadSafeHashSet<TPoint>;
 begin
-  Set := specialize TThreadSafeHashSet<TCustomer>.Create(@CustomerEquals, @CustomerHash);
+  Points := specialize TThreadSafeHashSet<TPoint>.Create(@PointEquals, @PointHash);
   try
-    Customer.ID := 1;
-    Customer.Name := 'John';
-    Set.Add(Customer);
-    WriteLn(Set.Contains(Customer)); // True
+    Points.Add(TPoint.Create(1, 1));
   finally
-    Set.Free;
+    Points.Free;
   end;
 end;
 ```
@@ -123,7 +117,6 @@ end;
 ## Architecture and Design
 
 ### Class Diagram
-
 ```mermaid
 classDiagram
     class IThreadSafeCollection~T~ {
@@ -140,6 +133,16 @@ classDiagram
         +Remove(item: T): Boolean
         +Contains(item: T): Boolean
         +ToArray(): TArray~T~
+        +AddRange(items: array of T)
+        +AddRange(collection: IThreadSafeHashSet~T~)
+        +RemoveRange(items: array of T): Integer
+        +RemoveRange(collection: IThreadSafeHashSet~T~): Integer
+        +IntersectWith(collection: IThreadSafeHashSet~T~)
+        +UnionWith(collection: IThreadSafeHashSet~T~)
+        +ExceptWith(collection: IThreadSafeHashSet~T~)
+        +Overlaps(collection: IThreadSafeHashSet~T~): Boolean
+        +SetEquals(collection: IThreadSafeHashSet~T~): Boolean
+        +TryGetValue(item: T, out value: T): Boolean
     }
     class TThreadSafeHashSet~T~ {
         -FBuckets: array of PEntry
@@ -153,87 +156,96 @@ classDiagram
         +Remove(item: T): Boolean
         +Contains(item: T): Boolean
         +Clear()
-        +Count: Integer
         +GetEnumerator(): TEnumerator
         +Lock(): ILockToken
         +IsEmpty(): Boolean
         +ToArray(): TArray~T~
+        +AddRange(items: array of T)
+        +AddRange(collection: IThreadSafeHashSet~T~)
+        +RemoveRange(items: array of T): Integer
+        +RemoveRange(collection: IThreadSafeHashSet~T~): Integer
+        +IntersectWith(collection: IThreadSafeHashSet~T~)
+        +UnionWith(collection: IThreadSafeHashSet~T~)
+        +ExceptWith(collection: IThreadSafeHashSet~T~)
+        +Overlaps(collection: IThreadSafeHashSet~T~): Boolean
+        +SetEquals(collection: IThreadSafeHashSet~T~): Boolean
+        +TryGetValue(item: T, out value: T): Boolean
     }
     class TEnumerator {
         -FSet: TThreadSafeHashSet
         -FCurrentBucket: Integer
         -FCurrentEntry: PEntry
         -FLockToken: ILockToken
-        +Create()
+        +Create(set: TThreadSafeHashSet)
         +Destroy()
-        +MoveNext(): Boolean
         +GetCurrent(): T
+        +MoveNext(): Boolean
         +Current: T
     }
-    class ILockToken {
-        <<interface>>
-        +Release()
-    }
-    class TThreadSafeHashSetInteger {
-        +Create(initialCapacity)
-    }
-    class TThreadSafeHashSetString {
-        +Create(initialCapacity)
-        +Create(hashFunction, initialCapacity)
-    }
-    class TThreadSafeHashSetBoolean {
-        +Create(initialCapacity)
-    }
-    class TThreadSafeHashSetReal {
-        +Create(initialCapacity)
-    }
-
+    
     IThreadSafeCollection~T~ <|-- IThreadSafeHashSet~T~
     IThreadSafeHashSet~T~ <|.. TThreadSafeHashSet~T~
-    TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetInteger
-    TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetString
-    TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetBoolean
-    TThreadSafeHashSet~T~ <|-- TThreadSafeHashSetReal
-    TThreadSafeHashSet~T~ *-- TEnumerator : contains
-    TEnumerator --> ILockToken : uses
-    TThreadSafeHashSet~T~ --> ILockToken : creates
+    TThreadSafeHashSet~T~ *-- TEnumerator
 ```
 
-### Core Components
-- Thread-safe operations
-- Automatic resizing when load factor exceeds 75%
-- Separate chaining for collision resolution
-- Generic implementation with specialized versions for common types
-- Custom hash function support (especially for testing)
-- RAII-style locking through interface counting
-- Thread-safe iteration support
+### Collision Resolution
+
+#### Separate Chaining (What We Use)
+- Each bucket contains a linked list of entries
+- New items are added to the front of the list
+- Provides good performance even with many collisions
+- Memory usage scales with number of items
+
+## API Reference
+
+### Constructors
+```pascal
+constructor Create(AEqualityComparer: TEqualityComparer<T>;
+                  AHashFunction: THashFunction<T>;
+                  AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
+```
+
+### Core Operations
+```pascal
+function Add(const Item: T): Boolean;
+function Remove(const Item: T): Boolean;
+function Contains(const Item: T): Boolean;
+procedure Clear;
+```
+
+### Bulk Operations
+```pascal
+procedure AddRange(const Items: array of T);
+procedure AddRange(const Collection: specialize IThreadSafeHashSet<T>);
+function RemoveRange(const Items: array of T): Integer;
+function RemoveRange(const Collection: specialize IThreadSafeHashSet<T>): Integer;
+```
+
+### Set Operations
+```pascal
+procedure IntersectWith(const Collection: specialize IThreadSafeHashSet<T>);
+procedure UnionWith(const Collection: specialize IThreadSafeHashSet<T>);
+procedure ExceptWith(const Collection: specialize IThreadSafeHashSet<T>);
+function Overlaps(const Collection: specialize IThreadSafeHashSet<T>): Boolean;
+function SetEquals(const Collection: specialize IThreadSafeHashSet<T>): Boolean;
+```
 
 ### Iterator Support
 
 ```pascal
-type
-  TIterator = class(TObject)
-  public
-    function MoveNext: Boolean;
-    function GetCurrent: T;
-    property Current: T read GetCurrent;
-  end;
-
-function GetEnumerator: TIterator;
+function GetEnumerator: TEnumerator;
 ```
 
 #### Usage Example
 ```pascal
 var
-  Set: TThreadSafeHashSetString;
-  Item: string;
+  Item: Integer;
+  Set: TThreadSafeHashSetInteger;
 begin
-  Set := TThreadSafeHashSetString.Create;
+  Set := TThreadSafeHashSetInteger.Create;
   try
-    Set.Add('one');
-    Set.Add('two');
-    
-    // Using iterator
+    Set.Add(1);
+    Set.Add(2);
     for Item in Set do
       WriteLn(Item);
   finally
@@ -243,45 +255,82 @@ end;
 ```
 
 #### Iterator Characteristics
-- Thread-safe within single thread context
-- Uses read locks during iteration
+- Thread-safe through RAII locking
 - Forward-only iteration
-- Protected from modifications during iteration (via read locks)
-- Other threads must wait for iteration to complete before modifying
-- No guaranteed iteration order (due to hash table structure)
+- No modification during iteration
+- Automatic lock release
 
-## API Reference
-
-### Generic TThreadSafeHashSet<T>
-
-#### Constructor
-
+### Utility Methods
 ```pascal
-constructor Create(AEqualityComparer: TEqualityComparer<T>;
-                   AHashFunction: THashFunction<T>;
-                   AInitialCapacity: Integer = 16);
+function TryGetValue(const Item: T; out Value: T): Boolean;
+function ToArray: specialize TArray<T>;
+function IsEmpty: Boolean;
+function Lock: ILockToken;
 ```
 
+### Properties
+```pascal
+property Count: Integer read GetCount;
+```
 
-#### Methods
-| Method | Description | Return Type |
-|--------|-------------|-------------|
-| `Add(const Item: T)` | Adds an item to the set. Returns True if item was added, False if it already existed | Boolean |
-| `Remove(const Item: T)` | Removes an item from the set. Returns True if item was found and removed, False if not found | Boolean |
-| `Contains(const Item: T)` | Checks if an item exists in the set. Returns True if found | Boolean |
-| `Clear` | Removes all items from the set | void |
+### Constants
+```pascal
+const
+  INITIAL_BUCKET_COUNT = 16;
+  LOAD_FACTOR = 0.75;
+  MIN_BUCKET_COUNT = 4;
+```
 
-#### Properties
-| Property | Description | Type | Thread-Safe |
-|----------|-------------|------|-------------|
-| `Count` | Number of items currently in the set | Integer | Yes |
+## Implementation Details
 
-> [!NOTE]
-> All methods are thread-safe and protected by internal critical section.
+### Built-in Hash Functions
+- Integer: Multiplicative hash
+- String: XXHash32
+- Boolean: Direct value hash
+- Real: Fixed-point conversion hash
 
-### Specialized Types
+### Thread Safety
+- Uses `TCriticalSection` for synchronization
+- RAII-style locking through `ILockToken`
+- All operations are mutually exclusive
 
-#### TThreadSafeHashSetInteger
+### Load Factor and Resizing
+- Triggers resize at 75% capacity
+- Doubles bucket count on resize
+- Rehashes all existing items
+- No automatic shrinking
+
+## Performance
+
+### Complexity Analysis
+- Add: O(1) average, O(n) worst
+- Remove: O(1) average, O(n) worst
+- Contains: O(1) average, O(n) worst
+- Clear: O(n)
+- Resize: O(n)
+
+### Performance Characteristics
+Based on test results with FPC 3.2.2 (Windows 11, 11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz, 2304 Mhz, 8 Core(s), 16 Logical Processors, 32 Gb RAM):
+
+| Operation | Time (ms) | Items | Notes |
+|-----------|-----------|-------|-------|
+| Basic Operations | 0.006 | 10,000 | Add/Contains operations |
+| Large Dataset | 1.562 | 100,000 | Sequential adds |
+| Concurrent Access | 0.120 | 4 threads | Basic thread safety |
+| Stress Test | 0.157 | 4,000 ops | Mixed operations |
+| Hash Collisions | 0.797 | 10,000 | Collision handling |
+| Aggressive Collisions | 35.608 | 10,000 | Worst-case scenario |
+| Iterator Operations | 0.005 | 1,000 | Basic iteration |
+| Iterator Stress | 8.112 | 10,000 | Concurrent iteration |
+| Lock Mechanism | 31.266 | 4,000 locks | Lock contention |
+| Bulk Add (Array) | 0.032 | 100,000 | AddRange operation |
+| Bulk Add (Collection) | 0.052 | 100,000 | AddRange from set |
+| Bulk Remove | 0.180 | 50,000 | RemoveRange operation |
+| Set Operations | < 0.001 | 1,000 | Union/Intersect/Except |
+
+## Usage Examples
+
+### Basic Usage
 ```pascal
 var
   IntSet: TThreadSafeHashSetInteger;
@@ -289,143 +338,14 @@ begin
   IntSet := TThreadSafeHashSetInteger.Create;
   try
     IntSet.Add(42);
-    IntSet.Contains(42); // Returns True
+    IntSet.Add(17);
+    
+    if IntSet.Contains(42) then
+      WriteLn('Found 42');
+      
+    IntSet.Remove(17);
   finally
     IntSet.Free;
-  end;
-end;
-```
-
-#### TThreadSafeHashSetString
-```pascal
-var
-  StrSet: TThreadSafeHashSetString;
-begin
-  StrSet := TThreadSafeHashSetString.Create;
-  try
-    StrSet.Add('Hello');
-    StrSet.Contains('Hello'); // Returns True
-  finally
-    StrSet.Free;
-  end;
-end;
-```
-
-#### TThreadSafeHashSetBoolean
-```pascal
-var
-  BoolSet: TThreadSafeHashSetBoolean;
-begin
-  BoolSet := TThreadSafeHashSetBoolean.Create;
-  try
-    BoolSet.Add(True);
-    BoolSet.Add(False);
-    BoolSet.Contains(True);  // Returns True
-    BoolSet.Contains(False); // Returns True
-  finally
-    BoolSet.Free;
-  end;
-end;
-```
-
-#### TThreadSafeHashSetReal
-```pascal
-var
-  RealSet: TThreadSafeHashSetReal;
-begin
-  RealSet := TThreadSafeHashSetReal.Create;
-  try
-    RealSet.Add(3.14159);
-    RealSet.Add(2.71828);
-    RealSet.Contains(3.14159); // Returns True
-    // Note: Be careful with floating-point equality comparisons
-  finally
-    RealSet.Free;
-  end;
-end;
-```
-
-> [!NOTE] 
-> When using `TThreadSafeHashSetReal`, be aware that floating-point comparisons might be affected by precision issues. Consider using a custom equality comparer if you need specific precision handling.
-
-
-### Custom Types Usage
-
-```pascal
-type
-  TMyRecord = record
-    Name: string;
-    Value: Integer;
-  end;
-
-function MyRecordEquals(const A, B: TMyRecord): Boolean;
-begin
-  Result := (A.Name = B.Name) and (A.Value = B.Value);
-end;
-
-function MyRecordHash(const Value: TMyRecord): Cardinal;
-begin
-  Result := XXHash32(Value.Name) xor MultiplicativeHash(Cardinal(Value.Value));
-end;
-
-var
-  CustomSet: specialize TThreadSafeHashSet<TMyRecord>;
-
-begin
-  CustomSet := specialize TThreadSafeHashSet<TMyRecord>.Create(@MyRecordEquals, @MyRecordHash);
-  try
-    // Use the set...
-  finally
-    CustomSet.Free;
-  end;
-end;
-```
-
-
-## Performance
-
-### Complexity Analysis
-- Average case O(1) for Add/Remove/Contains
-- Worst case O(n) when all items hash to same bucket
-- Automatic resizing keeps operations efficient
-- Load factor of 0.75 balances memory usage and performance
-
-### Memory Management
-- Separate chaining can use more memory than open addressing
-- Each entry requires additional pointer overhead
-- No automatic bucket count reduction when items removed
-
-### Lock Contention
-- Uses `TCriticalSection` for guaranteed thread safety
-- Single lock strategy (simple but potentially less concurrent)
-- All operations are mutually exclusive
-  
-  Performance Considerations:
-  - Multiple threads may wait when concurrent access occurs
-  - Best performance when contention is low
-  - Consider alternative collections if you need:
-    * Reader/writer separation
-    * Lock-free operations
-    * Higher concurrent throughput
-
-## Usage Examples
-
-### Basic Usage
-```pascal
-var
-  Set: TThreadSafeHashSetString;
-  Item: string;
-begin
-  Set := TThreadSafeHashSetString.Create;
-  try
-    Set.Add('one');
-    Set.Add('two');
-    
-    // Using iterator
-    for Item in Set do
-      WriteLn(Item);
-  finally
-    Set.Free;
   end;
 end;
 ```
@@ -449,94 +369,128 @@ begin
 end;
 
 var
-  Set: specialize TThreadSafeHashSet<TCustomer>;
-  Customer: TCustomer;
+  Customers: specialize TThreadSafeHashSet<TCustomer>;
 begin
-  Set := specialize TThreadSafeHashSet<TCustomer>.Create(@CustomerEquals, @CustomerHash);
+  Customers := specialize TThreadSafeHashSet<TCustomer>.Create(@CustomerEquals, @CustomerHash);
   try
-    Customer.ID := 1;
-    Customer.Name := 'John';
-    Set.Add(Customer);
-    WriteLn(Set.Contains(Customer)); // True
+    // Use the set...
+  finally
+    Customers.Free;
+  end;
+end;
+```
+
+### Set Operations
+```pascal
+var
+  SetA, SetB: TThreadSafeHashSetInteger;
+begin
+  SetA := TThreadSafeHashSetInteger.Create;
+  SetB := TThreadSafeHashSetInteger.Create;
+  try
+    // Setup sets
+    SetA.Add(1);
+    SetA.Add(2);
+    SetA.Add(3);
+    
+    SetB.Add(2);
+    SetB.Add(3);
+    SetB.Add(4);
+    
+    // Intersection
+    SetA.IntersectWith(SetB);  // SetA now contains {2, 3}
+    
+    // Union
+    SetA.UnionWith(SetB);      // SetA now contains {1, 2, 3, 4}
+    
+    // Difference
+    SetA.ExceptWith(SetB);     // SetA now contains {1}
+  finally
+    SetA.Free;
+    SetB.Free;
+  end;
+end;
+```
+
+### Bulk Operations
+```pascal
+var
+  Numbers: array of Integer;
+  Set: TThreadSafeHashSetInteger;
+begin
+  Set := TThreadSafeHashSetInteger.Create;
+  try
+    // Add multiple items at once
+    SetLength(Numbers, 3);
+    Numbers[0] := 1;
+    Numbers[1] := 2;
+    Numbers[2] := 3;
+    
+    Set.AddRange(Numbers);
+    
+    // Remove multiple items
+    SetLength(Numbers, 2);
+    Numbers[0] := 1;
+    Numbers[1] := 2;
+    
+    Set.RemoveRange(Numbers);
   finally
     Set.Free;
   end;
 end;
 ```
 
-### Testing Support
-
-Special constructor in TThreadSafeHashSetString supports custom hash functions for testing:
-
+### Iterator Usage
 ```pascal
 var
-  TestSet: TThreadSafeHashSetString;
-
+  Set: TThreadSafeHashSetInteger;
+  Item: Integer;
 begin
-  TestSet := TThreadSafeHashSetString.Create(@ForceCollisionHash);
+  Set := TThreadSafeHashSetInteger.Create;
   try
-    // All items will hash to same bucket ($DEADBEEF)
+    Set.Add(1);
+    Set.Add(2);
+    Set.Add(3);
+    
+    // Safe iteration with automatic locking
+    for Item in Set do
+      WriteLn(Item);
   finally
-    TestSet.Free;
+    Set.Free;
   end;
 end;
 ```
 
 ## Best Practices
-- Use `TThreadSafeHashSet` for thread-safe collections
-- Consider alternative collections if you need:
-  * Reader/writer separation
-  * Lock-free operations
-  * Higher concurrent throughput
+1. Always use try-finally blocks for proper cleanup
+2. Use bulk operations when adding/removing multiple items
+3. Choose appropriate initial capacity to minimize resizing
+4. Consider custom hash functions for special use cases
+5. Monitor performance under heavy collision scenarios
+6. Use specialized types (`TThreadSafeHashSetInteger`, etc.) when possible
 
 ## Known Limitations
-
-1. **No Iterator Support**
-   - No built-in mechanism for safe iteration over items
-   - No foreach-style enumeration
-   - Must extract items individually using `Contains`/`Remove`
-
-2. **No Bulk Operations**
-   - No batch Add/Remove operations
-   - Each operation requires separate lock acquisition
-   - Performance impact when adding/removing multiple items
-
-3. **Floating-Point Precision**
-   - `TThreadSafeHashSetReal` uses direct equality comparison
-   - May have precision issues with floating-point numbers
-   - Consider custom equality comparer for specific precision needs
-
-4. **Memory Usage**
-   - Separate chaining can use more memory than open addressing
-   - Each entry requires additional pointer overhead
-   - No automatic bucket count reduction when items removed
-
-5. **Concurrent Access Characteristics**
-   - Uses `TCriticalSection` for guaranteed thread safety
-   - Single lock strategy (simple but potentially less concurrent)
-   - All operations are mutually exclusive
-   
-   Performance Considerations:
-   - Multiple threads may wait when concurrent access occurs
-   - Best performance when contention is low
-   - Consider alternative collections if you need:
-     * Reader/writer separation
-     * Lock-free operations
-     * Higher concurrent throughput
-
-6. **Custom Type Limitations**
-   - Must manually implement hash and equality functions
-   - No default implementations for complex types
-   - No compile-time validation of hash function quality
-
-7. **Resizing Behavior**
-   - Only grows, never shrinks
-   - No way to manually reduce capacity
-   - May hold more memory than needed after many removals
+1. Single lock for all operations (potential contention)
+2. No shrinking after removals
+3. No concurrent iteration and modification
+4. Memory overhead from separate chaining
+5. Performance degrades under heavy collisions
+6. No built-in serialization support
 
 ## Debugging
-
-Set `DEBUG_LOGGING := True` for detailed operation logging:
+Enable detailed logging:
 ```pascal
 const
   DEBUG_LOGGING = True;  // Enable debug output
+```
+
+Performance monitoring:
+```pascal
+var
+  StartTime: TDateTime;
+begin
+  StartTime := Now;
+  // ... operations ...
+  WriteLn('Operation took: ', MilliSecondsBetween(Now, StartTime), 'ms');
+end;
+```

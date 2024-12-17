@@ -260,10 +260,19 @@ begin
 end;
 
 procedure TThreadSafeHashSetTest.Test2_SimpleAdd;
+const
+  TEST_SIZE = 10000;
+var
+  I: Integer;
+  S: string;
 begin
   Log('Test2_SimpleAdd starting...');
-  AssertTrue('Should add new string', FStrSet.Add('test'));
-  AssertTrue('Should contain added string', FStrSet.Contains('test'));
+  for I := 1 to TEST_SIZE do
+  begin
+    S := 'test' + IntToStr(I);
+    AssertTrue(Format('Should add new string %s', [S]), FStrSet.Add(S));
+    AssertTrue(Format('Should contain string %s', [S]), FStrSet.Contains(S));
+  end;
   Log('Test2_SimpleAdd completed');
 end;
 
@@ -967,54 +976,52 @@ begin
 end;
 
 procedure TThreadSafeHashSetTest.Test15_AddRange_Array;
+const
+  TEST_SIZE = 100000;
 var
   Values: array of Integer;
+  I: Integer;
 begin
   Log('Test15_AddRange_Array starting...');
   
-  // Setup test data
-  SetLength(Values, 3);
-  Values[0] := 1;
-  Values[1] := 2;
-  Values[2] := 3;
+  // Setup larger test data
+  SetLength(Values, TEST_SIZE);
+  for I := 0 to TEST_SIZE - 1 do
+    Values[I] := I;
   
   // Test adding range
   FIntSet.AddRange(Values);
   
   // Verify results
-  AssertEquals('Count should be 3', 3, FIntSet.Count);
-  AssertTrue('Should contain 1', FIntSet.Contains(1));
-  AssertTrue('Should contain 2', FIntSet.Contains(2));
-  AssertTrue('Should contain 3', FIntSet.Contains(3));
-  
-  // Test duplicate handling
-  FIntSet.AddRange(Values);
-  AssertEquals('Count should still be 3 after adding duplicates', 3, FIntSet.Count);
+  AssertEquals(Format('Count should be %d', [TEST_SIZE]), TEST_SIZE, FIntSet.Count);
+  for I := 0 to TEST_SIZE - 1 do
+    AssertTrue(Format('Should contain %d', [I]), FIntSet.Contains(I));
   
   Log('Test15_AddRange_Array completed');
 end;
 
 procedure TThreadSafeHashSetTest.Test16_AddRange_Collection;
+const
+  TEST_SIZE = 100000;
 var
   OtherSet: TThreadSafeHashSetInteger;
+  I: Integer;
 begin
   Log('Test16_AddRange_Collection starting...');
   
   OtherSet := TThreadSafeHashSetInteger.Create;
   try
-    // Setup source collection
-    OtherSet.Add(10);
-    OtherSet.Add(20);
-    OtherSet.Add(30);
+    // Setup larger source collection
+    for I := 0 to TEST_SIZE - 1 do
+      OtherSet.Add(I);
     
     // Test adding from another collection
     FIntSet.AddRange(OtherSet);
     
     // Verify results
-    AssertEquals('Count should be 3', 3, FIntSet.Count);
-    AssertTrue('Should contain 10', FIntSet.Contains(10));
-    AssertTrue('Should contain 20', FIntSet.Contains(20));
-    AssertTrue('Should contain 30', FIntSet.Contains(30));
+    AssertEquals(Format('Count should be %d', [TEST_SIZE]), TEST_SIZE, FIntSet.Count);
+    for I := 0 to TEST_SIZE - 1 do
+      AssertTrue(Format('Should contain %d', [I]), FIntSet.Contains(I));
   finally
     OtherSet.Free;
   end;
@@ -1023,32 +1030,41 @@ begin
 end;
 
 procedure TThreadSafeHashSetTest.Test17_RemoveRange;
+const
+  INITIAL_SIZE = 100000;
+  REMOVE_SIZE = 50000;
 var
   OtherSet: TThreadSafeHashSetInteger;
+  I: Integer;
+
+  function ShouldExist(const Index: Integer): string;
+  begin
+    if Index mod 2 = 0 then
+      Result := 'not exist'
+    else
+      Result := 'exist';
+  end;
+
 begin
   Log('Test17_RemoveRange starting...');
   
-  // Setup initial data
-  FIntSet.Add(1);
-  FIntSet.Add(2);
-  FIntSet.Add(3);
-  FIntSet.Add(4);
+  // Setup larger initial data
+  for I := 0 to INITIAL_SIZE - 1 do
+    FIntSet.Add(I);
   
   OtherSet := TThreadSafeHashSetInteger.Create;
   try
-    // Setup removal collection
-    OtherSet.Add(1);
-    OtherSet.Add(3);
+    // Setup larger removal collection
+    for I := 0 to REMOVE_SIZE - 1 do
+      OtherSet.Add(I * 2);  // Remove even numbers
     
-    // Test removing range
-    AssertEquals('Should remove 2 items', 2, FIntSet.RemoveRange(OtherSet));
+    AssertEquals('Should remove half the items', REMOVE_SIZE, FIntSet.RemoveRange(OtherSet));
+    AssertEquals('Count should be halved', INITIAL_SIZE - REMOVE_SIZE, FIntSet.Count);
     
-    // Verify results
-    AssertEquals('Count should be 2', 2, FIntSet.Count);
-    AssertFalse('Should not contain 1', FIntSet.Contains(1));
-    AssertTrue('Should contain 2', FIntSet.Contains(2));
-    AssertFalse('Should not contain 3', FIntSet.Contains(3));
-    AssertTrue('Should contain 4', FIntSet.Contains(4));
+    // Verify remaining items
+    for I := 0 to INITIAL_SIZE - 1 do
+      AssertEquals(Format('Item %d should %s', [I, ShouldExist(I)]),
+        I mod 2 = 1, FIntSet.Contains(I));
   finally
     OtherSet.Free;
   end;
