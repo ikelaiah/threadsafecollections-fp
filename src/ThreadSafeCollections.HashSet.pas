@@ -74,6 +74,12 @@ type
         property Current: T read GetCurrent;            // Read-only property to access the current element.
       end;
 
+      { 
+        Local array type for internal use only
+        Using specialize TArray<T> for better compatibility with FPC's generic collections
+      }
+      _TArray = specialize TArray<T>;
+
     const
       INITIAL_BUCKET_COUNT = 16;   // Default number of buckets in the hash table upon initialization.
       LOAD_FACTOR = 0.75;          // Threshold ratio to determine when to resize the hash table (75% full).
@@ -376,7 +382,9 @@ function RealHash(const Value: Real): Cardinal;
 
 implementation
 
-{ Basic equality comparers - straightforward comparisons }
+{ TThreadSafeHashSet }
+
+// Basic equality comparers - straightforward comparisons
 function IntegerEquals(const A, B: Integer): Boolean;
 begin
   Result := A = B;
@@ -397,7 +405,7 @@ begin
   Result := A = B;
 end;
 
-{ Hash functions for different types }
+// Hash functions for different types
 function IntegerHash(const Value: Integer): Cardinal;
 begin
   // Use multiplicative hash for integers (good distribution for sequential values)
@@ -424,8 +432,6 @@ begin
   IntValue := Int64(Trunc(Value * 1000000));
   Result := DefaultHash(IntValue);
 end;
-
-{ TThreadSafeHashSet implementation }
 
 constructor TThreadSafeHashSet.Create(AEqualityComparer: specialize TEqualityComparer<T>;
                                     AHashFunction: specialize THashFunction<T>;
@@ -743,21 +749,23 @@ var
   I: Integer;
   Current: PEntry;
   Index: Integer;
+  LocalArray: _TArray;
 begin
   FLock.Acquire;
   try
-    SetLength(Result, FCount);
+    SetLength(LocalArray, FCount);
     Index := 0;
     for I := 0 to Length(FBuckets) - 1 do
     begin
       Current := FBuckets[I];
       while Current <> nil do
       begin
-        Result[Index] := Current^.Value;
+        LocalArray[Index] := Current^.Value;
         Inc(Index);
         Current := Current^.Next;
       end;
     end;
+    Result := LocalArray;
   finally
     FLock.Release;
   end;
@@ -784,18 +792,16 @@ end;
 procedure TThreadSafeHashSet.AddRange(const Collection: specialize IThreadSafeHashSet<T>);
 var
   LockToken: ILockToken;
-  Items: specialize TArray<T>;
+  LocalArray: _TArray;
 begin
   if Collection = nil then
     Exit;
     
-  // Get items from source collection under its lock
   LockToken := Collection.Lock;
-  Items := Collection.ToArray;
-  LockToken := nil; // Release source lock
+  LocalArray := Collection.ToArray;
+  LockToken := nil;
   
-  // Add items to our collection
-  AddRange(Items);
+  AddRange(LocalArray);
 end;
 
 function TThreadSafeHashSet.RemoveRange(const Items: array of T): Integer;
@@ -819,16 +825,16 @@ end;
 function TThreadSafeHashSet.RemoveRange(const Collection: specialize IThreadSafeHashSet<T>): Integer;
 var
   LockToken: ILockToken;
-  Items: specialize TArray<T>;
+  LocalArray: _TArray;
 begin
   if Collection = nil then
     Exit(0);
     
   LockToken := Collection.Lock;
-  Items := Collection.ToArray;
+  LocalArray := Collection.ToArray;
   LockToken := nil;
   
-  Result := RemoveRange(Items);
+  Result := RemoveRange(LocalArray);
 end;
 
 function TThreadSafeHashSet.TryGetValue(const Item: T; out Value: T): Boolean;
@@ -852,9 +858,9 @@ end;
 
 procedure TThreadSafeHashSet.IntersectWith(const Collection: specialize IThreadSafeHashSet<T>);
 var
-  ToRemove: specialize TArray<T>;
+  ToRemove: _TArray;
+  CurrentArray: _TArray;
   I: Integer;
-  CurrentArray: specialize TArray<T>;
 begin
   if Collection = nil then
   begin
@@ -889,33 +895,33 @@ end;
 
 procedure TThreadSafeHashSet.ExceptWith(const Collection: specialize IThreadSafeHashSet<T>);
 var
-  Items: specialize TArray<T>;
+  LocalArray: _TArray;
 begin
   if Collection = nil then
     Exit;
     
-  Items := Collection.ToArray;
-  RemoveRange(Items);
+  LocalArray := Collection.ToArray;
+  RemoveRange(LocalArray);
 end;
 
 function TThreadSafeHashSet.Overlaps(const Collection: specialize IThreadSafeHashSet<T>): Boolean;
 var
-  Items: specialize TArray<T>;
+  LocalArray: _TArray;
   I: Integer;
 begin
   Result := False;
   if (Collection = nil) or IsEmpty or Collection.IsEmpty then
     Exit;
     
-  Items := Collection.ToArray;
-  for I := 0 to Length(Items) - 1 do
-    if Contains(Items[I]) then
+  LocalArray := Collection.ToArray;
+  for I := 0 to Length(LocalArray) - 1 do
+    if Contains(LocalArray[I]) then
       Exit(True);
 end;
 
 function TThreadSafeHashSet.SetEquals(const Collection: specialize IThreadSafeHashSet<T>): Boolean;
 var
-  OtherItems: specialize TArray<T>;
+  OtherArray: _TArray;
   I: Integer;
 begin
   Result := False;
@@ -926,9 +932,9 @@ begin
   if Count <> Collection.Count then
     Exit;
     
-  OtherItems := Collection.ToArray;
-  for I := 0 to Length(OtherItems) - 1 do
-    if not Contains(OtherItems[I]) then
+  OtherArray := Collection.ToArray;
+  for I := 0 to Length(OtherArray) - 1 do
+    if not Contains(OtherArray[I]) then
       Exit;
       
   Result := True;

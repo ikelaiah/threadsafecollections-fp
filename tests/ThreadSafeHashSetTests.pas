@@ -245,10 +245,17 @@ begin
 end;
 
 procedure TThreadSafeHashSetTest.Test1_BasicOperations;
+const
+  TEST_SIZE = 10000;  // Increase from current size
+var
+  I: Integer;
 begin
   Log('Test1_BasicOperations starting...');
-  AssertTrue('Should add new integer', FIntSet.Add(42));
-  AssertTrue('Should contain added integer', FIntSet.Contains(42));
+  for I := 1 to TEST_SIZE do
+  begin
+    AssertTrue(Format('Should add new integer %d', [I]), FIntSet.Add(I));
+    AssertTrue(Format('Should contain added integer %d', [I]), FIntSet.Contains(I));
+  end;
   Log('Test1_BasicOperations completed');
 end;
 
