@@ -581,10 +581,17 @@ end;
 
 ## 📁 Examples
 
-- [SimpleNumberList](examples/SimpleNumberList/SimpleNumberList.lpr) - Shows basic operations like Add, Remove, Sort with the built-in integer comparer.
-- [SimpleShoppingCart](examples/SimpleShoppingCart/SimpleShoppingCart.lpr) - Shows how to use TThreadSafeList with a custom type and a custom comparer.
-- [SimpleToDoList](examples/SimpleToDoList/SimpleToDoList.lpr) - Shows how to use TThreadSafeList with the built-in string comparer.   
-- [ChatMessageQueue](examples/ChatMessageQueue/ChatMessageQueue.lpr) - Demonstrates using TThreadSafeList for a multi-threaded chat system.
+- [SimpleNumberList](examples/SimpleNumberList/SimpleNumberList.lpr) - Shows basic operations in `TThreadSafeList`; Add, Remove, Sort with the built-in integer comparer.
+- [SimpleShoppingCart](examples/SimpleShoppingCart/SimpleShoppingCart.lpr) - Shows how to use `TThreadSafeList` with a custom type and a custom comparer.
+- [SimpleToDoList](examples/SimpleToDoList/SimpleToDoList.lpr) - Shows how to use `TThreadSafeList` with the built-in string comparer.   
+- [ChatMessageQueue](examples/ChatMessageQueue/ChatMessageQueue.lpr) - Demonstrates using `TThreadSafeList` for a multi-threaded chat system.
+- [DictionaryIterator](examples/DictionaryIterator/DictionaryIterator.lpr) - Demonstrates using `TThreadSafeDictionary` with an iterator.
+- [DictionaryWithCustomType](examples/DictionaryWithCustomType/DictionaryWithCustomType.lpr) - Demonstrates using `TThreadSafeDictionary` with a custom type and a custom comparer.
+- [SimpleHashSet](examples/SimpleHashSet/SimpleHashSet.lpr) - Demonstrates using `TThreadSafeHashSet` with the built-in integer comparer.
+- [SimpleHashSet](examples/SimpleHashSet/SimpleHashSet.lpr) - Demonstrates using `TThreadSafeHashSet` with a custom type and a custom comparer.
+- [HashSetClientDemo](examples/HashSetClientDemo/HashSetClientDemo.lpr) - Demonstrates using `TThreadSafeHashSet` with a custom type and a custom comparer.
+- [SimpleDeque](examples/SimpleDeque/SimpleDeque.lpr) - Demonstrates using `TThreadSafeDeque` with a custom type and a custom comparer.
+- [DequeWithCustomType](examples/DequeWithCustomType/DequeWithCustomType.lpr) - Demonstrates using `TThreadSafeDeque` with a custom type and a custom comparer.
 
 ## 🤝 Contributing
 
