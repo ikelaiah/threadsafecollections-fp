@@ -1,5 +1,10 @@
 # 🔒 ThreadSafeCollections-FP
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Free Pascal](https://img.shields.io/badge/Free%20Pascal-3.2.2-blue.svg)](https://www.freepascal.org/)
+[![Lazarus](https://img.shields.io/badge/Lazarus-3.6-orange.svg)](https://www.lazarus-ide.org/)
+
+
 A thread-safe generic collections library for Free Pascal, designed for learning and experimentation.
 
 > [!IMPORTANT] 
