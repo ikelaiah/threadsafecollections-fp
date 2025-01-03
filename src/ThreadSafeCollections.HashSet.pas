@@ -74,6 +74,12 @@ type
         property Current: T read GetCurrent;            // Read-only property to access the current element.
       end;
 
+      { 
+        Local array type for internal use only
+        Using specialize TArray<T> for better compatibility with FPC's generic collections
+      }
+      _TArray = specialize TArray<T>;
+
     const
       INITIAL_BUCKET_COUNT = 16;   // Default number of buckets in the hash table upon initialization.
       LOAD_FACTOR = 0.75;          // Threshold ratio to determine when to resize the hash table (75% full).
@@ -313,17 +319,163 @@ type
           - A dynamic array of type T containing all items from the hash set.
     }
     function ToArray: specialize TArray<T>;
+
+    { 
+      AddRange (array overload):
+        Adds multiple items from an array to the hash set.
+        
+        This procedure efficiently adds multiple items at once while maintaining thread safety.
+        Duplicate items are handled according to hash set rules.
+        
+        Parameters:
+          - Items: Array of type T containing elements to add
+    }
+    procedure AddRange(const Items: array of T);
+
+    { 
+      AddRange (collection overload):
+        Adds all items from another thread-safe hash set to this set.
+        
+        This procedure safely transfers items between sets while maintaining thread safety
+        for both collections. Duplicate items are handled according to hash set rules.
+        
+        Parameters:
+          - Collection: Source IThreadSafeHashSet to copy items from
+    }
+    procedure AddRange(const Collection: specialize IThreadSafeHashSet<T>);
+
+    { 
+      RemoveRange (array overload):
+        Removes multiple items specified in an array from the hash set.
+        
+        This function attempts to remove each item in the array and counts successful removals.
+        
+        Parameters:
+          - Items: Array of type T containing elements to remove
+        Returns:
+          - Number of items successfully removed
+    }
+    function RemoveRange(const Items: array of T): Integer;
+
+    { 
+      RemoveRange (collection overload):
+        Removes all items present in another thread-safe hash set from this set.
+        
+        This function safely removes items that exist in both sets while maintaining
+        thread safety.
+        
+        Parameters:
+          - Collection: Source IThreadSafeHashSet containing items to remove
+        Returns:
+          - Number of items successfully removed
+    }
+    function RemoveRange(const Collection: specialize IThreadSafeHashSet<T>): Integer;
+
+    { 
+      TryGetValue:
+        Attempts to retrieve a value from the set that matches the input item.
+        
+        This function is useful when the type T has additional properties beyond
+        those used for equality comparison.
+        
+        Parameters:
+          - Item: The item to search for
+          - Value: Output parameter that receives the found value
+        Returns:
+          - True if the item was found; False otherwise
+    }
+    function TryGetValue(const Item: T; out Value: T): Boolean;
+
+    { 
+      IntersectWith:
+        Modifies the current set to contain only elements present in both sets.
+        
+        This procedure performs a set intersection operation, keeping only items
+        that exist in both this set and the provided collection.
+        
+        Parameters:
+          - Collection: The IThreadSafeHashSet to intersect with
+    }
+    procedure IntersectWith(const Collection: specialize IThreadSafeHashSet<T>);
+
+    { 
+      UnionWith:
+        Modifies the current set to contain all unique elements from both sets.
+        
+        This procedure performs a set union operation, adding all items from the
+        provided collection while maintaining uniqueness.
+        
+        Parameters:
+          - Collection: The IThreadSafeHashSet to union with
+    }
+    procedure UnionWith(const Collection: specialize IThreadSafeHashSet<T>);
+
+    { 
+      ExceptWith:
+        Removes all elements in the specified collection from the current set.
+        
+        This procedure performs a set difference operation, removing any items
+        that exist in the provided collection.
+        
+        Parameters:
+          - Collection: The IThreadSafeHashSet containing items to remove
+    }
+    procedure ExceptWith(const Collection: specialize IThreadSafeHashSet<T>);
+
+    { 
+      Overlaps:
+        Determines whether the current set and another collection share any elements.
+        
+        This function checks if there is at least one common element between the sets.
+        
+        Parameters:
+          - Collection: The IThreadSafeHashSet to check for common elements
+        Returns:
+          - True if the sets have at least one element in common; False otherwise
+    }
+    function Overlaps(const Collection: specialize IThreadSafeHashSet<T>): Boolean;
+
+    { 
+      SetEquals:
+        Determines whether the current set contains exactly the same elements as another collection.
+        
+        This function verifies that both sets have the same size and contain the same elements.
+        
+        Parameters:
+          - Collection: The IThreadSafeHashSet to compare with
+        Returns:
+          - True if both sets contain exactly the same elements; False otherwise
+    }
+    function SetEquals(const Collection: specialize IThreadSafeHashSet<T>): Boolean;
   end;
 
   { Specialized hash set types with predefined hash and equality functions }
   
-  // Integer hash set
+  { TThreadSafeHashSetInteger:
+      Thread-safe hash set specialized for Integer values.
+      Uses IntegerEquals for equality comparison and IntegerHash for hashing.
+      Provides a simple way to store unique integer values in a thread-safe manner. }
   TThreadSafeHashSetInteger = class(specialize TThreadSafeHashSet<Integer>)
   public
+    { Default constructor using standard integer hash function and equality comparer.
+      Parameters:
+        - AInitialCapacity: Initial size of the internal bucket array. Will be
+                           rounded up to the next power of 2. Default is INITIAL_BUCKET_COUNT. }
     constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
   end;
 
-  // String hash set with optional custom hash function
+  { TThreadSafeHashSetString:
+      Thread-safe hash set specialized for string values.
+      Uses StringEquals for equality comparison and StringHash for hashing.
+      
+      The default constructor uses XXHash32 for string hashing, which provides:
+      - Fast hashing performance
+      - Good distribution characteristics
+      - Low collision rates for typical string data
+      
+      A custom hash function can be provided via the overloaded constructor,
+      which is particularly useful for testing collision handling and
+      other edge cases in the hash set implementation. }
   TThreadSafeHashSetString = class(specialize TThreadSafeHashSet<string>)
   public
     { Default constructor using standard string hash function (XXHash32) }
@@ -337,13 +489,21 @@ type
                       AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
   end;
 
-  // Boolean hash set
+  { TThreadSafeHashSetBoolean:
+      Thread-safe hash set specialized for Boolean values.
+      Uses BooleanEquals for equality comparison and BooleanHash for hashing.
+      Note: Since Boolean only has two possible values, this is mainly useful
+            for completeness and consistency with other primitive types. }
   TThreadSafeHashSetBoolean = class(specialize TThreadSafeHashSet<Boolean>)
   public
     constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
   end;
 
-  // Real number hash set
+  { TThreadSafeHashSetReal:
+      Thread-safe hash set specialized for floating point Real values.
+      Uses RealEquals for equality comparison and RealHash for hashing.
+      Note: Due to floating point precision, be careful when using Real values
+            as hash keys. Small rounding differences may cause unexpected behavior. }
   TThreadSafeHashSetReal = class(specialize TThreadSafeHashSet<Real>)
   public
     constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
@@ -363,7 +523,9 @@ function RealHash(const Value: Real): Cardinal;
 
 implementation
 
-{ Basic equality comparers - straightforward comparisons }
+{ TThreadSafeHashSet }
+
+// Basic equality comparers - straightforward comparisons
 function IntegerEquals(const A, B: Integer): Boolean;
 begin
   Result := A = B;
@@ -384,7 +546,7 @@ begin
   Result := A = B;
 end;
 
-{ Hash functions for different types }
+// Hash functions for different types
 function IntegerHash(const Value: Integer): Cardinal;
 begin
   // Use multiplicative hash for integers (good distribution for sequential values)
@@ -411,8 +573,6 @@ begin
   IntValue := Int64(Trunc(Value * 1000000));
   Result := DefaultHash(IntValue);
 end;
-
-{ TThreadSafeHashSet implementation }
 
 constructor TThreadSafeHashSet.Create(AEqualityComparer: specialize TEqualityComparer<T>;
                                     AHashFunction: specialize THashFunction<T>;
@@ -730,24 +890,195 @@ var
   I: Integer;
   Current: PEntry;
   Index: Integer;
+  LocalArray: _TArray;
 begin
   FLock.Acquire;
   try
-    SetLength(Result, FCount);
+    SetLength(LocalArray, FCount);
     Index := 0;
     for I := 0 to Length(FBuckets) - 1 do
     begin
       Current := FBuckets[I];
       while Current <> nil do
       begin
-        Result[Index] := Current^.Value;
+        LocalArray[Index] := Current^.Value;
         Inc(Index);
         Current := Current^.Next;
       end;
     end;
+    Result := LocalArray;
   finally
     FLock.Release;
   end;
+end;
+
+procedure TThreadSafeHashSet.AddRange(const Items: array of T);
+var
+  I: Integer;
+begin
+  if Length(Items) = 0 then
+    Exit;
+    
+  FLock.Acquire;
+  try
+    for I := Low(Items) to High(Items) do
+    begin
+      Add(Items[I]); // Add will handle duplicates
+    end;
+  finally
+    FLock.Release;
+  end;
+end;
+
+procedure TThreadSafeHashSet.AddRange(const Collection: specialize IThreadSafeHashSet<T>);
+var
+  LockToken: ILockToken;
+  LocalArray: _TArray;
+begin
+  if Collection = nil then
+    Exit;
+    
+  LockToken := Collection.Lock;
+  LocalArray := Collection.ToArray;
+  LockToken := nil;
+  
+  AddRange(LocalArray);
+end;
+
+function TThreadSafeHashSet.RemoveRange(const Items: array of T): Integer;
+var
+  I: Integer;
+begin
+  Result := 0;
+  if Length(Items) = 0 then
+    Exit;
+    
+  FLock.Acquire;
+  try
+    for I := Low(Items) to High(Items) do
+      if Remove(Items[I]) then
+        Inc(Result);
+  finally
+    FLock.Release;
+  end;
+end;
+
+function TThreadSafeHashSet.RemoveRange(const Collection: specialize IThreadSafeHashSet<T>): Integer;
+var
+  LockToken: ILockToken;
+  LocalArray: _TArray;
+begin
+  if Collection = nil then
+    Exit(0);
+    
+  LockToken := Collection.Lock;
+  LocalArray := Collection.ToArray;
+  LockToken := nil;
+  
+  Result := RemoveRange(LocalArray);
+end;
+
+function TThreadSafeHashSet.TryGetValue(const Item: T; out Value: T): Boolean;
+var
+  Hash: Cardinal;
+  BucketIdx: Integer;
+  Entry: PEntry;
+begin
+  FLock.Acquire;
+  try
+    Hash := FHashFunction(Item);
+    BucketIdx := GetBucketIndex(Hash);
+    Entry := FindEntry(Item, Hash, BucketIdx);
+    Result := Entry <> nil;
+    if Result then
+      Value := Entry^.Value;
+  finally
+    FLock.Release;
+  end;
+end;
+
+procedure TThreadSafeHashSet.IntersectWith(const Collection: specialize IThreadSafeHashSet<T>);
+var
+  ToRemove: _TArray;
+  CurrentArray: _TArray;
+  I: Integer;
+begin
+  if Collection = nil then
+  begin
+    Clear;
+    Exit;
+  end;
+
+  FLock.Acquire;
+  try
+    CurrentArray := ToArray;
+    SetLength(ToRemove, Length(CurrentArray));
+    
+    // Find items to remove (those not in other collection)
+    for I := 0 to Length(CurrentArray) - 1 do
+      if not Collection.Contains(CurrentArray[I]) then
+        ToRemove[I] := CurrentArray[I];
+        
+    // Remove items not in intersection
+    RemoveRange(ToRemove);
+  finally
+    FLock.Release;
+  end;
+end;
+
+procedure TThreadSafeHashSet.UnionWith(const Collection: specialize IThreadSafeHashSet<T>);
+begin
+  if Collection = nil then
+    Exit;
+    
+  AddRange(Collection);
+end;
+
+procedure TThreadSafeHashSet.ExceptWith(const Collection: specialize IThreadSafeHashSet<T>);
+var
+  LocalArray: _TArray;
+begin
+  if Collection = nil then
+    Exit;
+    
+  LocalArray := Collection.ToArray;
+  RemoveRange(LocalArray);
+end;
+
+function TThreadSafeHashSet.Overlaps(const Collection: specialize IThreadSafeHashSet<T>): Boolean;
+var
+  LocalArray: _TArray;
+  I: Integer;
+begin
+  Result := False;
+  if (Collection = nil) or IsEmpty or Collection.IsEmpty then
+    Exit;
+    
+  LocalArray := Collection.ToArray;
+  for I := 0 to Length(LocalArray) - 1 do
+    if Contains(LocalArray[I]) then
+      Exit(True);
+end;
+
+function TThreadSafeHashSet.SetEquals(const Collection: specialize IThreadSafeHashSet<T>): Boolean;
+var
+  OtherArray: _TArray;
+  I: Integer;
+begin
+  Result := False;
+  
+  if Collection = nil then
+    Exit;
+    
+  if Count <> Collection.Count then
+    Exit;
+    
+  OtherArray := Collection.ToArray;
+  for I := 0 to Length(OtherArray) - 1 do
+    if not Contains(OtherArray[I]) then
+      Exit;
+      
+  Result := True;
 end;
 
 end.

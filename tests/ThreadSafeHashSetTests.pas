@@ -73,9 +73,14 @@ type
     procedure Test9_StressTest;             // Intensive thread safety
     procedure Test10_HashCollisions;        // Single-threaded collision handling
     procedure Test11_AggressiveCollisions;  // Multi-threaded collision stress test
-    procedure Test12_Iterator;           // Basic iterator functionality
-    procedure Test13_IteratorStress;     // Concurrent iterator stress test
-    procedure Test14_LockingMechanism;     // Locking mechanism test
+    procedure Test12_Iterator;              // Basic iterator functionality
+    procedure Test13_IteratorStress;        // Concurrent iterator stress test
+    procedure Test14_LockingMechanism;      // Locking mechanism test
+    procedure Test15_AddRange_Array;        // Bulk add from array
+    procedure Test16_AddRange_Collection;   // Bulk add from collection
+    procedure Test17_RemoveRange;           // Bulk remove operations
+    procedure Test18_SetOperations;         // Set algebra operations
+    procedure Test19_TryGetValue;           // Safe value retrieval
   end;
 
 { Special hash set class that forces collisions for testing }
@@ -240,18 +245,34 @@ begin
 end;
 
 procedure TThreadSafeHashSetTest.Test1_BasicOperations;
+const
+  TEST_SIZE = 10000;  // Increase from current size
+var
+  I: Integer;
 begin
   Log('Test1_BasicOperations starting...');
-  AssertTrue('Should add new integer', FIntSet.Add(42));
-  AssertTrue('Should contain added integer', FIntSet.Contains(42));
+  for I := 1 to TEST_SIZE do
+  begin
+    AssertTrue(Format('Should add new integer %d', [I]), FIntSet.Add(I));
+    AssertTrue(Format('Should contain added integer %d', [I]), FIntSet.Contains(I));
+  end;
   Log('Test1_BasicOperations completed');
 end;
 
 procedure TThreadSafeHashSetTest.Test2_SimpleAdd;
+const
+  TEST_SIZE = 10000;
+var
+  I: Integer;
+  S: string;
 begin
   Log('Test2_SimpleAdd starting...');
-  AssertTrue('Should add new string', FStrSet.Add('test'));
-  AssertTrue('Should contain added string', FStrSet.Contains('test'));
+  for I := 1 to TEST_SIZE do
+  begin
+    S := 'test' + IntToStr(I);
+    AssertTrue(Format('Should add new string %s', [S]), FStrSet.Add(S));
+    AssertTrue(Format('Should contain string %s', [S]), FStrSet.Contains(S));
+  end;
   Log('Test2_SimpleAdd completed');
 end;
 
@@ -952,6 +973,190 @@ begin
         WriteLn('Lock failed: ', E.Message);
     end;
   end;
+end;
+
+procedure TThreadSafeHashSetTest.Test15_AddRange_Array;
+const
+  TEST_SIZE = 100000;
+var
+  Values: array of Integer;
+  I: Integer;
+begin
+  Log('Test15_AddRange_Array starting...');
+  
+  // Setup larger test data
+  SetLength(Values, TEST_SIZE);
+  for I := 0 to TEST_SIZE - 1 do
+    Values[I] := I;
+  
+  // Test adding range
+  FIntSet.AddRange(Values);
+  
+  // Verify results
+  AssertEquals(Format('Count should be %d', [TEST_SIZE]), TEST_SIZE, FIntSet.Count);
+  for I := 0 to TEST_SIZE - 1 do
+    AssertTrue(Format('Should contain %d', [I]), FIntSet.Contains(I));
+  
+  Log('Test15_AddRange_Array completed');
+end;
+
+procedure TThreadSafeHashSetTest.Test16_AddRange_Collection;
+const
+  TEST_SIZE = 100000;
+var
+  OtherSet: TThreadSafeHashSetInteger;
+  I: Integer;
+begin
+  Log('Test16_AddRange_Collection starting...');
+  
+  OtherSet := TThreadSafeHashSetInteger.Create;
+  try
+    // Setup larger source collection
+    for I := 0 to TEST_SIZE - 1 do
+      OtherSet.Add(I);
+    
+    // Test adding from another collection
+    FIntSet.AddRange(OtherSet);
+    
+    // Verify results
+    AssertEquals(Format('Count should be %d', [TEST_SIZE]), TEST_SIZE, FIntSet.Count);
+    for I := 0 to TEST_SIZE - 1 do
+      AssertTrue(Format('Should contain %d', [I]), FIntSet.Contains(I));
+  finally
+    OtherSet.Free;
+  end;
+  
+  Log('Test16_AddRange_Collection completed');
+end;
+
+procedure TThreadSafeHashSetTest.Test17_RemoveRange;
+const
+  INITIAL_SIZE = 100000;
+  REMOVE_SIZE = 50000;
+var
+  OtherSet: TThreadSafeHashSetInteger;
+  I: Integer;
+
+  function ShouldExist(const Index: Integer): string;
+  begin
+    if Index mod 2 = 0 then
+      Result := 'not exist'
+    else
+      Result := 'exist';
+  end;
+
+begin
+  Log('Test17_RemoveRange starting...');
+  
+  // Setup larger initial data
+  for I := 0 to INITIAL_SIZE - 1 do
+    FIntSet.Add(I);
+  
+  OtherSet := TThreadSafeHashSetInteger.Create;
+  try
+    // Setup larger removal collection
+    for I := 0 to REMOVE_SIZE - 1 do
+      OtherSet.Add(I * 2);  // Remove even numbers
+    
+    AssertEquals('Should remove half the items', REMOVE_SIZE, FIntSet.RemoveRange(OtherSet));
+    AssertEquals('Count should be halved', INITIAL_SIZE - REMOVE_SIZE, FIntSet.Count);
+    
+    // Verify remaining items
+    for I := 0 to INITIAL_SIZE - 1 do
+      AssertEquals(Format('Item %d should %s', [I, ShouldExist(I)]),
+        I mod 2 = 1, FIntSet.Contains(I));
+  finally
+    OtherSet.Free;
+  end;
+  
+  Log('Test17_RemoveRange completed');
+end;
+
+procedure TThreadSafeHashSetTest.Test18_SetOperations;
+var
+  SetA, SetB: TThreadSafeHashSetInteger;
+begin
+  Log('Test18_SetOperations starting...');
+  
+  SetA := TThreadSafeHashSetInteger.Create;
+  SetB := TThreadSafeHashSetInteger.Create;
+  try
+    // Setup test sets
+    SetA.Add(1);
+    SetA.Add(2);
+    SetA.Add(3);
+    
+    SetB.Add(2);
+    SetB.Add(3);
+    SetB.Add(4);
+    
+    // Test IntersectWith
+    FIntSet.AddRange(SetA);
+    FIntSet.IntersectWith(SetB);
+    AssertEquals('Intersection should have 2 items', 2, FIntSet.Count);
+    AssertFalse('Should not contain 1', FIntSet.Contains(1));
+    AssertTrue('Should contain 2', FIntSet.Contains(2));
+    AssertTrue('Should contain 3', FIntSet.Contains(3));
+    AssertFalse('Should not contain 4', FIntSet.Contains(4));
+    
+    // Test UnionWith
+    FIntSet.Clear;
+    FIntSet.AddRange(SetA);
+    FIntSet.UnionWith(SetB);
+    AssertEquals('Union should have 4 items', 4, FIntSet.Count);
+    AssertTrue('Should contain 1', FIntSet.Contains(1));
+    AssertTrue('Should contain 2', FIntSet.Contains(2));
+    AssertTrue('Should contain 3', FIntSet.Contains(3));
+    AssertTrue('Should contain 4', FIntSet.Contains(4));
+    
+    // Test ExceptWith
+    FIntSet.Clear;
+    FIntSet.AddRange(SetA);
+    FIntSet.ExceptWith(SetB);
+    AssertEquals('Except should have 1 item', 1, FIntSet.Count);
+    AssertTrue('Should contain 1', FIntSet.Contains(1));
+    AssertFalse('Should not contain 2', FIntSet.Contains(2));
+    AssertFalse('Should not contain 3', FIntSet.Contains(3));
+    AssertFalse('Should not contain 4', FIntSet.Contains(4));
+    
+    // Test Overlaps
+    FIntSet.Clear;
+    FIntSet.AddRange(SetA);
+    AssertTrue('Sets should overlap', FIntSet.Overlaps(SetB));
+    FIntSet.Clear;
+    FIntSet.Add(1);
+    AssertFalse('Sets should not overlap', FIntSet.Overlaps(SetB));
+    
+    // Test SetEquals
+    FIntSet.Clear;
+    FIntSet.AddRange(SetA);
+    AssertFalse('Sets should not be equal', FIntSet.SetEquals(SetB));
+    FIntSet.Clear;
+    FIntSet.AddRange(SetB);
+    AssertTrue('Sets should be equal', FIntSet.SetEquals(SetB));
+  finally
+    SetA.Free;
+    SetB.Free;
+  end;
+  
+  Log('Test18_SetOperations completed');
+end;
+
+procedure TThreadSafeHashSetTest.Test19_TryGetValue;
+var
+  Value: Integer;
+begin
+  Log('Test19_TryGetValue starting...');
+  
+  // Test with existing value
+  FIntSet.Add(42);
+  AssertTrue('Should find existing value', FIntSet.TryGetValue(42, Value));
+  AssertEquals('Retrieved value should match', 42, Value);
+  
+  // Test with non-existent value
+  AssertFalse('Should not find non-existent value', FIntSet.TryGetValue(99, Value));
+  
+  Log('Test19_TryGetValue completed');
 end;
 
 initialization
