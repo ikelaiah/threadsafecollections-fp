@@ -914,13 +914,24 @@ end;
 
 procedure TThreadSafeHashSet.AddRange(const Items: array of T);
 var
-  I: Integer;
+  I, NewCount, RequiredBuckets: Integer;
 begin
   if Length(Items) = 0 then
     Exit;
-    
+
   FLock.Acquire;
   try
+    // v0.8: Pre-calculate required bucket count (assuming most items are unique)
+    NewCount := FCount + Length(Items);
+    if NewCount > Length(FBuckets) * LOAD_FACTOR then
+    begin
+      RequiredBuckets := Trunc(NewCount / LOAD_FACTOR) + 1;
+      RequiredBuckets := GetNextPowerOfTwo(RequiredBuckets);
+      if RequiredBuckets > Length(FBuckets) then
+        Resize(RequiredBuckets);
+    end;
+
+    // Add items
     for I := Low(Items) to High(Items) do
     begin
       Add(Items[I]); // Add will handle duplicates

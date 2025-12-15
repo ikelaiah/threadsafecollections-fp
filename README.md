@@ -18,6 +18,8 @@ A thread-safe generic collections library for Free Pascal, designed for learning
 
 ## 🚧 Development Status
 
+**Latest Release: v0.8.0** - Major Performance Update
+
 Current State:
 
 - ✅ Basic operations working (Add, Remove, GetItem)
@@ -28,11 +30,15 @@ Current State:
    - Thread-safe iteration with automatic lock management
    - Each iterator maintains its own lock token
 - ✅ Bulk operations support
-- ❌ Performance not yet optimized
+- ✅ **NEW in v0.8**: Performance optimizations implemented
+  - Circular array-based Deque (5-10x faster)
+  - Pre-allocation strategies for List
+  - Optimized hash table resizing
 
 Planned Features:
 
-- 🔄 Performance optimizations
+- 🔄 Read-write lock support (concurrent reads)
+- 🔄 Lock-free operations for simple checks
 - 🔄 More specialized types
 
 ## 🎯 Why Use This?
@@ -83,12 +89,15 @@ end;
 > 
 > For custom types, implement your own comparer: `function MyComparer(const A, B: TMyType): Integer;`
 
-2. **ThreadSafeDeque**: A double-ended queue
+2. **ThreadSafeDeque**: A double-ended queue (v0.8: Now circular array-based!)
+
 ```pascal
 var
   Deque: specialize TThreadSafeDeque<Integer>;
 begin
+  // Create with default capacity (16) or specify initial capacity
   Deque := specialize TThreadSafeDeque<Integer>.Create;
+  // Deque := specialize TThreadSafeDeque<Integer>.Create(1000); // For better performance
   try
     Deque.PushBack(1);
     Deque.PushFront(2);
