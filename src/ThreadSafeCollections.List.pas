@@ -71,6 +71,12 @@ type
     //   AComparer: A comparer function to determine the order of elements
     constructor Create(AComparer: specialize TComparer<T>);
 
+    // v0.8: Constructor with initial capacity hint for performance optimization
+    // Parameters:
+    //   AComparer: A comparer function to determine the order of elements
+    //   AInitialCapacity: Suggested initial capacity (will be pre-allocated to avoid early resizes)
+    constructor Create(AComparer: specialize TComparer<T>; AInitialCapacity: Integer);
+
     // Destructor
     // Cleans up resources used by the list, including the critical section
     destructor Destroy; override;
@@ -320,6 +326,11 @@ end;
 
 constructor TThreadSafeList.Create(AComparer: specialize TComparer<T>);
 begin
+  Create(AComparer, 16);  // v0.8: Delegate to overloaded constructor with default capacity
+end;
+
+constructor TThreadSafeList.Create(AComparer: specialize TComparer<T>; AInitialCapacity: Integer);
+begin
   inherited Create;
   if not Assigned(AComparer) then
     raise Exception.Create('Comparer must be provided');
@@ -327,7 +338,12 @@ begin
   FLock := TCriticalSection.Create;      // Initialize the critical section for thread safety
   FComparer := AComparer;                // Assign the comparer function
   FCount := 0;                           // Initialize item count
-  FCapacity := 0;                        // Initialize capacity
+
+  // v0.8: Use provided capacity hint or default to 16
+  if AInitialCapacity < 4 then
+    AInitialCapacity := 4;                // Minimum reasonable capacity
+  FCapacity := AInitialCapacity;         // Set initial capacity
+  SetLength(FList, FCapacity);           // Pre-allocate buffer to reduce early resizes
   FSorted := True;                       // Initially, the list is considered sorted
 end;
 
@@ -339,10 +355,13 @@ end;
 
 procedure TThreadSafeList.Grow;
 begin
+  // v0.8: Optimized growth strategy
   if FCapacity = 0 then
-    FCapacity := 4                          // Start with an initial capacity
+    FCapacity := 16                         // Start with reasonable initial capacity
+  else if FCapacity < 64 then
+    FCapacity := FCapacity * 2              // Double for small sizes
   else
-    FCapacity := FCapacity * 2;             // Double the capacity when needed
+    FCapacity := FCapacity + (FCapacity div 2);  // Grow by 50% for larger sizes to reduce memory waste
   SetLength(FList, FCapacity);              // Resize the internal array
 end;
 
@@ -656,12 +675,36 @@ end;
 
 procedure TThreadSafeList.AddRange(const Values: array of T);
 var
-  I: Integer;
+  I, NewCount, RequiredCapacity: Integer;
 begin
+  if Length(Values) = 0 then
+    Exit;                                          // Nothing to add
+
   FLock.Acquire;                                   // Enter critical section
   try
+    NewCount := FCount + Length(Values);
+
+    // v0.8: Pre-allocate capacity if needed to avoid multiple resizes
+    if NewCount > FCapacity then
+    begin
+      RequiredCapacity := NewCount;
+      // Round up to avoid immediate regrowth
+      if RequiredCapacity < 64 then
+        RequiredCapacity := ((RequiredCapacity + 15) div 16) * 16  // Round to nearest 16
+      else
+        RequiredCapacity := ((RequiredCapacity * 3) div 2);         // 50% extra buffer
+      SetCapacity(RequiredCapacity);
+    end;
+
+    // Copy items efficiently
     for I := 0 to High(Values) do
-      Add(Values[I]);                              // Add each item to the list
+    begin
+      FList[FCount] := Values[I];
+      Inc(FCount);
+      // Update the sorted flag if necessary
+      if (FCount > 1) and FSorted then
+        FSorted := FComparer(FList[FCount-2], FList[FCount-1]) <= 0;
+    end;
   finally
     FLock.Release;                                 // Exit critical section
   end;

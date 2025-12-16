@@ -1266,10 +1266,24 @@ end;
 
 procedure TThreadSafeDictionary.AddRange(const AArray: specialize TPairArray<TKey, TValue>);
 var
-  I: Integer;
+  I, NewCount, RequiredBuckets: Integer;
 begin
+  if Length(AArray) = 0 then
+    Exit;
+
   FLock.Enter;
   try
+    NewCount := FCount + Length(AArray);
+
+    // v0.8: Pre-calculate required bucket count to avoid multiple resizes
+    RequiredBuckets := Trunc(NewCount / LOAD_FACTOR) + 1;
+    if RequiredBuckets > Length(FBuckets) then
+    begin
+      RequiredBuckets := GetNextPowerOfTwo(RequiredBuckets);
+      Resize(RequiredBuckets);
+    end;
+
+    // Add all items
     for I := Low(AArray) to High(AArray) do
       AddOrSetValue(AArray[I].Key, AArray[I].Value);
   finally

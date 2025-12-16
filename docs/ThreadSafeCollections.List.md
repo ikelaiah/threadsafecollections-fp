@@ -53,9 +53,12 @@ This implementation requires:
 ### Features
 - Thread-safe operations using critical sections
 - Dynamic array-based storage with automatic resizing
+- **Smart growth strategy (v0.8)** - Optimized for both small and large lists
+- **Pre-allocation for better performance (v0.8)** - Specify initial capacity
+- **Default initial capacity of 16 (v0.8)** - Avoids early resizes
 - Support for custom comparers
 - Sorting capabilities with custom ordering
-- Bulk operations support
+- Bulk operations support with intelligent pre-allocation
 - Iterator support with RAII locking
 - Range-based operations
 - Memory optimization features
@@ -318,7 +321,18 @@ constructor Create(AComparer: specialize TComparer<T>);
 ```
 
 - Creates new list with specified comparer
+- **v0.8:** Default initial capacity is 16 elements
 - Throws exception if comparer is nil
+
+```pascal
+constructor Create(AComparer: specialize TComparer<T>; AInitialCapacity: Integer);
+```
+
+- **v0.8 New:** Creates list with specified initial capacity
+- Useful for performance when approximate size is known upfront
+- Minimum capacity is 4 elements
+- Example: `Create(@IntegerComparer, 1000)` pre-allocates for 1000 elements
+- Avoids multiple resize operations during initial population
 
 #### Built-in Comparers
 
@@ -618,38 +632,87 @@ end;
 - Extract operations: O(n) combining find and remove in single lock
 
 ### Memory Management
-- Growing strategy: Double capacity when full (4, 8, 16, etc.)
+
+**v0.8 Growth Strategy Improvements:**
+
+- **Small lists (<64 items):** Double capacity on growth (2x)
+  - Ensures fast growth for small collections
+  - Sequence: 4 → 8 → 16 → 32 → 64
+- **Large lists (≥64 items):** Grow by 50% (1.5x)
+  - Reduces memory waste for larger collections
+  - More conservative growth to avoid over-allocation
+- **Default initial capacity:** 16 elements (v0.8)
+  - Avoids early resize operations
+  - Good balance for most use cases
+
+**Pre-allocation (v0.8):**
+```pascal
+// If you know approximate size:
+List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer, 1000);
+// Avoids ~8-10 resize operations
+```
+
+**Bulk Operations:**
 - Memory moves optimized for bulk operations
+- `AddRange` now pre-calculates required capacity (v0.8)
 - TrimExcess optimizes memory usage after removals
 
+**Growth Example:**
+```
+Starting with capacity 16:
+- Add 17th item: Resize to 32
+- Add 33rd item: Resize to 64
+- Add 65th item: Resize to 96 (64 + 32)
+- Add 97th item: Resize to 144 (96 + 48)
+```
+
 ### Optimization Tips
-1. **Use Bulk Operations**
+
+1. **Pre-allocate Capacity (v0.8 - Recommended)**
+   ```pascal
+   // If you know approximate size upfront:
+   List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer, 1000);
+   // This is better than setting capacity after creation
+
+   // Alternatively, set capacity before bulk operations:
+   List.Capacity := ExpectedSize;
+   ```
+
+2. **Use Bulk Operations**
    ```pascal
    // Instead of:
    for I := 0 to High(Values) do
      List.Add(Values[I]);
-   
-   // Use:
-   List.AddRange(Values);
+
+   // Use (v0.8 optimized):
+   List.AddRange(Values);  // Pre-calculates capacity, single resize
    ```
 
-2. **Manage Capacity**
+3. **v0.8 Performance Benefits**
    ```pascal
-   // Pre-allocate if size is known
-   List.Capacity := ExpectedSize;
-   
+   // Old way: Multiple resizes
+   for I := 0 to 999 do
+     List.Add(I);  // ~8-10 resize operations
+
+   // New way: Single resize (v0.8)
+   List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer, 1000);
+   List.AddRange(ArrayOfValues);  // 1 resize at most
+   ```
+
+4. **Manage Capacity**
+   ```pascal
    // Trim after bulk removals
    List.DeleteRange(0, RemoveCount);
-   List.TrimExcess;
+   List.TrimExcess;  // Free unused capacity
    ```
 
-3. **Optimize Searches**
+5. **Optimize Searches**
    ```pascal
    // For frequent searches, keep list sorted
    List.Sort;
    ```
 
-4. **Minimize Lock Contention**
+6. **Minimize Lock Contention**
    ```pascal
    // Use Lock() for multiple operations
    var
@@ -711,22 +774,43 @@ end;
 
 ## Best Practices
 
-1. **Memory Management**
+1. **Memory Management (v0.8 Enhanced)**
+   - **Pre-allocate capacity when size is known** (v0.8 recommended)
+     ```pascal
+     List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer, 1000);
+     ```
    - Use TrimExcess periodically in long-running applications
-   - Consider initial capacity when known
    - Use bulk operations instead of multiple single operations
+   - Monitor growth pattern for large lists (50% growth after 64 items)
 
-2. **Search Operations**
+2. **Performance Optimization (v0.8)**
+   - **Use new constructor for better performance:**
+     ```pascal
+     // Before v0.8:
+     List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+
+     // v0.8 optimized (if you know approximate size):
+     List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer, 1000);
+     ```
+   - **AddRange is now much faster** - Pre-calculates capacity
+   - Default capacity of 16 eliminates early resizes for small lists
+
+3. **Search Operations**
    - Use Contains for simple existence checks
    - Use IndexOfItem for forward searches
    - Use LastIndexOf for backward searches
    - Consider sorting for better search performance
 
-3. **Range Operations**
-   - Prefer AddRange over multiple Add calls
+4. **Range Operations (v0.8 Optimized)**
+   - Prefer AddRange over multiple Add calls (now pre-allocates capacity)
    - Use InsertRange for bulk insertions
    - Use DeleteRange for bulk deletions
    - Check bounds before range operations
+
+5. **Growth Strategy Awareness (v0.8)**
+   - Small lists: Aggressive growth (2x) for fast population
+   - Large lists: Conservative growth (1.5x) to reduce memory waste
+   - Plan capacity accordingly for very large lists
 
 ## Known Limitations
 
@@ -737,8 +821,13 @@ end;
 
 2. **Bulk Operation Characteristics**
    - Single lock acquisition per bulk operation
-   - Memory allocation may grow in steps
+   - **v0.8:** Memory allocation optimized (pre-calculates capacity)
    - No parallel processing of bulk operations
+
+3. **Capacity Management (v0.8)**
+   - No automatic shrinking (except via TrimExcess)
+   - Large lists grow by 50% which may still over-allocate
+   - Pre-allocation is a hint, actual capacity may differ
 
 ## Debugging
 

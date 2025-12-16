@@ -695,8 +695,8 @@ end;
 
 procedure TThreadSafeListTest.Test26_Capacity;
 begin
-  // Initial capacity should be 0
-  AssertEquals('Initial capacity should be 0', 0, FIntList.Capacity);
+  // v0.8: Initial capacity is now 16 (pre-allocated for performance)
+  AssertEquals('Initial capacity should be 16', 16, FIntList.Capacity);
 
   // Adding items should increase capacity
   FIntList.Add(1);
