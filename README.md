@@ -418,13 +418,32 @@ end;
 
 ### Performance Characteristics
 
-Recent test results show excellent performance for the HashSet implementation:
+Performance benchmarks on **Dell Inspiron 15 7510** (Intel i7-11800H @ 2.30GHz, 8 cores, 16GB RAM, Windows 11):
 
-| Operation | Time (ms) | Items | Notes |
-|-----------|-----------|-------|-------|
-| Basic Ops | 0.006 | 10,000 | Add/Contains |
-| Bulk Add | 0.032 | 100,000 | AddRange |
-| Set Ops | < 0.001 | 1,000 | Union/Intersect |
+**List Operations:**
+
+| Operation            | Time (ms) | Items   | Notes           |
+|----------------------|-----------|---------|-----------------|
+| Sort Integers        | < 1       | 100,000 | Quicksort       |
+| Sort Strings         | 94        | 100,000 | Quicksort       |
+| Sort Students (Name) | 157       | 100,000 | Custom comparer |
+| Sort Students (ID)   | 94        | 100,000 | Custom comparer |
+
+**Dictionary Operations:**
+
+| Operation | Time (ms) | Items   | Notes            |
+|-----------|-----------|---------|------------------|
+| Add       | 63        | 100,000 | Bulk insert      |
+| Find      | 265       | 100,000 | Lookup all items |
+
+**HashSet Operations:**
+
+| Operation        | Time (ms) | Items   | Notes            |
+|------------------|-----------|---------|------------------|
+| Add              | 31        | 100,000 | Bulk insert      |
+| Find             | 47        | 100,000 | Contains checks  |
+| Stress Test      | 172       | 100,000 | Mixed operations |
+| Hash Collisions  | 3,468     | 10,000  | Forced collisions|
 
 > [!TIP]
 > Use bulk operations (AddRange, RemoveRange) for better performance when working with multiple items.
