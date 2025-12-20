@@ -431,10 +431,10 @@ Performance benchmarks on **Dell Inspiron 15 7510** (Intel i7-11800H @ 2.30GHz, 
 
 **Dictionary Operations:**
 
-| Operation | Time (ms) | Items   | Notes            |
-|-----------|-----------|---------|------------------|
-| Add       | 63        | 100,000 | Bulk insert      |
-| Find      | 265       | 100,000 | Lookup all items |
+| Operation | Time (ms) | Items   | Notes              |
+|-----------|-----------|---------|---------------------|
+| Add       | 63        | 100,000 | Bulk insert         |
+| Find      | 265       | 100,000 | Sequential lookups  |
 
 **HashSet Operations:**
 
