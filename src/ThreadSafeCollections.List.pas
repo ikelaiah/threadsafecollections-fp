@@ -20,6 +20,16 @@ type
   // It allows concurrent access and modifications by multiple threads without data corruption.
   generic TThreadSafeList<T> = class(TInterfacedObject, specialize IThreadSafeList<T>)
   private
+    const
+      DEFAULT_INITIAL_CAPACITY = 16;      // Default number of elements to allocate initially
+      MIN_CAPACITY = 4;                   // Minimum capacity for the list
+      SMALL_LIST_THRESHOLD = 64;          // Threshold for switching growth strategies
+      GROWTH_FACTOR_DOUBLE = 2;           // Growth factor for small lists (double)
+      GROWTH_FACTOR_LARGE_NUMERATOR = 3;  // Numerator for large list growth (3/2 = 1.5)
+      GROWTH_FACTOR_LARGE_DENOMINATOR = 2;// Denominator for large list growth (3/2 = 1.5)
+      ARRAY_ALIGNMENT = 16;               // Alignment boundary for small arrays
+
+  private
     FList: array of T;                             // Internal dynamic array to store list items
     FCount: Integer;                               // Current number of items in the list
     FCapacity: Integer;                            // Current capacity of the internal array
@@ -326,7 +336,7 @@ end;
 
 constructor TThreadSafeList.Create(AComparer: specialize TComparer<T>);
 begin
-  Create(AComparer, 16);  // v0.8: Delegate to overloaded constructor with default capacity
+  Create(AComparer, DEFAULT_INITIAL_CAPACITY);  // v0.8: Delegate to overloaded constructor with default capacity
 end;
 
 constructor TThreadSafeList.Create(AComparer: specialize TComparer<T>; AInitialCapacity: Integer);
@@ -339,9 +349,9 @@ begin
   FComparer := AComparer;                // Assign the comparer function
   FCount := 0;                           // Initialize item count
 
-  // v0.8: Use provided capacity hint or default to 16
-  if AInitialCapacity < 4 then
-    AInitialCapacity := 4;                // Minimum reasonable capacity
+  // v0.8: Use provided capacity hint or default to minimum
+  if AInitialCapacity < MIN_CAPACITY then
+    AInitialCapacity := MIN_CAPACITY;     // Minimum reasonable capacity
   FCapacity := AInitialCapacity;         // Set initial capacity
   SetLength(FList, FCapacity);           // Pre-allocate buffer to reduce early resizes
   FSorted := True;                       // Initially, the list is considered sorted
@@ -357,12 +367,12 @@ procedure TThreadSafeList.Grow;
 begin
   // v0.8: Optimized growth strategy
   if FCapacity = 0 then
-    FCapacity := 16                         // Start with reasonable initial capacity
-  else if FCapacity < 64 then
-    FCapacity := FCapacity * 2              // Double for small sizes
+    FCapacity := DEFAULT_INITIAL_CAPACITY           // Start with reasonable initial capacity
+  else if FCapacity < SMALL_LIST_THRESHOLD then
+    FCapacity := FCapacity * GROWTH_FACTOR_DOUBLE   // Double for small sizes
   else
-    FCapacity := FCapacity + (FCapacity div 2);  // Grow by 50% for larger sizes to reduce memory waste
-  SetLength(FList, FCapacity);              // Resize the internal array
+    FCapacity := FCapacity + (FCapacity div GROWTH_FACTOR_LARGE_DENOMINATOR);  // Grow by 50% for larger sizes to reduce memory waste
+  SetLength(FList, FCapacity);                      // Resize the internal array
 end;
 
 procedure TThreadSafeList.QuickSort(Left, Right: Integer; Ascending: Boolean);
@@ -689,10 +699,10 @@ begin
     begin
       RequiredCapacity := NewCount;
       // Round up to avoid immediate regrowth
-      if RequiredCapacity < 64 then
-        RequiredCapacity := ((RequiredCapacity + 15) div 16) * 16  // Round to nearest 16
+      if RequiredCapacity < SMALL_LIST_THRESHOLD then
+        RequiredCapacity := ((RequiredCapacity + (ARRAY_ALIGNMENT - 1)) div ARRAY_ALIGNMENT) * ARRAY_ALIGNMENT  // Round to nearest alignment
       else
-        RequiredCapacity := ((RequiredCapacity * 3) div 2);         // 50% extra buffer
+        RequiredCapacity := ((RequiredCapacity * GROWTH_FACTOR_LARGE_NUMERATOR) div GROWTH_FACTOR_LARGE_DENOMINATOR);  // 50% extra buffer
       SetCapacity(RequiredCapacity);
     end;
 

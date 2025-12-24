@@ -21,6 +21,10 @@
   - Compatible with Delphi's TDictionary interface
   - RAII-style locking mechanism
 
+  NOTE: This implementation shares common hash table patterns with ThreadSafeCollections.HashSet.
+        Both use: bucket arrays, GetBucketIndex, Resize, CheckLoadFactor, and entry chaining.
+        Future refactoring could extract a common base class to reduce duplication.
+
   Usage example:
     var
       Dict: specialize TThreadSafeDictionary<string, integer>;

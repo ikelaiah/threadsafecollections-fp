@@ -25,6 +25,12 @@ type
   }
   generic TThreadSafeDeque<T> = class(TInterfacedObject, specialize IThreadSafeDeque<T>)
   private
+    const
+      DEFAULT_INITIAL_CAPACITY = 16;  // Default number of elements to allocate initially
+      MIN_CAPACITY = 4;               // Minimum capacity for the deque (must be power of 2)
+      GROWTH_FACTOR = 2;              // Growth factor when resizing (double the capacity)
+
+  private
     FLock: TCriticalSection;     // Synchronization object to ensure that deque operations are thread-safe
     FBuffer: array of T;          // v0.8: Circular array buffer for storing elements
     FHead: Integer;               // v0.8: Index of the first element (front)
@@ -222,7 +228,7 @@ implementation
 
 constructor TThreadSafeDeque.Create;
 begin
-  Create(16);  // v0.8: Default to reasonable initial capacity
+  Create(DEFAULT_INITIAL_CAPACITY);  // v0.8: Default to reasonable initial capacity
 end;
 
 constructor TThreadSafeDeque.Create(AInitialCapacity: Integer);
@@ -233,9 +239,9 @@ begin
   FLock := TCriticalSection.Create;
 
   // v0.8: Ensure capacity is power of 2 for efficient modulo operations
-  PowerOfTwo := 4;
+  PowerOfTwo := MIN_CAPACITY;
   while PowerOfTwo < AInitialCapacity do
-    PowerOfTwo := PowerOfTwo * 2;
+    PowerOfTwo := PowerOfTwo * GROWTH_FACTOR;
 
   FCapacity := PowerOfTwo;
   SetLength(FBuffer, FCapacity);
@@ -257,7 +263,7 @@ var
   NewBuffer: array of T;
 begin
   // v0.8: Double the capacity
-  NewCapacity := FCapacity * 2;
+  NewCapacity := FCapacity * GROWTH_FACTOR;
   SetLength(NewBuffer, NewCapacity);
 
   // Copy elements in order from old buffer to new buffer
@@ -524,7 +530,7 @@ begin
     begin
       RequiredCapacity := FCapacity;
       while RequiredCapacity < FCount + Length(AItems) do
-        RequiredCapacity := RequiredCapacity * 2;
+        RequiredCapacity := RequiredCapacity * GROWTH_FACTOR;
 
       // Resize to required capacity
       while FCapacity < RequiredCapacity do
@@ -557,7 +563,7 @@ begin
     begin
       RequiredCapacity := FCapacity;
       while RequiredCapacity < FCount + Length(AItems) do
-        RequiredCapacity := RequiredCapacity * 2;
+        RequiredCapacity := RequiredCapacity * GROWTH_FACTOR;
 
       // Resize to required capacity
       while FCapacity < RequiredCapacity do
