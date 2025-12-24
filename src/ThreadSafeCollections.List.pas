@@ -6,7 +6,8 @@ unit ThreadSafeCollections.List;
 interface
 
 uses
-  Classes, SysUtils, SyncObjs, ThreadSafeCollections.Interfaces, Math;
+  Classes, SysUtils, SyncObjs, ThreadSafeCollections.Interfaces,
+  ThreadSafeCollections.ErrorMessages, Math;
 
 type
   // Generic comparer type
@@ -343,7 +344,7 @@ constructor TThreadSafeList.Create(AComparer: specialize TComparer<T>; AInitialC
 begin
   inherited Create;
   if not Assigned(AComparer) then
-    raise Exception.Create('Comparer must be provided');
+    raise Exception.Create(ERR_COMPARER_REQUIRED);
 
   FLock := TCriticalSection.Create;      // Initialize the critical section for thread safety
   FComparer := AComparer;                // Assign the comparer function
@@ -437,7 +438,7 @@ begin
   FLock.Acquire;                                       // Enter critical section
   try
     if (Index < 0) or (Index >= FCount) then
-      raise Exception.Create('Index out of bounds');
+      raise Exception.Create(ERR_INDEX_OUT_OF_BOUNDS);
 
     // Shift elements to remove the item
     for I := Index to FCount - 2 do
@@ -471,7 +472,7 @@ begin
   FLock.Acquire;                                       // Enter critical section
   try
     if FCount = 0 then
-      raise Exception.Create('List is empty');
+      raise Exception.Create(ERR_LIST_EMPTY);
     Result := FList[0];                                // Return the first item
   finally
     FLock.Release;                                     // Exit critical section
@@ -483,7 +484,7 @@ begin
   FLock.Acquire;                                       // Enter critical section
   try
     if FCount = 0 then
-      raise Exception.Create('List is empty');
+      raise Exception.Create(ERR_LIST_EMPTY);
     Result := FList[FCount - 1];                       // Return the last item
   finally
     FLock.Release;                                     // Exit critical section
@@ -517,7 +518,7 @@ begin
   FLock.Acquire;                                       // Enter critical section
   try
     if (Index < 0) or (Index >= FCount) then
-      raise Exception.Create('Index out of bounds');
+      raise Exception.Create(ERR_INDEX_OUT_OF_BOUNDS);
     FList[Index] := Item;                              // Replace the item
 
     // Update the sorted flag based on neighboring elements
@@ -538,7 +539,7 @@ begin
   FLock.Acquire;                                       // Enter critical section
   try
     if (Index < 0) or (Index >= FCount) then
-      raise Exception.Create('Index out of bounds');
+      raise Exception.Create(ERR_INDEX_OUT_OF_BOUNDS);
     Result := FList[Index];                            // Retrieve the item
   finally
     FLock.Release;                                     // Exit critical section
@@ -638,7 +639,7 @@ begin
   FLock.Acquire;                                           // Enter critical section
   try
     if Value < FCount then
-      raise EArgumentOutOfRangeException.Create('Capacity cannot be less than Count');
+      raise EArgumentOutOfRangeException.Create(ERR_CAPACITY_LESS_THAN_COUNT);
 
     if Value <> FCapacity then
     begin
@@ -739,7 +740,7 @@ begin
   FLock.Acquire;                                           // Enter critical section
   try
     if (Index < 0) or (Index > FCount) then
-      raise EArgumentOutOfRangeException.Create('Index out of bounds');
+      raise EArgumentOutOfRangeException.Create(ERR_INDEX_OUT_OF_BOUNDS);
 
     InsertCount := Length(Values);
     if InsertCount = 0 then
@@ -780,7 +781,7 @@ begin
   FLock.Acquire;                                           // Enter critical section
   try
     if (AIndex < 0) or (ACount < 0) or (AIndex + ACount > FCount) then
-      raise EArgumentOutOfRangeException.Create('Invalid index or count');
+      raise EArgumentOutOfRangeException.Create(ERR_INVALID_INDEX_OR_COUNT);
 
     if ACount = 0 then
       Exit;                                                 // Nothing to delete
@@ -874,7 +875,7 @@ begin
   try
     if (CurIndex < 0) or (CurIndex >= FCount) or
        (NewIndex < 0) or (NewIndex >= FCount) then
-      raise EArgumentOutOfRangeException.Create('Index out of bounds');
+      raise EArgumentOutOfRangeException.Create(ERR_INDEX_OUT_OF_BOUNDS);
 
     if CurIndex <> NewIndex then
     begin
@@ -901,7 +902,7 @@ end;
 procedure TThreadSafeList.RaiseIfOutOfBounds(Index: Integer);
 begin
   if (Index < 0) or (Index >= FCount) then
-    raise EArgumentOutOfRangeException.Create('Index out of bounds');   // Raise exception for invalid index
+    raise EArgumentOutOfRangeException.Create(ERR_INDEX_OUT_OF_BOUNDS);   // Raise exception for invalid index
 end;
 
 procedure TThreadSafeList.Insert(Index: Integer; const Item: T);
@@ -909,7 +910,7 @@ begin
   FLock.Acquire;                                               // Enter critical section
   try
     if (Index < 0) or (Index > FCount) then
-      raise EArgumentOutOfRangeException.Create('Index out of bounds');
+      raise EArgumentOutOfRangeException.Create(ERR_INDEX_OUT_OF_BOUNDS);
 
     if FCount = FCapacity then
       Grow;                                                   // Grow the list if capacity is reached
@@ -975,7 +976,7 @@ begin
   try
     Index := IndexOf(Item);                                    // Find the item's index
     if Index = -1 then
-      raise EArgumentOutOfRangeException.Create('Item not found');
+      raise EArgumentOutOfRangeException.Create(ERR_ITEM_NOT_FOUND);
     Result := FList[Index];                                    // Retrieve the item
     Delete(Index);                                             // Remove the item from the list
   finally

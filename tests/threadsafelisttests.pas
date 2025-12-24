@@ -285,6 +285,7 @@ begin
   AssertEquals('Last should be 3', 3, FIntList.Last);
 
   try
+    FIntList.Free;  // Free the old list before creating a new one
     FIntList := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
     FIntList.First;
     Fail('Should raise exception on empty list First');

@@ -6,7 +6,8 @@ unit ThreadSafeCollections.HashSet;
 interface
 
 uses
-  Classes, SysUtils, SyncObjs, HashFunctions, TypInfo, ThreadSafeCollections.Interfaces;
+  Classes, SysUtils, SyncObjs, HashFunctions, TypInfo,
+  ThreadSafeCollections.Interfaces, ThreadSafeCollections.ErrorMessages;
 
 type
   // Function type for comparing two values of type T for equality
@@ -763,7 +764,7 @@ end;
 function TThreadSafeHashSet.TEnumerator.GetCurrent: T;
 begin
   if FCurrentEntry = nil then
-    raise EInvalidOperation.Create('Invalid enumerator position');
+    raise EInvalidOperation.Create(ERR_INVALID_ENUMERATOR_POSITION);
   Result := FCurrentEntry^.Value;
 end;
 

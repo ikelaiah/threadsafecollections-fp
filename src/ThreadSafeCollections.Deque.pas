@@ -6,7 +6,8 @@ unit ThreadSafeCollections.Deque;
 interface
 
 uses
-  Classes, SysUtils, SyncObjs, ThreadSafeCollections.Interfaces;
+  Classes, SysUtils, SyncObjs, ThreadSafeCollections.Interfaces,
+  ThreadSafeCollections.ErrorMessages;
 
 type
 
@@ -332,7 +333,7 @@ end;
 function TThreadSafeDeque.PopFront: T;
 begin
   if not TryPopFront(Result) then
-    raise EListError.Create('Deque is empty');
+    raise EListError.Create(ERR_DEQUE_EMPTY);
 end;
 
 function TThreadSafeDeque.TryPopBack(out AValue: T): Boolean;
@@ -356,7 +357,7 @@ end;
 function TThreadSafeDeque.PopBack: T;
 begin
   if not TryPopBack(Result) then
-    raise EListError.Create('Deque is empty');
+    raise EListError.Create(ERR_DEQUE_EMPTY);
 end;
 
 function TThreadSafeDeque.TryPeekFront(out AValue: T): Boolean;
@@ -377,7 +378,7 @@ end;
 function TThreadSafeDeque.PeekFront: T;
 begin
   if not TryPeekFront(Result) then
-    raise EListError.Create('Deque is empty');
+    raise EListError.Create(ERR_DEQUE_EMPTY);
 end;
 
 function TThreadSafeDeque.TryPeekBack(out AValue: T): Boolean;
@@ -401,7 +402,7 @@ end;
 function TThreadSafeDeque.PeekBack: T;
 begin
   if not TryPeekBack(Result) then
-    raise EListError.Create('Deque is empty');
+    raise EListError.Create(ERR_DEQUE_EMPTY);
 end;
 
 procedure TThreadSafeDeque.Clear;
@@ -453,7 +454,7 @@ end;
 function TThreadSafeDeque.TEnumerator.GetCurrent: T;
 begin
   if FCurrentIndex < 0 then
-    raise Exception.Create('Invalid enumerator position');
+    raise Exception.Create(ERR_INVALID_ENUMERATOR_POSITION);
   Result := FCurrent;
 end;
 
@@ -499,12 +500,12 @@ var
   I, Idx: Integer;
 begin
   if AStartIndex < 0 then
-    raise EArgumentOutOfRangeException.Create('AStartIndex must be non-negative');
+    raise EArgumentOutOfRangeException.Create(ERR_START_INDEX_NEGATIVE);
 
   FLock.Acquire;
   try
     if Length(AArray) - AStartIndex < FCount then
-      raise EArgumentException.Create('Destination array is too small');
+      raise EArgumentException.Create(ERR_ARRAY_TOO_SMALL);
 
     for I := 0 to FCount - 1 do
     begin
