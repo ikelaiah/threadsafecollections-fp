@@ -6,7 +6,8 @@ unit ThreadSafeCollections.HashSet;
 interface
 
 uses
-  Classes, SysUtils, SyncObjs, HashFunctions, TypInfo, ThreadSafeCollections.Interfaces;
+  Classes, SysUtils, SyncObjs, HashFunctions, TypInfo,
+  ThreadSafeCollections.Interfaces, ThreadSafeCollections.ErrorMessages;
 
 type
   // Function type for comparing two values of type T for equality
@@ -19,20 +20,24 @@ type
     - Uses separate chaining for collision resolution
     - Automatically resizes when load factor exceeds threshold
     - Thread-safe for all operations }
-  { 
-    TThreadSafeHashSet<T>: 
+  {
+    TThreadSafeHashSet<T>:
       A generic thread-safe hash set implementation.
-      
+
       This class manages a collection of unique items of type T, ensuring thread safety
       for concurrent operations. It utilizes separate chaining for collision resolution
       and automatically resizes the underlying bucket array when the load factor exceeds
       a predefined threshold. This implementation is suitable for scenarios requiring
       high-performance set operations in multi-threaded environments.
-      
+
       Features:
         - Separate chaining for resolving hash collisions.
         - Automatic resizing based on load factor to maintain performance.
         - Thread-safe operations for adding, removing, and searching items.
+
+      NOTE: This implementation shares common hash table patterns with ThreadSafeCollections.Dictionary.
+            Both use: bucket arrays, GetBucketIndex, Resize, CheckLoadFactor, and entry chaining.
+            Future refactoring could extract a common base class to reduce duplication.
   }
   generic TThreadSafeHashSet<T> = class(TInterfacedObject, specialize IThreadSafeHashSet<T>)
   private
@@ -759,7 +764,7 @@ end;
 function TThreadSafeHashSet.TEnumerator.GetCurrent: T;
 begin
   if FCurrentEntry = nil then
-    raise EInvalidOperation.Create('Invalid enumerator position');
+    raise EInvalidOperation.Create(ERR_INVALID_ENUMERATOR_POSITION);
   Result := FCurrentEntry^.Value;
 end;
 

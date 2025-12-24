@@ -6,7 +6,8 @@ unit ThreadSafeCollections.Deque;
 interface
 
 uses
-  Classes, SysUtils, SyncObjs, ThreadSafeCollections.Interfaces;
+  Classes, SysUtils, SyncObjs, ThreadSafeCollections.Interfaces,
+  ThreadSafeCollections.ErrorMessages;
 
 type
 
@@ -24,6 +25,12 @@ type
     of the queue without causing data corruption or race conditions.
   }
   generic TThreadSafeDeque<T> = class(TInterfacedObject, specialize IThreadSafeDeque<T>)
+  private
+    const
+      DEFAULT_INITIAL_CAPACITY = 16;  // Default number of elements to allocate initially
+      MIN_CAPACITY = 4;               // Minimum capacity for the deque (must be power of 2)
+      GROWTH_FACTOR = 2;              // Growth factor when resizing (double the capacity)
+
   private
     FLock: TCriticalSection;     // Synchronization object to ensure that deque operations are thread-safe
     FBuffer: array of T;          // v0.8: Circular array buffer for storing elements
@@ -222,7 +229,7 @@ implementation
 
 constructor TThreadSafeDeque.Create;
 begin
-  Create(16);  // v0.8: Default to reasonable initial capacity
+  Create(DEFAULT_INITIAL_CAPACITY);  // v0.8: Default to reasonable initial capacity
 end;
 
 constructor TThreadSafeDeque.Create(AInitialCapacity: Integer);
@@ -233,9 +240,9 @@ begin
   FLock := TCriticalSection.Create;
 
   // v0.8: Ensure capacity is power of 2 for efficient modulo operations
-  PowerOfTwo := 4;
+  PowerOfTwo := MIN_CAPACITY;
   while PowerOfTwo < AInitialCapacity do
-    PowerOfTwo := PowerOfTwo * 2;
+    PowerOfTwo := PowerOfTwo * GROWTH_FACTOR;
 
   FCapacity := PowerOfTwo;
   SetLength(FBuffer, FCapacity);
@@ -257,7 +264,7 @@ var
   NewBuffer: array of T;
 begin
   // v0.8: Double the capacity
-  NewCapacity := FCapacity * 2;
+  NewCapacity := FCapacity * GROWTH_FACTOR;
   SetLength(NewBuffer, NewCapacity);
 
   // Copy elements in order from old buffer to new buffer
@@ -326,7 +333,7 @@ end;
 function TThreadSafeDeque.PopFront: T;
 begin
   if not TryPopFront(Result) then
-    raise EListError.Create('Deque is empty');
+    raise EListError.Create(ERR_DEQUE_EMPTY);
 end;
 
 function TThreadSafeDeque.TryPopBack(out AValue: T): Boolean;
@@ -350,7 +357,7 @@ end;
 function TThreadSafeDeque.PopBack: T;
 begin
   if not TryPopBack(Result) then
-    raise EListError.Create('Deque is empty');
+    raise EListError.Create(ERR_DEQUE_EMPTY);
 end;
 
 function TThreadSafeDeque.TryPeekFront(out AValue: T): Boolean;
@@ -371,7 +378,7 @@ end;
 function TThreadSafeDeque.PeekFront: T;
 begin
   if not TryPeekFront(Result) then
-    raise EListError.Create('Deque is empty');
+    raise EListError.Create(ERR_DEQUE_EMPTY);
 end;
 
 function TThreadSafeDeque.TryPeekBack(out AValue: T): Boolean;
@@ -395,7 +402,7 @@ end;
 function TThreadSafeDeque.PeekBack: T;
 begin
   if not TryPeekBack(Result) then
-    raise EListError.Create('Deque is empty');
+    raise EListError.Create(ERR_DEQUE_EMPTY);
 end;
 
 procedure TThreadSafeDeque.Clear;
@@ -447,7 +454,7 @@ end;
 function TThreadSafeDeque.TEnumerator.GetCurrent: T;
 begin
   if FCurrentIndex < 0 then
-    raise Exception.Create('Invalid enumerator position');
+    raise Exception.Create(ERR_INVALID_ENUMERATOR_POSITION);
   Result := FCurrent;
 end;
 
@@ -493,12 +500,12 @@ var
   I, Idx: Integer;
 begin
   if AStartIndex < 0 then
-    raise EArgumentOutOfRangeException.Create('AStartIndex must be non-negative');
+    raise EArgumentOutOfRangeException.Create(ERR_START_INDEX_NEGATIVE);
 
   FLock.Acquire;
   try
     if Length(AArray) - AStartIndex < FCount then
-      raise EArgumentException.Create('Destination array is too small');
+      raise EArgumentException.Create(ERR_ARRAY_TOO_SMALL);
 
     for I := 0 to FCount - 1 do
     begin
@@ -524,7 +531,7 @@ begin
     begin
       RequiredCapacity := FCapacity;
       while RequiredCapacity < FCount + Length(AItems) do
-        RequiredCapacity := RequiredCapacity * 2;
+        RequiredCapacity := RequiredCapacity * GROWTH_FACTOR;
 
       // Resize to required capacity
       while FCapacity < RequiredCapacity do
@@ -557,7 +564,7 @@ begin
     begin
       RequiredCapacity := FCapacity;
       while RequiredCapacity < FCount + Length(AItems) do
-        RequiredCapacity := RequiredCapacity * 2;
+        RequiredCapacity := RequiredCapacity * GROWTH_FACTOR;
 
       // Resize to required capacity
       while FCapacity < RequiredCapacity do

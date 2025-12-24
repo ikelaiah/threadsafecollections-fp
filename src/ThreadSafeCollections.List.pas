@@ -6,7 +6,8 @@ unit ThreadSafeCollections.List;
 interface
 
 uses
-  Classes, SysUtils, SyncObjs, ThreadSafeCollections.Interfaces, Math;
+  Classes, SysUtils, SyncObjs, ThreadSafeCollections.Interfaces,
+  ThreadSafeCollections.ErrorMessages, Math;
 
 type
   // Generic comparer type
@@ -19,6 +20,16 @@ type
   // This class provides a thread-safe implementation of a generic list.
   // It allows concurrent access and modifications by multiple threads without data corruption.
   generic TThreadSafeList<T> = class(TInterfacedObject, specialize IThreadSafeList<T>)
+  private
+    const
+      DEFAULT_INITIAL_CAPACITY = 16;      // Default number of elements to allocate initially
+      MIN_CAPACITY = 4;                   // Minimum capacity for the list
+      SMALL_LIST_THRESHOLD = 64;          // Threshold for switching growth strategies
+      GROWTH_FACTOR_DOUBLE = 2;           // Growth factor for small lists (double)
+      GROWTH_FACTOR_LARGE_NUMERATOR = 3;  // Numerator for large list growth (3/2 = 1.5)
+      GROWTH_FACTOR_LARGE_DENOMINATOR = 2;// Denominator for large list growth (3/2 = 1.5)
+      ARRAY_ALIGNMENT = 16;               // Alignment boundary for small arrays
+
   private
     FList: array of T;                             // Internal dynamic array to store list items
     FCount: Integer;                               // Current number of items in the list
@@ -326,22 +337,22 @@ end;
 
 constructor TThreadSafeList.Create(AComparer: specialize TComparer<T>);
 begin
-  Create(AComparer, 16);  // v0.8: Delegate to overloaded constructor with default capacity
+  Create(AComparer, DEFAULT_INITIAL_CAPACITY);  // v0.8: Delegate to overloaded constructor with default capacity
 end;
 
 constructor TThreadSafeList.Create(AComparer: specialize TComparer<T>; AInitialCapacity: Integer);
 begin
   inherited Create;
   if not Assigned(AComparer) then
-    raise Exception.Create('Comparer must be provided');
+    raise Exception.Create(ERR_COMPARER_REQUIRED);
 
   FLock := TCriticalSection.Create;      // Initialize the critical section for thread safety
   FComparer := AComparer;                // Assign the comparer function
   FCount := 0;                           // Initialize item count
 
-  // v0.8: Use provided capacity hint or default to 16
-  if AInitialCapacity < 4 then
-    AInitialCapacity := 4;                // Minimum reasonable capacity
+  // v0.8: Use provided capacity hint or default to minimum
+  if AInitialCapacity < MIN_CAPACITY then
+    AInitialCapacity := MIN_CAPACITY;     // Minimum reasonable capacity
   FCapacity := AInitialCapacity;         // Set initial capacity
   SetLength(FList, FCapacity);           // Pre-allocate buffer to reduce early resizes
   FSorted := True;                       // Initially, the list is considered sorted
@@ -357,12 +368,12 @@ procedure TThreadSafeList.Grow;
 begin
   // v0.8: Optimized growth strategy
   if FCapacity = 0 then
-    FCapacity := 16                         // Start with reasonable initial capacity
-  else if FCapacity < 64 then
-    FCapacity := FCapacity * 2              // Double for small sizes
+    FCapacity := DEFAULT_INITIAL_CAPACITY           // Start with reasonable initial capacity
+  else if FCapacity < SMALL_LIST_THRESHOLD then
+    FCapacity := FCapacity * GROWTH_FACTOR_DOUBLE   // Double for small sizes
   else
-    FCapacity := FCapacity + (FCapacity div 2);  // Grow by 50% for larger sizes to reduce memory waste
-  SetLength(FList, FCapacity);              // Resize the internal array
+    FCapacity := FCapacity + (FCapacity div GROWTH_FACTOR_LARGE_DENOMINATOR);  // Grow by 50% for larger sizes to reduce memory waste
+  SetLength(FList, FCapacity);                      // Resize the internal array
 end;
 
 procedure TThreadSafeList.QuickSort(Left, Right: Integer; Ascending: Boolean);
@@ -427,7 +438,7 @@ begin
   FLock.Acquire;                                       // Enter critical section
   try
     if (Index < 0) or (Index >= FCount) then
-      raise Exception.Create('Index out of bounds');
+      raise Exception.Create(ERR_INDEX_OUT_OF_BOUNDS);
 
     // Shift elements to remove the item
     for I := Index to FCount - 2 do
@@ -461,7 +472,7 @@ begin
   FLock.Acquire;                                       // Enter critical section
   try
     if FCount = 0 then
-      raise Exception.Create('List is empty');
+      raise Exception.Create(ERR_LIST_EMPTY);
     Result := FList[0];                                // Return the first item
   finally
     FLock.Release;                                     // Exit critical section
@@ -473,7 +484,7 @@ begin
   FLock.Acquire;                                       // Enter critical section
   try
     if FCount = 0 then
-      raise Exception.Create('List is empty');
+      raise Exception.Create(ERR_LIST_EMPTY);
     Result := FList[FCount - 1];                       // Return the last item
   finally
     FLock.Release;                                     // Exit critical section
@@ -507,7 +518,7 @@ begin
   FLock.Acquire;                                       // Enter critical section
   try
     if (Index < 0) or (Index >= FCount) then
-      raise Exception.Create('Index out of bounds');
+      raise Exception.Create(ERR_INDEX_OUT_OF_BOUNDS);
     FList[Index] := Item;                              // Replace the item
 
     // Update the sorted flag based on neighboring elements
@@ -528,7 +539,7 @@ begin
   FLock.Acquire;                                       // Enter critical section
   try
     if (Index < 0) or (Index >= FCount) then
-      raise Exception.Create('Index out of bounds');
+      raise Exception.Create(ERR_INDEX_OUT_OF_BOUNDS);
     Result := FList[Index];                            // Retrieve the item
   finally
     FLock.Release;                                     // Exit critical section
@@ -628,7 +639,7 @@ begin
   FLock.Acquire;                                           // Enter critical section
   try
     if Value < FCount then
-      raise EArgumentOutOfRangeException.Create('Capacity cannot be less than Count');
+      raise EArgumentOutOfRangeException.Create(ERR_CAPACITY_LESS_THAN_COUNT);
 
     if Value <> FCapacity then
     begin
@@ -689,10 +700,10 @@ begin
     begin
       RequiredCapacity := NewCount;
       // Round up to avoid immediate regrowth
-      if RequiredCapacity < 64 then
-        RequiredCapacity := ((RequiredCapacity + 15) div 16) * 16  // Round to nearest 16
+      if RequiredCapacity < SMALL_LIST_THRESHOLD then
+        RequiredCapacity := ((RequiredCapacity + (ARRAY_ALIGNMENT - 1)) div ARRAY_ALIGNMENT) * ARRAY_ALIGNMENT  // Round to nearest alignment
       else
-        RequiredCapacity := ((RequiredCapacity * 3) div 2);         // 50% extra buffer
+        RequiredCapacity := ((RequiredCapacity * GROWTH_FACTOR_LARGE_NUMERATOR) div GROWTH_FACTOR_LARGE_DENOMINATOR);  // 50% extra buffer
       SetCapacity(RequiredCapacity);
     end;
 
@@ -729,7 +740,7 @@ begin
   FLock.Acquire;                                           // Enter critical section
   try
     if (Index < 0) or (Index > FCount) then
-      raise EArgumentOutOfRangeException.Create('Index out of bounds');
+      raise EArgumentOutOfRangeException.Create(ERR_INDEX_OUT_OF_BOUNDS);
 
     InsertCount := Length(Values);
     if InsertCount = 0 then
@@ -770,7 +781,7 @@ begin
   FLock.Acquire;                                           // Enter critical section
   try
     if (AIndex < 0) or (ACount < 0) or (AIndex + ACount > FCount) then
-      raise EArgumentOutOfRangeException.Create('Invalid index or count');
+      raise EArgumentOutOfRangeException.Create(ERR_INVALID_INDEX_OR_COUNT);
 
     if ACount = 0 then
       Exit;                                                 // Nothing to delete
@@ -864,7 +875,7 @@ begin
   try
     if (CurIndex < 0) or (CurIndex >= FCount) or
        (NewIndex < 0) or (NewIndex >= FCount) then
-      raise EArgumentOutOfRangeException.Create('Index out of bounds');
+      raise EArgumentOutOfRangeException.Create(ERR_INDEX_OUT_OF_BOUNDS);
 
     if CurIndex <> NewIndex then
     begin
@@ -891,7 +902,7 @@ end;
 procedure TThreadSafeList.RaiseIfOutOfBounds(Index: Integer);
 begin
   if (Index < 0) or (Index >= FCount) then
-    raise EArgumentOutOfRangeException.Create('Index out of bounds');   // Raise exception for invalid index
+    raise EArgumentOutOfRangeException.Create(ERR_INDEX_OUT_OF_BOUNDS);   // Raise exception for invalid index
 end;
 
 procedure TThreadSafeList.Insert(Index: Integer; const Item: T);
@@ -899,7 +910,7 @@ begin
   FLock.Acquire;                                               // Enter critical section
   try
     if (Index < 0) or (Index > FCount) then
-      raise EArgumentOutOfRangeException.Create('Index out of bounds');
+      raise EArgumentOutOfRangeException.Create(ERR_INDEX_OUT_OF_BOUNDS);
 
     if FCount = FCapacity then
       Grow;                                                   // Grow the list if capacity is reached
@@ -965,7 +976,7 @@ begin
   try
     Index := IndexOf(Item);                                    // Find the item's index
     if Index = -1 then
-      raise EArgumentOutOfRangeException.Create('Item not found');
+      raise EArgumentOutOfRangeException.Create(ERR_ITEM_NOT_FOUND);
     Result := FList[Index];                                    // Retrieve the item
     Delete(Index);                                             // Remove the item from the list
   finally

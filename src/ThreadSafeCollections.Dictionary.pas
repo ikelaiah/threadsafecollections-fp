@@ -21,6 +21,10 @@
   - Compatible with Delphi's TDictionary interface
   - RAII-style locking mechanism
 
+  NOTE: This implementation shares common hash table patterns with ThreadSafeCollections.HashSet.
+        Both use: bucket arrays, GetBucketIndex, Resize, CheckLoadFactor, and entry chaining.
+        Future refactoring could extract a common base class to reduce duplication.
+
   Usage example:
     var
       Dict: specialize TThreadSafeDictionary<string, integer>;
@@ -48,8 +52,9 @@ unit ThreadSafeCollections.Dictionary;
 interface
 
 uses
-  SysUtils, Classes, SyncObjs, HashFunctions, TypInfo, 
-  ThreadSafeCollections.Interfaces, Generics.Collections;
+  SysUtils, Classes, SyncObjs, HashFunctions, TypInfo,
+  ThreadSafeCollections.Interfaces, ThreadSafeCollections.ErrorMessages,
+  Generics.Collections;
 
 { 
   DEBUG_LOGGING: Global flag to control debug output
@@ -847,7 +852,7 @@ begin
     if FindEntry(Key, Hash, BucketIdx) <> nil then
     begin
       if DEBUG_LOGGING then WriteLn('Add: Found duplicate key');
-      raise Exception.Create('Duplicate key');
+      raise Exception.Create(ERR_DUPLICATE_KEY);
     end;
 
     if DEBUG_LOGGING then WriteLn('Add: Creating new entry');
@@ -1045,7 +1050,7 @@ end;
 function TThreadSafeDictionary.TEnumerator.GetCurrent: specialize TPair<TKey, TValue>;
 begin
   if FCurrentEntry = nil then
-    raise Exception.Create('Invalid enumerator position');
+    raise Exception.Create(ERR_INVALID_ENUMERATOR_POSITION);
   Result.Key := FCurrentEntry^.Key;
   Result.Value := FCurrentEntry^.Value;
 end;
@@ -1120,7 +1125,7 @@ begin
     BucketIdx := GetBucketIndex(Hash);
     Entry := FindEntry(Key, Hash, BucketIdx);
     if Entry = nil then
-      raise EKeyNotFoundException.Create('Key not found');
+      raise EKeyNotFoundException.Create(ERR_KEY_NOT_FOUND);
     Result := Entry^.Value;
   finally
     FLock.Leave;
