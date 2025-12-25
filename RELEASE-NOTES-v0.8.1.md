@@ -4,7 +4,7 @@
 
 ## Overview
 
-Version 0.8.1 is a maintainability-focused release that improves code organization, documentation quality, and developer experience while maintaining 100% backward compatibility. This release focuses on making the codebase easier to understand, maintain, and extend without changing any public APIs or behaviors.
+Version 0.8.1 is a maintainability-focused release that improves code organisation, documentation quality, and developer experience while maintaining 100% backward compatibility. This release focuses on making the codebase easier to understand, maintain, and extend without changing any public APIs or behaviours.
 
 ## 🔧 Highlights
 
@@ -141,11 +141,11 @@ All existing code continues to work without modifications.
 
 **100% backward compatible** - All changes are internal improvements:
 
-- Code organization and documentation
+- Code organisation and documentation
 - Error message consistency
 - Test suite quality
 - No API changes
-- No behavioral modifications
+- No behavioural modifications
 - No performance regressions
 
 ## 🧪 Testing

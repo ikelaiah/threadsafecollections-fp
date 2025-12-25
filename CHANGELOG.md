@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🔧 Code Maintainability Improvements
 
-This release focuses on improving code maintainability, documentation quality, and code organization while maintaining full backward compatibility.
+This release focuses on improving code maintainability, documentation quality, and code organisation while maintaining full backward compatibility.
 
 ### Added
 
@@ -79,7 +79,7 @@ This release focuses on improving code maintainability, documentation quality, a
 
 ### Backward Compatibility
 
-✅ **Fully backward compatible** - All changes are internal improvements to code organization and documentation. No API changes or behavioral modifications.
+✅ **Fully backward compatible** - All changes are internal improvements to code organisation and documentation. No API changes or behavioural modifications.
 
 ---
 
@@ -87,7 +87,7 @@ This release focuses on improving code maintainability, documentation quality, a
 
 ### 🚀 Major Performance Improvements
 
-This release focuses on significant performance optimizations across all collection types while maintaining full thread safety and backward compatibility.
+This release focuses on significant performance optimisations across all collection types while maintaining full thread safety and backward compatibility.
 
 ### Added
 
@@ -98,7 +98,7 @@ This release focuses on significant performance optimizations across all collect
 
 #### TThreadSafeDeque
 - **New constructor** `Create(AInitialCapacity)` - Allows specifying initial capacity
-- Bulk operation optimizations in `PushRangeBack` with intelligent pre-allocation
+- Bulk operation optimisations in `PushRangeBack` with intelligent pre-allocation
 
 ### Changed
 
@@ -130,7 +130,7 @@ This release focuses on significant performance optimizations across all collect
 
 - **TThreadSafeDeque**: Corrected `PushRangeFront` method to properly maintain item order when pushing multiple items to the front
   - Items are now pushed in the correct sequence so that the last item in the input array becomes the front element
-  - Ensures behavior matches sequential calls to `PushFront`
+  - Ensures behaviour matches sequential calls to `PushFront`
 
 ### Performance Impact
 
@@ -209,7 +209,7 @@ List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
 Deque := specialize TThreadSafeDeque<Integer>.Create;
 ```
 
-**After (optional optimization):**
+**After (optional optimisation):**
 ```pascal
 // Pre-allocate for 1000 items - avoids early resizes
 List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer, 1000);
@@ -218,7 +218,7 @@ Deque := specialize TThreadSafeDeque<Integer>.Create(1000);
 
 ### Deferred to Future Releases
 
-The following optimizations were considered but deferred to maintain stability:
+The following optimisations were considered but deferred to maintain stability:
 - Read-write locks (`TMultiReadExclusiveWriteSynchronizer`) - Would require extensive refactoring
 - Lock-free atomic operations for simple checks - Requires significant architecture changes
 
@@ -226,7 +226,7 @@ These features are planned for future releases.
 
 ### Testing
 
-All optimizations have been verified with the comprehensive test suite:
+All optimisations have been verified with the comprehensive test suite:
 - ✅ All existing tests pass
 - ✅ Thread safety verified with concurrent access tests
 - ✅ Memory management tested with stress tests

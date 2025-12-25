@@ -42,10 +42,10 @@ Current State:
   - Centralized error messages (14 constants)
   - Named constants replacing magic numbers
   - Zero memory leaks (100% cleanup rate)
-- ✅ **v0.8.0**: Performance optimizations implemented
+- ✅ **v0.8.0**: Performance optimisations implemented
   - Circular array-based Deque (5-10x faster)
   - Pre-allocation strategies for List
-  - Optimized hash table resizing
+  - Optimised hash table resizing
 
 Planned Features:
 
