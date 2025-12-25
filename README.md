@@ -13,14 +13,15 @@
 
 A thread-safe generic collections library for Free Pascal, designed for learning and experimentation.
 
-> [!IMPORTANT] 
-> 🚧 **Development Status**: This library is a learning/experimental project and not yet production-ready.
+> [!NOTE]
+> 📚 **Library Maturity**: This is a learning-focused project with stable core functionality.
 > 
-> For production use, please consider these mature alternatives:
+> For production applications requiring battle-tested code, consider these more mature alternatives:
 > 
 > 1. [FPC Generics.Collections](https://gitlab.com/freepascal.org/fpc/source/-/blob/main/packages/rtl-generics/src/generics.collections.pas) - Official FPC generic collections
 > 2. [FCL-STL](https://gitlab.com/freepascal.org/fpc/source/-/tree/main/packages/fcl-stl) - FPC's template library
 > 3. [LGenerics](https://github.com/avk959/LGenerics) - Comprehensive generics library
+
 
 ## 🚧 Development Status
 
