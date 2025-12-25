@@ -5,7 +5,7 @@
 [![Lazarus](https://img.shields.io/badge/Lazarus-4.0+-60A5FA.svg)](https://www.lazarus-ide.org/)
 ![Supports Windows](https://img.shields.io/badge/support-Windows-F59E0B?logo=Windows)
 ![Supports Linux](https://img.shields.io/badge/support-Linux-F59E0B?logo=Linux)
-[![Version](https://img.shields.io/badge/version-0.8.0-8B5CF6.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.8.1-8B5CF6.svg)](CHANGELOG.md)
 ![No Dependencies](https://img.shields.io/badge/dependencies-none-10B981.svg)
 [![Documentation](https://img.shields.io/badge/Docs-Available-brightgreen.svg)](docs/)
 [![Status](https://img.shields.io/badge/Status-Stable-brightgreen.svg)]()
@@ -24,7 +24,7 @@ A thread-safe generic collections library for Free Pascal, designed for learning
 
 ## 🚧 Development Status
 
-**Latest Release: v0.8.0** - Major Performance Update
+**Latest Release: v0.8.1** - Code Maintainability Update
 
 Current State:
 
@@ -36,7 +36,12 @@ Current State:
    - Thread-safe iteration with automatic lock management
    - Each iterator maintains its own lock token
 - ✅ Bulk operations support
-- ✅ **NEW in v0.8**: Performance optimizations implemented
+- ✅ **NEW in v0.8.1**: Code maintainability improvements
+  - Algorithm complexity annotations (Big-O) on all 80+ methods
+  - Centralized error messages (14 constants)
+  - Named constants replacing magic numbers
+  - Zero memory leaks (100% cleanup rate)
+- ✅ **v0.8.0**: Performance optimizations implemented
   - Circular array-based Deque (5-10x faster)
   - Pre-allocation strategies for List
   - Optimized hash table resizing
