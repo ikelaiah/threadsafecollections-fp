@@ -167,16 +167,20 @@ type
       }
       function GetNextPowerOfTwo(Value: Integer): Integer;
 
-      { 
-        GetCount: 
+      {
+        GetCount:
           Retrieves the current number of items stored in the hash set.
-          
+
           This function provides a thread-safe way to access the FCount field.
-          
+
           Returns:
             - The total number of unique items in the set.
       }
       function GetCount: Integer;
+
+      // Internal unlocked helpers — must only be called while FLock is already held.
+      function  InternalAdd(const Item: T): Boolean;
+      function  InternalRemove(const Item: T): Boolean;
 
   public
     { 
@@ -603,32 +607,63 @@ begin
   Result := Hash and (Length(FBuckets) - 1);
 end;
 
-function TThreadSafeHashSet.Add(const Item: T): Boolean;
+// Internal: add item without acquiring the lock. Caller must hold FLock.
+function TThreadSafeHashSet.InternalAdd(const Item: T): Boolean;
 var
   Hash: Cardinal;
   BucketIdx: Integer;
   Entry: PEntry;
 begin
   Result := False;
+  Hash := FHashFunction(Item);
+  BucketIdx := GetBucketIndex(Hash);
+  if FindEntry(Item, Hash, BucketIdx) <> nil then
+    Exit;
+  New(Entry);
+  Entry^.Value := Item;
+  Entry^.Hash := Hash;
+  Entry^.Next := FBuckets[BucketIdx];
+  FBuckets[BucketIdx] := Entry;
+  Inc(FCount);
+  CheckLoadFactor;
+  Result := True;
+end;
+
+// Internal: remove item without acquiring the lock. Caller must hold FLock.
+function TThreadSafeHashSet.InternalRemove(const Item: T): Boolean;
+var
+  Hash: Cardinal;
+  BucketIdx: Integer;
+  Current, Previous: PEntry;
+begin
+  Result := False;
+  Hash := FHashFunction(Item);
+  BucketIdx := GetBucketIndex(Hash);
+  Current := FBuckets[BucketIdx];
+  Previous := nil;
+  while Current <> nil do
+  begin
+    if (Current^.Hash = Hash) and FEqualityComparer(Current^.Value, Item) then
+    begin
+      if Previous = nil then
+        FBuckets[BucketIdx] := Current^.Next
+      else
+        Previous^.Next := Current^.Next;
+      Dispose(Current);
+      Dec(FCount);
+      Result := True;
+      Exit;
+    end;
+    Previous := Current;
+    Current := Current^.Next;
+  end;
+end;
+
+function TThreadSafeHashSet.Add(const Item: T): Boolean;
+begin
   FLock.Acquire;
   try
-    Hash := FHashFunction(Item);
-    BucketIdx := GetBucketIndex(Hash);
-    
-    // Check if item already exists
-    if FindEntry(Item, Hash, BucketIdx) <> nil then
-      Exit;
-
-    // Add new entry
-    New(Entry);
-    Entry^.Value := Item;
-    Entry^.Hash := Hash;
-    Entry^.Next := FBuckets[BucketIdx];
-    FBuckets[BucketIdx] := Entry;
-    Inc(FCount);
-    
-    CheckLoadFactor;
-    Result := True;
+    Result := InternalAdd(Item);
   finally
     FLock.Release;
   end;
@@ -650,37 +685,10 @@ begin
 end;
 
 function TThreadSafeHashSet.Remove(const Item: T): Boolean;
-var
-  Hash: Cardinal;
-  BucketIdx: Integer;
-  Current, Previous: PEntry;
 begin
-  Result := False;
   FLock.Acquire;
   try
-    Hash := FHashFunction(Item);
-    BucketIdx := GetBucketIndex(Hash);
-    
-    Current := FBuckets[BucketIdx];
-    Previous := nil;
-    
-    while Current <> nil do
-    begin
-      if (Current^.Hash = Hash) and FEqualityComparer(Current^.Value, Item) then
-      begin
-        if Previous = nil then
-          FBuckets[BucketIdx] := Current^.Next
-        else
-          Previous^.Next := Current^.Next;
-          
-        Dispose(Current);
-        Dec(FCount);
-        Result := True;
-        Exit;
-      end;
-      Previous := Current;
-      Current := Current^.Next;
-    end;
+    Result := InternalRemove(Item);
   finally
     FLock.Release;
   end;
@@ -936,11 +944,9 @@ begin
         Resize(RequiredBuckets);
     end;
 
-    // Add items
+    // Add items — use internal helper, lock already held
     for I := Low(Items) to High(Items) do
-    begin
-      Add(Items[I]); // Add will handle duplicates
-    end;
+      InternalAdd(Items[I]);
   finally
     FLock.Release;
   end;
@@ -968,11 +974,12 @@ begin
   Result := 0;
   if Length(Items) = 0 then
     Exit;
-    
+
   FLock.Acquire;
   try
+    // Use internal helper — lock already held
     for I := Low(Items) to High(Items) do
-      if Remove(Items[I]) then
+      if InternalRemove(Items[I]) then
         Inc(Result);
   finally
     FLock.Release;
@@ -1017,7 +1024,9 @@ procedure TThreadSafeHashSet.IntersectWith(const Collection: specialize IThreadS
 var
   ToRemove: _TArray;
   CurrentArray: _TArray;
-  I: Integer;
+  RemoveCount, I, J, BucketIdx: Integer;
+  Entry: PEntry;
+  FoundInOther: Boolean;
 begin
   if Collection = nil then
   begin
@@ -1025,18 +1034,46 @@ begin
     Exit;
   end;
 
+  // Snapshot the other collection BEFORE acquiring our own lock to avoid the
+  // ABBA lock-order deadlock that would occur if two threads simultaneously
+  // called A.IntersectWith(B) and B.IntersectWith(A).
+  CurrentArray := Collection.ToArray;
+
   FLock.Acquire;
   try
-    CurrentArray := ToArray;
-    SetLength(ToRemove, Length(CurrentArray));
-    
-    // Find items to remove (those not in other collection)
-    for I := 0 to Length(CurrentArray) - 1 do
-      if not Collection.Contains(CurrentArray[I]) then
-        ToRemove[I] := CurrentArray[I];
-        
-    // Remove items not in intersection
-    RemoveRange(ToRemove);
+    // Collect items from Self that are not present in Collection.
+    // We have a snapshot of Collection; check membership against it using our
+    // own hash/equality functions by scanning the snapshot linearly.
+    // Note: we cannot call Collection.Contains here while holding FLock because
+    // that would re-introduce the ABBA risk on the Collection's lock.
+    SetLength(ToRemove, FCount);
+    RemoveCount := 0;
+
+    for BucketIdx := 0 to Length(FBuckets) - 1 do
+    begin
+      Entry := FBuckets[BucketIdx];
+      while Entry <> nil do
+      begin
+        // Check if this entry's value exists in the snapshot
+        FoundInOther := False;
+        for J := 0 to Length(CurrentArray) - 1 do
+          if FEqualityComparer(Entry^.Value, CurrentArray[J]) then
+          begin
+            FoundInOther := True;
+            Break;
+          end;
+        if not FoundInOther then
+        begin
+          ToRemove[RemoveCount] := Entry^.Value;
+          Inc(RemoveCount);
+        end;
+        Entry := Entry^.Next;
+      end;
+    end;
+
+    // Remove only the items we actually want to remove — use internal helper
+    for I := 0 to RemoveCount - 1 do
+      InternalRemove(ToRemove[I]);
   finally
     FLock.Release;
   end;

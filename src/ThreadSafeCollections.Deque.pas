@@ -406,15 +406,20 @@ begin
 end;
 
 procedure TThreadSafeDeque.Clear;
+var
+  I: Integer;
 begin
   FLock.Acquire;
   try
-    // v0.8: Simply reset indices - no need to free individual nodes
+    // Reset all slots to Default(T) via element-wise assignment so that managed
+    // types (string, interface, dynamic array, etc.) have their reference counts
+    // decremented correctly. FillChar must not be used here because it bypasses
+    // the reference-counting mechanism and would cause memory leaks or double-frees.
+    for I := 0 to FCapacity - 1 do
+      FBuffer[I] := Default(T);
     FHead := 0;
     FTail := 0;
     FCount := 0;
-    // Clear buffer to release any references (for managed types)
-    FillChar(FBuffer[0], FCapacity * SizeOf(T), 0);
   finally
     FLock.Release;
   end;
@@ -520,25 +525,33 @@ end;
 procedure TThreadSafeDeque.PushRangeBack(const AItems: array of T);
 var
   I, RequiredCapacity: Integer;
+  NewBuffer: array of T;
+  Idx: Integer;
 begin
   if Length(AItems) = 0 then
     Exit;
 
   FLock.Acquire;
   try
-    // v0.8: Pre-allocate capacity if needed
     if FCount + Length(AItems) > FCapacity then
     begin
+      // Compute target capacity in one step (power-of-2 doubling), then resize once.
       RequiredCapacity := FCapacity;
       while RequiredCapacity < FCount + Length(AItems) do
         RequiredCapacity := RequiredCapacity * GROWTH_FACTOR;
-
-      // Resize to required capacity
-      while FCapacity < RequiredCapacity do
-        Grow;
+      // Single resize to RequiredCapacity (no repeated full-copy Grow calls)
+      SetLength(NewBuffer, RequiredCapacity);
+      for I := 0 to FCount - 1 do
+      begin
+        Idx := (FHead + I) and (FCapacity - 1);
+        NewBuffer[I] := FBuffer[Idx];
+      end;
+      FBuffer := NewBuffer;
+      FCapacity := RequiredCapacity;
+      FHead := 0;
+      FTail := FCount;
     end;
 
-    // Add items efficiently
     for I := Low(AItems) to High(AItems) do
     begin
       FBuffer[FTail] := AItems[I];
@@ -553,25 +566,33 @@ end;
 procedure TThreadSafeDeque.PushRangeFront(const AItems: array of T);
 var
   I, RequiredCapacity: Integer;
+  NewBuffer: array of T;
+  Idx: Integer;
 begin
   if Length(AItems) = 0 then
     Exit;
 
   FLock.Acquire;
   try
-    // v0.8: Pre-allocate capacity if needed
     if FCount + Length(AItems) > FCapacity then
     begin
+      // Compute target capacity in one step, then resize once.
       RequiredCapacity := FCapacity;
       while RequiredCapacity < FCount + Length(AItems) do
         RequiredCapacity := RequiredCapacity * GROWTH_FACTOR;
-
-      // Resize to required capacity
-      while FCapacity < RequiredCapacity do
-        Grow;
+      SetLength(NewBuffer, RequiredCapacity);
+      for I := 0 to FCount - 1 do
+      begin
+        Idx := (FHead + I) and (FCapacity - 1);
+        NewBuffer[I] := FBuffer[Idx];
+      end;
+      FBuffer := NewBuffer;
+      FCapacity := RequiredCapacity;
+      FHead := 0;
+      FTail := FCount;
     end;
 
-    // Push in forward order - each push makes the new item the front element
+    // Push in forward order — each push prepends, making it the new front element
     for I := Low(AItems) to High(AItems) do
     begin
       FHead := (FHead - 1 + FCapacity) and (FCapacity - 1);

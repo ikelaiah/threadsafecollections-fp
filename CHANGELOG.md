@@ -5,6 +5,80 @@ All notable changes to ThreadSafeCollections-FP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-04-10
+
+### Fixed
+
+#### Critical — Deadlocks (Re-entrant Lock)
+
+Free Pascal's `TCriticalSection` is not re-entrant on POSIX platforms. Several public
+methods were acquiring the lock and then calling other public methods that also acquire it,
+causing deadlocks on Linux/macOS. Fixed by introducing private internal helpers
+(`InternalAdd`, `InternalDelete`, `InternalIndexOf`, `InternalSetCapacity`,
+`InternalRemove`) that operate without re-acquiring the lock, and having the public
+locked methods call them.
+
+- **List** — `Extract`, `ExtractAt`, `AddRange(array)`, `InsertRange`, `FromArray`, `TrimExcess`:
+  all called `IndexOf`, `Delete`, or `SetCapacity` while holding the lock.
+- **HashSet** — `AddRange(array)`, `RemoveRange(array)`: called `Add`/`Remove` inside a held lock.
+- **Dictionary** — `AddOrSetValue`, `AddRange(array)`: called `Add` inside a held lock.
+- **Dictionary `TEnumerator.MoveNext`**: acquired `FLock` even though the enumerator
+  already holds it for its lifetime via `FLockToken` — double-lock deadlock on POSIX.
+
+#### Critical — Memory Safety with Managed Types
+
+- **List `ToArray`**, **`FromArray`**, **`InsertRange`**, **`DeleteRange`**, **`MoveItem`**,
+  **`Insert`**, **`Delete`**: replaced raw `Move()` / `System.Move()` with element-wise
+  assignment so that managed types (`string`, `interface`, dynamic arrays) have their
+  reference counts maintained correctly. Raw `Move` was bypassing the reference-counting
+  mechanism, leading to use-after-free or double-free for `TThreadSafeList<string>`.
+  Vacated slots are now zeroed via `Default(T)` to release references.
+- **Deque `Clear`**: replaced `FillChar` (which bypasses refcounting) with element-wise
+  `FBuffer[I] := Default(T)` assignment.
+
+#### High — Cross-Collection ABBA Deadlock
+
+- **HashSet `IntersectWith`**: previously acquired `Self`'s lock then called
+  `Collection.Contains`, which would acquire the *other* collection's lock.
+  Two simultaneous calls `A.IntersectWith(B)` and `B.IntersectWith(A)` produced a
+  classic ABBA deadlock. Fixed by snapshotting the other collection via `ToArray`
+  *before* acquiring `Self`'s lock.
+
+#### High — `IntersectWith` Incorrect Removal
+
+- **HashSet `IntersectWith`**: the `ToRemove` array was pre-allocated to full size;
+  unmatched slots remained `Default(T)`, so `RemoveRange` could accidentally remove
+  the zero-value or empty-string item from the set. Fixed by iterating the live buckets
+  directly and collecting only real items to remove, with an exact count.
+
+#### Medium — Correctness
+
+- **List `IntegerComparer`**: `Result := A - B` overflows for `A = MaxInt, B < 0`.
+  Replaced with safe three-way comparison.
+- **List `Sort`**: `FSorted` was always set to `True` regardless of sort direction,
+  making `IsSorted` meaningless after a descending sort. Now `FSorted := Ascending`.
+
+#### Low — Correctness
+
+- **HashFunctions `XXHash32`**: `Data := @Key[1]` formed an invalid pointer when
+  `Key = ''`. Added an early-exit guard that runs the finalisation mix and returns
+  without dereferencing `Key[1]`.
+
+#### Low — Code Quality
+
+- **Dictionary**: removed ~20 `if DEBUG_LOGGING then WriteLn(...)` dead-code blocks
+  (compile-time constant `DEBUG_LOGGING = False` was never enabled in production).
+  Removed the `DEBUG_LOGGING` constant itself.
+- **Dictionary**: standardised all locking calls from `FLock.Enter`/`FLock.Leave`
+  to `FLock.Acquire`/`FLock.Release`, consistent with List, Deque, and HashSet.
+
+#### Performance
+
+- **Deque `PushRangeBack` / `PushRangeFront`**: previously computed the target
+  capacity in an outer loop but then called `Grow` (which copies the full buffer each
+  time) in a second inner loop — O(n·k) copies for k doublings. Now computes the
+  required capacity in one pass and allocates a single new buffer, reducing to O(n).
+
 ## [0.8.1] - 2025-12-25
 
 ### 🔧 Code Maintainability Improvements

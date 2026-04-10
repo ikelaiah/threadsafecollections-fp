@@ -3,7 +3,7 @@
 {       Thread-safe Dictionary Implementation           }
 {                                                       }
 {       Copyright (C) 2024                              }
-{       Version: 0.5                                    }
+{       Version: 0.8.2                                  }
 {                                                       }
 {*******************************************************}
 
@@ -56,13 +56,6 @@ uses
   ThreadSafeCollections.Interfaces, ThreadSafeCollections.ErrorMessages,
   Generics.Collections;
 
-{ 
-  DEBUG_LOGGING: Global flag to control debug output
-  - When True: Outputs detailed operation logs
-  - When False: No debug output (use for production)
-}
-const
-  DEBUG_LOGGING = False;
 
 type
   { EKeyNotFoundException
@@ -132,20 +125,22 @@ type
         Next: PEntry;                      // Pointer to the next entry in the same bucket (in case of hash collisions)
       end;
 
-      // TEnumerator is a helper class to enable iteration over the dictionary's key-value pairs
+      // TEnumerator is a helper class to enable iteration over the dictionary's key-value pairs.
+      // It takes a snapshot of all entries at construction time so that modifications to the
+      // dictionary during iteration do not cause access violations or corrupt the traversal.
       TEnumerator = class
       private
-        FDictionary: TThreadSafeDictionary;          // Reference to the dictionary being enumerated
-        FCurrentBucket: Integer;                     // Index of the current bucket being iterated
-        FCurrentEntry: PEntry;                       // Pointer to the current entry in the bucket
-        FLockToken: ILockToken;                      // Token for managing thread-safe access during enumeration
+        type
+          TSnapshot = array of specialize TPair<TKey, TValue>;
+      private
+        FSnapshot: TSnapshot;                        // Snapshot of key-value pairs taken at construction
+        FSnapshotIndex: Integer;                     // Current position in the snapshot (-1 = before first)
 
         // Retrieves the current key-value pair
         function GetCurrent: specialize TPair<TKey, TValue>;
 
-
       public
-        // Constructor initializes the enumerator with a reference to the dictionary
+        // Constructor initializes the enumerator and snapshots the dictionary contents
         constructor Create(ADictionary: TThreadSafeDictionary);
 
         // Destructor cleans up any resources
@@ -262,9 +257,11 @@ type
     function CompareKeys(const Left, Right: TKey): Boolean;
 
     // Private helper methods
-    function GetCount: Integer;  // Add this for interface
+    function GetCount: Integer;
+    procedure SetItem(const Key: TKey; const Value: TValue);
 
-    procedure SetItem(const Key: TKey; const Value: TValue);  // Add this for interface
+    // Internal unlocked helper — must only be called while FLock is already held.
+    procedure InternalAdd(const Key: TKey; const Value: TValue);
 
   public
     { Create
@@ -690,11 +687,11 @@ end;
 
 function TThreadSafeDictionary.GetBucketCount: integer;
 begin
-  FLock.Enter;
+  FLock.Acquire;
   try
     Result := Length(FBuckets);
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -704,7 +701,7 @@ var
   MinRequired: integer;
   AdjustedSize: integer;
 begin
-  FLock.Enter;
+  FLock.Acquire;
   try
     // Calculate minimum size needed for current items
     MinRequired := Trunc(FCount / LOAD_FACTOR) + 1;
@@ -717,15 +714,10 @@ begin
     
     // Adjust to next power of 2 and ensure minimum
     AdjustedSize := GetNextPowerOfTwo(NewSize);
-    
-    if DEBUG_LOGGING then
-      WriteLn(Format('ResizeBuckets: Adjusting requested size %d to %d',
-          [NewSize, AdjustedSize]));
-    
     // Perform the resize
     Resize(AdjustedSize);
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -752,24 +744,14 @@ end;
 
 function TThreadSafeDictionary.GetBucketIndex(Hash: cardinal): integer;
 begin
-  if DEBUG_LOGGING then WriteLn(
-      Format('DEBUG: GetBucketIndex - Hash: %d, Buckets Length: %d',
-      [Hash, Length(FBuckets)]));
   Result := Hash and (Length(FBuckets) - 1);
-  if DEBUG_LOGGING then WriteLn(Format('DEBUG: GetBucketIndex - Result: %d', [Result]));
 end;
 
 
 procedure TThreadSafeDictionary.CheckLoadFactor;
 begin
-  if DEBUG_LOGGING then WriteLn(Format('CheckLoadFactor: Current ratio: %f',
-      [FCount / Length(FBuckets)]));
   if (FCount / Length(FBuckets)) > LOAD_FACTOR then
-  begin
-    if DEBUG_LOGGING then WriteLn('CheckLoadFactor: Resizing needed');
     Resize(Length(FBuckets) * 2);
-    if DEBUG_LOGGING then WriteLn('CheckLoadFactor: Resize complete');
-  end;
 end;
 
 
@@ -779,9 +761,6 @@ var
   Entry, Next: PEntry;
   I, NewBucketIdx: integer;
 begin
-  if DEBUG_LOGGING then WriteLn(Format('Resize: Starting resize from %d to %d',
-      [Length(FBuckets), NewSize]));
-
   // Store old buckets and create new array
   OldBuckets := FBuckets;
   SetLength(FBuckets, NewSize);
@@ -808,8 +787,6 @@ begin
       Entry := Next;  // Move to next entry in original chain
     end;
   end;
-
-  if DEBUG_LOGGING then WriteLn('Resize: Complete');
 end;
 
 
@@ -829,46 +806,34 @@ begin
 end;
 
 
-procedure TThreadSafeDictionary.Add(const Key: TKey; const Value: TValue);
+// Internal: add key-value pair without acquiring the lock. Caller must hold FLock.
+procedure TThreadSafeDictionary.InternalAdd(const Key: TKey; const Value: TValue);
 var
   Hash: cardinal;
   BucketIdx: integer;
   NewEntry: PEntry;
 begin
-  if DEBUG_LOGGING then WriteLn('Add: Before lock');
-  FLock.Enter;
-  if DEBUG_LOGGING then WriteLn('Add: Lock acquired');
+  Hash := GetHashValue(Key);
+  BucketIdx := GetBucketIndex(Hash);
+  if FindEntry(Key, Hash, BucketIdx) <> nil then
+    raise Exception.Create(ERR_DUPLICATE_KEY);
+  New(NewEntry);
+  NewEntry^.Key := Key;
+  NewEntry^.Value := Value;
+  NewEntry^.Hash := Hash;
+  NewEntry^.Next := FBuckets[BucketIdx];
+  FBuckets[BucketIdx] := NewEntry;
+  Inc(FCount);
+  CheckLoadFactor;
+end;
+
+procedure TThreadSafeDictionary.Add(const Key: TKey; const Value: TValue);
+begin
+  FLock.Acquire;
   try
-    if DEBUG_LOGGING then WriteLn(Format('DEBUG: Add - Current bucket array size: %d',
-        [Length(FBuckets)]));
-    Hash := GetHashValue(Key);
-    if DEBUG_LOGGING then WriteLn(Format('Add: Raw hash value: %d', [integer(Hash)]));
-    Hash := Hash and $7FFFFFFF;  // Double-check positive value
-    if DEBUG_LOGGING then WriteLn(Format('Add: Masked hash value: %d', [integer(Hash)]));
-
-    BucketIdx := GetBucketIndex(Hash);
-    if DEBUG_LOGGING then WriteLn(Format('Add: Got bucket index: %d', [BucketIdx]));
-
-    if FindEntry(Key, Hash, BucketIdx) <> nil then
-    begin
-      if DEBUG_LOGGING then WriteLn('Add: Found duplicate key');
-      raise Exception.Create(ERR_DUPLICATE_KEY);
-    end;
-
-    if DEBUG_LOGGING then WriteLn('Add: Creating new entry');
-    New(NewEntry);
-    NewEntry^.Key := Key;
-    NewEntry^.Value := Value;
-    NewEntry^.Hash := Hash;  // Store the masked hash
-
-    NewEntry^.Next := FBuckets[BucketIdx];
-    FBuckets[BucketIdx] := NewEntry;
-
-    Inc(FCount);
-    CheckLoadFactor;
+    InternalAdd(Key, Value);
   finally
-    if DEBUG_LOGGING then WriteLn('Add: Releasing lock');
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -879,7 +844,7 @@ var
   Entry, Prev: PEntry;
 begin
   Result := False;
-  FLock.Enter;
+  FLock.Acquire;
   try
     Hash := GetHashValue(Key);
     BucketIdx := GetBucketIndex(Hash);
@@ -905,7 +870,7 @@ begin
       Entry := Entry^.Next;
     end;
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -915,7 +880,7 @@ var
   BucketIdx: Integer;
   Entry: PEntry;
 begin
-  FLock.Enter;
+  FLock.Acquire;
   try
     Hash := GetHashValue(Key);
     BucketIdx := GetBucketIndex(Hash);
@@ -923,9 +888,9 @@ begin
     if Entry <> nil then
       Entry^.Value := Value
     else
-      Add(Key, Value);
+      InternalAdd(Key, Value);  // Use internal helper — lock already held
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -935,7 +900,7 @@ var
   I: integer;
 begin
   Result := False;
-  FLock.Enter;
+  FLock.Acquire;
   try
     for I := 0 to Length(FBuckets) - 1 do
       if FBuckets[I] <> nil then
@@ -946,7 +911,7 @@ begin
         Exit;
       end;
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -955,7 +920,7 @@ var
   I: integer;
 begin
   Result := False;
-  FLock.Enter;
+  FLock.Acquire;
   try
     for I := Length(FBuckets) - 1 downto 0 do
       if FBuckets[I] <> nil then
@@ -966,7 +931,7 @@ begin
         Exit;
       end;
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -975,7 +940,7 @@ var
   I: integer;
   Entry, Next: PEntry;
 begin
-  FLock.Enter;
+  FLock.Acquire;
   try
     for I := 0 to Length(FBuckets) - 1 do
     begin
@@ -990,18 +955,18 @@ begin
     end;
     FCount := 0;
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
 
 function TThreadSafeDictionary.Count: integer;
 begin
-  FLock.Enter;
+  FLock.Acquire;
   try
     Result := FCount;
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -1012,7 +977,7 @@ var
   BucketIdx: integer;
   Entry: PEntry;
 begin
-  FLock.Enter;
+  FLock.Acquire;
   try
     Hash := GetHashValue(Key);
     BucketIdx := GetBucketIndex(Hash);
@@ -1026,62 +991,61 @@ begin
     else
       Result := False;
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
 { TThreadSafeDictionary.TEnumerator }
 
 constructor TThreadSafeDictionary.TEnumerator.Create(ADictionary: TThreadSafeDictionary);
+var
+  LockToken: ILockToken;
+  BucketIdx, SnapCount: Integer;
+  Entry: PEntry;
 begin
   inherited Create;
-  FDictionary := ADictionary;
-  FCurrentBucket := -1;  // Start before first bucket
-  FCurrentEntry := nil;
-  FLockToken := FDictionary.Lock;
+  FSnapshotIndex := -1;
+
+  // Acquire lock only long enough to copy all entries into a snapshot.
+  // Releasing it immediately means concurrent modifications during iteration
+  // are allowed but will not cause dangling-pointer access violations.
+  LockToken := ADictionary.Lock;
+  try
+    SetLength(FSnapshot, ADictionary.FCount);
+    SnapCount := 0;
+    for BucketIdx := 0 to Length(ADictionary.FBuckets) - 1 do
+    begin
+      Entry := ADictionary.FBuckets[BucketIdx];
+      while Entry <> nil do
+      begin
+        FSnapshot[SnapCount].Key   := Entry^.Key;
+        FSnapshot[SnapCount].Value := Entry^.Value;
+        Inc(SnapCount);
+        Entry := Entry^.Next;
+      end;
+    end;
+    SetLength(FSnapshot, SnapCount);
+  finally
+    LockToken := nil; // Release lock — snapshot is self-contained
+  end;
 end;
 
 destructor TThreadSafeDictionary.TEnumerator.Destroy;
 begin
-  FLockToken := nil; // Release lock
   inherited;
 end;
 
 function TThreadSafeDictionary.TEnumerator.GetCurrent: specialize TPair<TKey, TValue>;
 begin
-  if FCurrentEntry = nil then
+  if (FSnapshotIndex < 0) or (FSnapshotIndex >= Length(FSnapshot)) then
     raise Exception.Create(ERR_INVALID_ENUMERATOR_POSITION);
-  Result.Key := FCurrentEntry^.Key;
-  Result.Value := FCurrentEntry^.Value;
+  Result := FSnapshot[FSnapshotIndex];
 end;
 
 function TThreadSafeDictionary.TEnumerator.MoveNext: Boolean;
 begin
-  Result := False;
-  FDictionary.FLock.Enter;
-  try
-    // If we have more entries in current bucket
-    if (FCurrentEntry <> nil) and (FCurrentEntry^.Next <> nil) then
-    begin
-      FCurrentEntry := FCurrentEntry^.Next;
-      Result := True;
-      Exit;
-    end;
-
-    // Find next non-empty bucket
-    while FCurrentBucket < Length(FDictionary.FBuckets) - 1 do
-    begin
-      Inc(FCurrentBucket);
-      if FDictionary.FBuckets[FCurrentBucket] <> nil then
-      begin
-        FCurrentEntry := FDictionary.FBuckets[FCurrentBucket];
-        Result := True;
-        Exit;
-      end;
-    end;
-  finally
-    FDictionary.FLock.Leave;
-  end;
+  Inc(FSnapshotIndex);
+  Result := FSnapshotIndex < Length(FSnapshot);
 end;
 
 function TThreadSafeDictionary.GetEnumerator: TEnumerator;
@@ -1105,11 +1069,11 @@ end;
 
 function TThreadSafeDictionary.GetCount: Integer;
 begin
-  FLock.Enter;
+  FLock.Acquire;
   try
     Result := FCount;
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -1119,7 +1083,7 @@ var
   BucketIdx: Integer;
   Entry: PEntry;
 begin
-  FLock.Enter;
+  FLock.Acquire;
   try
     Hash := GetHashValue(Key);
     BucketIdx := GetBucketIndex(Hash);
@@ -1128,7 +1092,7 @@ begin
       raise EKeyNotFoundException.Create(ERR_KEY_NOT_FOUND);
     Result := Entry^.Value;
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -1142,13 +1106,13 @@ var
   Hash: Cardinal;
   BucketIdx: Integer;
 begin
-  FLock.Enter;
+  FLock.Acquire;
   try
     Hash := GetHashValue(Key);
     BucketIdx := GetBucketIndex(Hash);
     Result := FindEntry(Key, Hash, BucketIdx) <> nil;
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -1158,7 +1122,7 @@ var
   Entry: PEntry;
   Index: Integer;
 begin
-  FLock.Enter;
+  FLock.Acquire;
   try
     SetLength(Result, FCount);
     Index := 0;
@@ -1173,7 +1137,7 @@ begin
       end;
     end;
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -1183,7 +1147,7 @@ var
   Entry: PEntry;
   Index: Integer;
 begin
-  FLock.Enter;
+  FLock.Acquire;
   try
     SetLength(Result, FCount);
     Index := 0;
@@ -1198,7 +1162,7 @@ begin
       end;
     end;
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -1206,13 +1170,13 @@ procedure TThreadSafeDictionary.TrimExcess;
 var
   NewSize: Integer;
 begin
-  FLock.Enter;
+  FLock.Acquire;
   try
     NewSize := GetNextPowerOfTwo(Trunc(FCount / LOAD_FACTOR) + 1);
     if NewSize < Length(FBuckets) then
       Resize(NewSize);
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -1223,7 +1187,7 @@ var
   NewEntry: PEntry;
 begin
   Result := False;
-  FLock.Enter;
+  FLock.Acquire;
   try
     Hash := GetHashValue(Key);
     BucketIdx := GetBucketIndex(Hash);
@@ -1242,7 +1206,7 @@ begin
     CheckLoadFactor;
     Result := True;
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -1272,11 +1236,14 @@ end;
 procedure TThreadSafeDictionary.AddRange(const AArray: specialize TPairArray<TKey, TValue>);
 var
   I, NewCount, RequiredBuckets: Integer;
+  Hash: Cardinal;
+  BucketIdx: Integer;
+  Entry: PEntry;
 begin
   if Length(AArray) = 0 then
     Exit;
 
-  FLock.Enter;
+  FLock.Acquire;
   try
     NewCount := FCount + Length(AArray);
 
@@ -1288,11 +1255,19 @@ begin
       Resize(RequiredBuckets);
     end;
 
-    // Add all items
+    // Add all items — inline AddOrSetValue logic to avoid re-acquiring the lock
     for I := Low(AArray) to High(AArray) do
-      AddOrSetValue(AArray[I].Key, AArray[I].Value);
+    begin
+      Hash := GetHashValue(AArray[I].Key);
+      BucketIdx := GetBucketIndex(Hash);
+      Entry := FindEntry(AArray[I].Key, Hash, BucketIdx);
+      if Entry <> nil then
+        Entry^.Value := AArray[I].Value
+      else
+        InternalAdd(AArray[I].Key, AArray[I].Value);
+    end;
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -1302,7 +1277,7 @@ var
   Entry: PEntry;
   Index: Integer;
 begin
-  FLock.Enter;
+  FLock.Acquire;
   try
     SetLength(Result, FCount);
     Index := 0;
@@ -1318,7 +1293,7 @@ begin
       end;
     end;
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 
@@ -1342,11 +1317,11 @@ end;
 
 function TThreadSafeDictionary.ContainsValue(const Value: TValue): Boolean;
 begin
-  FLock.Enter;
+  FLock.Acquire;
   try
     Result := FindValue(Value);
   finally
-    FLock.Leave;
+    FLock.Release;
   end;
 end;
 

@@ -34,26 +34,43 @@ function DefaultHash(const Key): Cardinal;
 
 implementation
 
+// All hash functions use intentional modular (wrap-around) 32-bit arithmetic.
+// Disable range checking for this entire unit so FPC does not raise ERangeError
+// on overflow, which is expected and correct behaviour for hash mixing.
+{$PUSH}
+{$R-}
+
 const
   // XXHash constants
-  PRIME32_1 = 2654435761;
-  PRIME32_2 = 2246822519;
-  PRIME32_3 = 3266489917;
-  PRIME32_4 = 668265263;
-  PRIME32_5 = 374761393;
+  PRIME32_1: Cardinal = 2654435761;
+  PRIME32_2: Cardinal = 2246822519;
+  PRIME32_3: Cardinal = 3266489917;
+  PRIME32_4: Cardinal = 668265263;
+  PRIME32_5: Cardinal = 374761393;
 
   // FNV constants
-  FNV_PRIME = 16777619;
-  FNV_OFFSET_BASIS = 2166136261;
+  FNV_PRIME:         Cardinal = 16777619;
+  FNV_OFFSET_BASIS:  Cardinal = 2166136261;
 
 function XXHash32(const Key: string): Cardinal;
 var
-  I, Len: Integer;
+  Len: Integer;
   H32: Cardinal;
   Data: PByte;
 begin
   Len := Length(Key);
   H32 := PRIME32_5;
+  if Len = 0 then
+  begin
+    // Finalization mix for empty string
+    H32 := H32 xor (H32 shr 15);
+    H32 := H32 * PRIME32_2;
+    H32 := H32 xor (H32 shr 13);
+    H32 := H32 * PRIME32_3;
+    H32 := H32 xor (H32 shr 16);
+    Result := H32;
+    Exit;
+  end;
   Data := @Key[1];
 
   // Process 4 bytes at a time
@@ -100,7 +117,7 @@ end;
 
 function MultiplicativeHash(Key: Cardinal): Cardinal;
 const
-  GOLDEN_RATIO = 2654435769;  // 2^32 * (sqrt(5)-1)/2
+  GOLDEN_RATIO: Cardinal = 2654435769;  // 2^32 * (sqrt(5)-1)/2
 begin
   Result := Key * GOLDEN_RATIO;
 end;
@@ -111,15 +128,17 @@ var
   Size: Integer;
   I: Integer;
 begin
-  Result := 2166136261; // FNV offset basis
+  Result := FNV_OFFSET_BASIS;
   Data := @Key;
   Size := SizeOf(Key);
-  
+
   for I := 0 to Size - 1 do
   begin
     Result := Result xor Data[I];
-    Result := Result * 16777619; // FNV prime
+    Result := Result * FNV_PRIME;
   end;
 end;
+
+{$POP}
 
 end.
