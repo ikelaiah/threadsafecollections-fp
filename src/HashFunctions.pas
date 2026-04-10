@@ -54,15 +54,16 @@ const
 
 function XXHash32(const Key: string): Cardinal;
 var
-  Len: Integer;
-  H32: Cardinal;
+  Len, OriginalLen: Integer;
+  H32, V1, V2, V3, V4: Cardinal;
   Data: PByte;
 begin
-  Len := Length(Key);
-  H32 := PRIME32_5;
+  OriginalLen := Length(Key);
+  Len := OriginalLen;
+
   if Len = 0 then
   begin
-    // Finalization mix for empty string
+    H32 := PRIME32_5;
     H32 := H32 xor (H32 shr 15);
     H32 := H32 * PRIME32_2;
     H32 := H32 xor (H32 shr 13);
@@ -71,29 +72,96 @@ begin
     Result := H32;
     Exit;
   end;
+
   Data := @Key[1];
 
-  // Process 4 bytes at a time
-  while Len >= 4 do
+  if Len >= 16 then
   begin
-    H32 := H32 + PLongWord(Data)^ * PRIME32_3;
-    H32 := (H32 shl 17) or (H32 shr 15);
-    H32 := H32 * PRIME32_4;
-    Inc(Data, 4);
-    Dec(Len, 4);
+    // 4-lane main loop: processes 16 bytes per iteration across four independent
+    // accumulators, allowing the CPU to pipeline all four multiply+rotate chains.
+    V1 := PRIME32_1 + PRIME32_2;
+    V2 := PRIME32_2;
+    V3 := 0;
+    V4 := Cardinal(0) - PRIME32_1;
+
+    repeat
+      V1 := V1 + PLongWord(Data)^ * PRIME32_2;
+      V1 := (V1 shl 13) or (V1 shr 19);
+      V1 := V1 * PRIME32_1;
+      Inc(Data, 4);
+
+      V2 := V2 + PLongWord(Data)^ * PRIME32_2;
+      V2 := (V2 shl 13) or (V2 shr 19);
+      V2 := V2 * PRIME32_1;
+      Inc(Data, 4);
+
+      V3 := V3 + PLongWord(Data)^ * PRIME32_2;
+      V3 := (V3 shl 13) or (V3 shr 19);
+      V3 := V3 * PRIME32_1;
+      Inc(Data, 4);
+
+      V4 := V4 + PLongWord(Data)^ * PRIME32_2;
+      V4 := (V4 shl 13) or (V4 shr 19);
+      V4 := V4 * PRIME32_1;
+      Inc(Data, 4);
+
+      Dec(Len, 16);
+    until Len < 16;
+
+    H32 := ((V1 shl 1)  or (V1 shr 31)) +
+           ((V2 shl 7)  or (V2 shr 25)) +
+           ((V3 shl 12) or (V3 shr 20)) +
+           ((V4 shl 18) or (V4 shr 14));
+
+    H32 := H32 + Cardinal(OriginalLen);
+
+    // Process remaining 4-byte chunks after the main loop
+    while Len >= 4 do
+    begin
+      H32 := H32 + PLongWord(Data)^ * PRIME32_3;
+      H32 := (H32 shl 17) or (H32 shr 15);
+      H32 := H32 * PRIME32_4;
+      Inc(Data, 4);
+      Dec(Len, 4);
+    end;
+
+    // Process remaining bytes
+    while Len > 0 do
+    begin
+      H32 := H32 + Data^ * PRIME32_5;
+      H32 := (H32 shl 11) or (H32 shr 21);
+      H32 := H32 * PRIME32_1;
+      Inc(Data);
+      Dec(Len);
+    end;
+  end
+  else
+  begin
+    // Short strings (< 16 bytes): single-lane path.
+    // Uses the original pre-4-lane algorithm which has proven good distribution
+    // for short sequential keys (e.g. "key00001"…"key01000").
+    H32 := PRIME32_5;
+
+    while Len >= 4 do
+    begin
+      H32 := H32 + PLongWord(Data)^ * PRIME32_3;
+      H32 := (H32 shl 17) or (H32 shr 15);
+      H32 := H32 * PRIME32_4;
+      Inc(Data, 4);
+      Dec(Len, 4);
+    end;
+
+    while Len > 0 do
+    begin
+      H32 := H32 + Data^ * PRIME32_5;
+      H32 := (H32 shl 11) or (H32 shr 21);
+      H32 := H32 * PRIME32_1;
+      Inc(Data);
+      Dec(Len);
+    end;
   end;
 
-  // Process remaining bytes
-  while Len > 0 do
-  begin
-    H32 := H32 + Data^ * PRIME32_5;
-    H32 := (H32 shl 11) or (H32 shr 21);
-    H32 := H32 * PRIME32_1;
-    Inc(Data);
-    Dec(Len);
-  end;
-
-  // Finalization
+  // Finalization avalanche
   H32 := H32 xor (H32 shr 15);
   H32 := H32 * PRIME32_2;
   H32 := H32 xor (H32 shr 13);

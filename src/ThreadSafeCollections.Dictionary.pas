@@ -154,6 +154,11 @@ type
       end;
 
   private
+    type
+      // Key kind cached at construction to avoid repeated TypeInfo pointer comparisons
+      // on every hash operation.
+      TKeyKind = (kkString, kkInteger, kkOther);
+
     const
       INITIAL_BUCKET_COUNT = 16;   // Initial number of buckets in the hash table
       LOAD_FACTOR = 0.75;          // Load factor threshold to trigger resizing (75% full)
@@ -165,6 +170,7 @@ type
     FCount: integer;             // Current number of key-value pairs stored in the dictionary
     FHashFunc: specialize THashFunction<TKey>;             // Custom hash function for hashing keys
     FEqualityComparer: specialize TEqualityComparison<TKey>; // Custom equality comparison function for keys
+    FKeyKind: TKeyKind;          // Cached key type to avoid TypeInfo comparisons per call
 
     { 
       Internal methods for hash table operations 
@@ -666,11 +672,20 @@ var
 begin
   inherited Create;
   FLock := TCriticalSection.Create;
-  
+
   // Store the custom functions or use defaults
   FHashFunc := AHashFunc;
   FEqualityComparer := AEqualityComparer;
-  
+
+  // Cache key type once so GetHashValue uses a fast case branch instead of
+  // TypeInfo pointer comparisons on every single hash call.
+  if TypeInfo(TKey) = TypeInfo(string) then
+    FKeyKind := kkString
+  else if TypeInfo(TKey) = TypeInfo(integer) then
+    FKeyKind := kkInteger
+  else
+    FKeyKind := kkOther;
+
   // Ensure power of 2 and minimum size
   AdjustedSize := GetNextPowerOfTwo(InitialCapacity);
   SetLength(FBuckets, AdjustedSize);
@@ -729,15 +744,16 @@ begin
     Result := FHashFunc(Key)
   else
   begin
-    // Original type-specific hash logic
-    if TypeInfo(TKey) = TypeInfo(string) then
-      Result := XXHash32(string((@Key)^))
-    else if TypeInfo(TKey) = TypeInfo(integer) then
-      Result := MultiplicativeHash(cardinal(integer((@Key)^)))
+    // FKeyKind is set once in the constructor, avoiding repeated TypeInfo pointer
+    // comparisons on every hash call.
+    case FKeyKind of
+      kkString:  Result := XXHash32(string((@Key)^));
+      kkInteger: Result := MultiplicativeHash(cardinal(integer((@Key)^)));
     else
       Result := DefaultHash(Key);
+    end;
   end;
-  
+
   Result := Result and $7FFFFFFF; // Ensure positive
 end;
 

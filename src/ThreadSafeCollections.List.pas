@@ -81,6 +81,8 @@ type
     procedure InternalSetCapacity(const Value: Integer);
     procedure InternalDelete(Index: Integer);
     function  InternalIndexOf(const Item: T): Integer;
+    // Binary search — only valid when FSorted = True. Returns index of Item or -1.
+    function  InternalBinarySearch(const Item: T): Integer;
 
   public
     // Constructor
@@ -658,13 +660,42 @@ function TThreadSafeList.InternalIndexOf(const Item: T): Integer;
 var
   I: Integer;
 begin
+  if FSorted then
+    Result := InternalBinarySearch(Item)
+  else
+  begin
+    Result := -1;
+    for I := 0 to FCount - 1 do
+      if FComparer(FList[I], Item) = 0 then
+      begin
+        Result := I;
+        Break;
+      end;
+  end;
+end;
+
+// Internal: binary search on a sorted list. Caller must hold FLock and FSorted must be True.
+function TThreadSafeList.InternalBinarySearch(const Item: T): Integer;
+var
+  Lo, Hi, Mid, Cmp: Integer;
+begin
   Result := -1;
-  for I := 0 to FCount - 1 do
-    if FComparer(FList[I], Item) = 0 then
+  Lo := 0;
+  Hi := FCount - 1;
+  while Lo <= Hi do
+  begin
+    Mid := Lo + (Hi - Lo) shr 1;
+    Cmp := FComparer(FList[Mid], Item);
+    if Cmp = 0 then
     begin
-      Result := I;
-      Break;
-    end;
+      Result := Mid;
+      Exit;
+    end
+    else if Cmp < 0 then
+      Lo := Mid + 1
+    else
+      Hi := Mid - 1;
+  end;
 end;
 
 procedure TThreadSafeList.SetCapacity(const Value: Integer);
