@@ -17,13 +17,13 @@ program Benchmark;
 
   Scenarios per collection
     Single-threaded
-      Add / PushBack        ITEM_COUNT items
+      Add / PushBack        GItemCount items
       Contains / TryGetValue / Peek
       Remove / PopFront
       Iterate (for-in)
       Sort (List only)
 
-    Multi-threaded  (THREAD_COUNT concurrent threads, ITEM_COUNT total)
+    Multi-threaded  (THREAD_COUNT concurrent threads, GItemCount total)
       Concurrent Add
       Concurrent mixed read+write
 
@@ -33,7 +33,7 @@ program Benchmark;
 }
 
 uses
-  SysUtils, Classes, DateUtils, Math, SyncObjs,
+  SysUtils, Classes, DateUtils, Math, SyncObjs, Windows,
   ThreadSafeCollections.List,
   ThreadSafeCollections.Dictionary,
   ThreadSafeCollections.HashSet,
@@ -41,10 +41,16 @@ uses
   HashFunctions;
 
 const
-  ITEM_COUNT   = 100000;   // items per single-threaded scenario
+  MAX_ITEMS    = 1000000;  // maximum collection size (pre-allocates data arrays)
   THREAD_COUNT = 4;        // threads for multi-threaded scenarios
   RUNS         = 5;        // total runs per scenario (best+worst trimmed)
   TRIM         = 1;        // runs to drop from each end before averaging
+
+  SIZES: array[0..3] of Integer = (1000, 10000, 100000, 1000000);
+
+var
+  GItemCount:     Integer;  // active size for current pass
+  GContainsCount: Integer;  // 1% of GItemCount for O(n) Contains
 
 { ============================================================
   Helpers
@@ -54,20 +60,24 @@ type
   TTimings = array of Int64;   // milliseconds per run
 
 { Run AProc RUNS times, return trimmed-mean ms and best ms. }
-procedure RunScenario(AProc: TProcedure; out AvgMs, BestMs: Int64);
+var
+  GPerfFreq: Int64;  // counts per second, initialised once in main block
+
+procedure RunScenario(AProc: TProcedure; out AvgUs, BestUs: Int64);
 var
   Timings: TTimings;
   Sorted: TTimings;
   I, J, K: Integer;
-  T0: TDateTime;
+  C0, C1: Int64;
   Sum, Tmp: Int64;
 begin
   SetLength(Timings, RUNS);
   for I := 0 to RUNS - 1 do
   begin
-    T0 := Now;
+    QueryPerformanceCounter(C0);
     AProc;
-    Timings[I] := MilliSecondsBetween(Now, T0);
+    QueryPerformanceCounter(C1);
+    Timings[I] := Round((C1 - C0) * 1000000.0 / GPerfFreq);
   end;
 
   // simple insertion sort for RUNS elements
@@ -84,24 +94,32 @@ begin
     Sorted[K + 1] := Tmp;
   end;
 
-  BestMs := Sorted[0];
+  BestUs := Sorted[0];
   Sum := 0;
   for I := TRIM to RUNS - 1 - TRIM do
     Sum := Sum + Sorted[I];
-  AvgMs := Sum div (RUNS - 2 * TRIM);
+  AvgUs := Sum div (RUNS - 2 * TRIM);
 end;
 
+var
+  GCsvFile: TextFile;
+  GTimestamp: string;
+
 procedure PrintResult(const Collection, Scenario: string;
-                      N: Integer; AvgMs, BestMs: Int64);
+                      N: Integer; AvgUs, BestUs: Int64);
 var
   OpsPerSec: Int64;
 begin
-  if AvgMs > 0 then
-    OpsPerSec := Round(N / (AvgMs / 1000.0))
+  if AvgUs > 0 then
+    OpsPerSec := Round(N / (AvgUs / 1000000.0))
   else
     OpsPerSec := 0;
-  WriteLn(Format('  %-14s  %-32s  %6d items  avg %5d ms  best %5d ms  %12d ops/s',
-    [Collection, Scenario, N, AvgMs, BestMs, OpsPerSec]));
+  // Console
+  WriteLn(Format('  %-14s  %-32s  %7d items  avg %7d us  best %7d us  %12d ops/s',
+    [Collection, Scenario, N, AvgUs, BestUs, OpsPerSec]));
+  // CSV: timestamp,collection,scenario,items,avg_us,best_us,ops_per_sec
+  WriteLn(GCsvFile, Format('%s,%s,%s,%d,%d,%d,%d',
+    [GTimestamp, Collection, Scenario, N, AvgUs, BestUs, OpsPerSec]));
 end;
 
 procedure Separator(const Title: string);
@@ -131,27 +149,58 @@ type
   TIntSet     = TThreadSafeHashSetInteger;
   TIntDeque   = specialize TThreadSafeDeque<Integer>;
 
-var
-  GIntegers:  array[0..ITEM_COUNT - 1] of Integer;
-  GStrings:   array[0..ITEM_COUNT - 1] of string;
+const
+  SHORT_STR_LEN = 8;
+  LONG_STR_LEN  = 200;
 
-procedure BuildData;
+var
+  GIntegers:     array[0..MAX_ITEMS - 1] of Integer;
+  GStrings:      array[0..MAX_ITEMS - 1] of string;
+  GShortStrings: array[0..MAX_ITEMS - 1] of string;
+  GLongStrings:  array[0..MAX_ITEMS - 1] of string;
+  GRandomOrder:  array[0..MAX_ITEMS - 1] of Integer;
+
+function MakeString(const Prefix: string; Index, TotalLen: Integer): string;
+var
+  S: string;
+begin
+  S := Prefix + IntToStr(Index);
+  while Length(S) < TotalLen do
+    S := S + 'x';
+  SetLength(S, TotalLen);
+  Result := S;
+end;
+
+procedure BuildData(N: Integer);
 var
   I, J, Tmp: Integer;
 begin
+  GItemCount     := N;
+  GContainsCount := Max(1, N div 100);  // 1% of N, minimum 1
   RandSeed := 42;
-  for I := 0 to ITEM_COUNT - 1 do
+  for I := 0 to N - 1 do
   begin
-    GIntegers[I] := I;            // unique sequential integers
-    GStrings[I]  := 'key_' + IntToStr(I);
+    GIntegers[I]     := I;
+    GStrings[I]      := 'key_' + IntToStr(I);
+    GShortStrings[I] := MakeString('k', I, SHORT_STR_LEN);
+    GLongStrings[I]  := MakeString('key_', I, LONG_STR_LEN);
+    GRandomOrder[I]  := I;
   end;
-  // shuffle integers so Sort has real work to do
-  for I := ITEM_COUNT - 1 downto 1 do
+  // Shuffle integers (for Sort benchmark)
+  for I := N - 1 downto 1 do
   begin
     J := Random(I + 1);
     Tmp := GIntegers[I];
     GIntegers[I] := GIntegers[J];
     GIntegers[J] := Tmp;
+  end;
+  // Shuffle GRandomOrder (for random-read benchmarks)
+  for I := N - 1 downto 1 do
+  begin
+    J := Random(I + 1);
+    Tmp := GRandomOrder[I];
+    GRandomOrder[I] := GRandomOrder[J];
+    GRandomOrder[J] := Tmp;
   end;
 end;
 
@@ -167,7 +216,7 @@ var I: Integer;
 begin
   GList := TIntList.Create(@CmpInt);
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GList.Add(GIntegers[I]);
   finally
     GList.Free;
@@ -175,18 +224,17 @@ begin
   end;
 end;
 
-// List.Contains is a linear scan (O(n)), so we test with a smaller count
+// List.Contains is a linear scan (O(n)) — use GContainsCount (1% of GItemCount)
 // to avoid an O(n^2) benchmark that takes minutes.
-const CONTAINS_COUNT = 1000;
 
 procedure ListContains;
 var I: Integer; B: Boolean;
 begin
   GList := TIntList.Create(@CmpInt);
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GList.Add(GIntegers[I]);
-    for I := 0 to CONTAINS_COUNT - 1 do
+    for I := 0 to GContainsCount - 1 do
       B := GList.Contains(GIntegers[I]);
   finally
     GList.Free;
@@ -200,7 +248,7 @@ var I: Integer;
 begin
   GList := TIntList.Create(@CmpInt);
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GList.Add(GIntegers[I]);
     GList.Sort;
   finally
@@ -216,7 +264,7 @@ var
 begin
   GList := TIntList.Create(@CmpInt);
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GList.Add(GIntegers[I]);
     Iter := GList.GetEnumerator;
     try
@@ -235,14 +283,46 @@ var I: Integer;
 begin
   GList := TIntList.Create(@CmpInt);
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GList.Add(GIntegers[I]);
-    for I := ITEM_COUNT - 1 downto 0 do
+    for I := GItemCount - 1 downto 0 do
       GList.Delete(I);
   finally
     GList.Free;
     GList := nil;
   end;
+end;
+
+procedure ListReadSequential;
+var I, V: Integer;
+begin
+  GList := TIntList.Create(@CmpInt);
+  try
+    for I := 0 to GItemCount - 1 do
+      GList.Add(GIntegers[I]);
+    for I := 0 to GItemCount - 1 do
+      V := GList[I];
+  finally
+    GList.Free;
+    GList := nil;
+  end;
+  V := V;
+end;
+
+procedure ListReadRandom;
+var I, V: Integer;
+begin
+  GList := TIntList.Create(@CmpInt);
+  try
+    for I := 0 to GItemCount - 1 do
+      GList.Add(GIntegers[I]);
+    for I := 0 to GItemCount - 1 do
+      V := GList[GRandomOrder[I]];
+  finally
+    GList.Free;
+    GList := nil;
+  end;
+  V := V;
 end;
 
 { Multi-threaded List add }
@@ -278,7 +358,7 @@ var
 begin
   GList := TIntList.Create(@CmpInt);
   try
-    PerThread := ITEM_COUNT div THREAD_COUNT;
+    PerThread := GItemCount div THREAD_COUNT;
     for I := 0 to THREAD_COUNT - 1 do
       Threads[I] := TListAddThread.Create(I * PerThread, PerThread);
     for I := 0 to THREAD_COUNT - 1 do
@@ -294,56 +374,6 @@ begin
   end;
 end;
 
-{ Multi-threaded List mixed read+write }
-
-type
-  TListMixedThread = class(TThread)
-  private
-    FStart, FCount: Integer;
-  public
-    constructor Create(AStart, ACount: Integer);
-    procedure Execute; override;
-  end;
-
-constructor TListMixedThread.Create(AStart, ACount: Integer);
-begin
-  inherited Create(True);
-  FStart := AStart;
-  FCount := ACount;
-  FreeOnTerminate := False;
-end;
-
-procedure TListMixedThread.Execute;
-var I: Integer;
-begin
-  // Only Add — Contains on a large unsorted list is O(n) per call,
-  // making a mixed Add+Contains benchmark impractical at ITEM_COUNT scale.
-  for I := FStart to FStart + FCount - 1 do
-    GList.Add(GIntegers[I]);
-end;
-
-procedure ListMTMixed;
-var
-  Threads: array[0..THREAD_COUNT - 1] of TListMixedThread;
-  PerThread, I: Integer;
-begin
-  GList := TIntList.Create(@CmpInt);
-  try
-    PerThread := ITEM_COUNT div THREAD_COUNT;
-    for I := 0 to THREAD_COUNT - 1 do
-      Threads[I] := TListMixedThread.Create(I * PerThread, PerThread);
-    for I := 0 to THREAD_COUNT - 1 do
-      Threads[I].Start;
-    for I := 0 to THREAD_COUNT - 1 do
-    begin
-      Threads[I].WaitFor;
-      Threads[I].Free;
-    end;
-  finally
-    GList.Free;
-    GList := nil;
-  end;
-end;
 
 { ============================================================
   TThreadSafeDictionary<string,Integer> benchmarks
@@ -357,7 +387,7 @@ var I: Integer;
 begin
   GDict := TStrIntDict.Create;
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GDict.Add(GStrings[I], I);
   finally
     GDict.Free;
@@ -370,9 +400,9 @@ var I, V: Integer; B: Boolean;
 begin
   GDict := TStrIntDict.Create;
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GDict.Add(GStrings[I], I);
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       B := GDict.TryGetValue(GStrings[I], V);
   finally
     GDict.Free;
@@ -386,14 +416,104 @@ var I: Integer;
 begin
   GDict := TStrIntDict.Create;
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GDict.Add(GStrings[I], I);
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GDict.Remove(GStrings[I]);
   finally
     GDict.Free;
     GDict := nil;
   end;
+end;
+
+procedure DictShortStringAdd;
+var I: Integer;
+begin
+  GDict := TStrIntDict.Create;
+  try
+    for I := 0 to GItemCount - 1 do
+      GDict.Add(GShortStrings[I], I);
+  finally
+    GDict.Free;
+    GDict := nil;
+  end;
+end;
+
+procedure DictShortStringRead;
+var I, V: Integer; B: Boolean;
+begin
+  GDict := TStrIntDict.Create;
+  try
+    for I := 0 to GItemCount - 1 do
+      GDict.Add(GShortStrings[I], I);
+    for I := 0 to GItemCount - 1 do
+      B := GDict.TryGetValue(GShortStrings[I], V);
+  finally
+    GDict.Free;
+    GDict := nil;
+  end;
+  B := B;
+end;
+
+procedure DictLongStringAdd;
+var I: Integer;
+begin
+  GDict := TStrIntDict.Create;
+  try
+    for I := 0 to GItemCount - 1 do
+      GDict.Add(GLongStrings[I], I);
+  finally
+    GDict.Free;
+    GDict := nil;
+  end;
+end;
+
+procedure DictLongStringRead;
+var I, V: Integer; B: Boolean;
+begin
+  GDict := TStrIntDict.Create;
+  try
+    for I := 0 to GItemCount - 1 do
+      GDict.Add(GLongStrings[I], I);
+    for I := 0 to GItemCount - 1 do
+      B := GDict.TryGetValue(GLongStrings[I], V);
+  finally
+    GDict.Free;
+    GDict := nil;
+  end;
+  B := B;
+end;
+
+procedure DictReadSequential;
+var I, V: Integer; B: Boolean;
+begin
+  GDict := TStrIntDict.Create;
+  try
+    for I := 0 to GItemCount - 1 do
+      GDict.Add(GStrings[I], I);
+    for I := 0 to GItemCount - 1 do
+      B := GDict.TryGetValue(GStrings[I], V);
+  finally
+    GDict.Free;
+    GDict := nil;
+  end;
+  B := B;
+end;
+
+procedure DictReadRandom;
+var I, V: Integer; B: Boolean;
+begin
+  GDict := TStrIntDict.Create;
+  try
+    for I := 0 to GItemCount - 1 do
+      GDict.Add(GStrings[I], I);
+    for I := 0 to GItemCount - 1 do
+      B := GDict.TryGetValue(GStrings[GRandomOrder[I]], V);
+  finally
+    GDict.Free;
+    GDict := nil;
+  end;
+  B := B;
 end;
 
 procedure DictIterate;
@@ -403,7 +523,7 @@ var
 begin
   GDict := TStrIntDict.Create;
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GDict.Add(GStrings[I], I);
     Iter := GDict.GetEnumerator;
     try
@@ -450,7 +570,7 @@ var
 begin
   GDict := TStrIntDict.Create;
   try
-    PerThread := ITEM_COUNT div THREAD_COUNT;
+    PerThread := GItemCount div THREAD_COUNT;
     for I := 0 to THREAD_COUNT - 1 do
       Threads[I] := TDictAddThread.Create(I * PerThread, PerThread);
     for I := 0 to THREAD_COUNT - 1 do
@@ -505,7 +625,7 @@ var
 begin
   GDict := TStrIntDict.Create;
   try
-    PerThread := ITEM_COUNT div THREAD_COUNT;
+    PerThread := GItemCount div THREAD_COUNT;
     for I := 0 to THREAD_COUNT - 1 do
       Threads[I] := TDictMixedThread.Create(I * PerThread, PerThread);
     for I := 0 to THREAD_COUNT - 1 do
@@ -533,7 +653,7 @@ var I: Integer;
 begin
   GSet := TIntSet.Create;
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GSet.Add(GIntegers[I]);
   finally
     GSet.Free;
@@ -546,9 +666,9 @@ var I: Integer; B: Boolean;
 begin
   GSet := TIntSet.Create;
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GSet.Add(GIntegers[I]);
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       B := GSet.Contains(GIntegers[I]);
   finally
     GSet.Free;
@@ -562,9 +682,9 @@ var I: Integer;
 begin
   GSet := TIntSet.Create;
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GSet.Add(GIntegers[I]);
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GSet.Remove(GIntegers[I]);
   finally
     GSet.Free;
@@ -579,7 +699,7 @@ var
 begin
   GSet := TIntSet.Create;
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GSet.Add(GIntegers[I]);
     Iter := GSet.GetEnumerator;
     try
@@ -591,6 +711,83 @@ begin
     GSet.Free;
     GSet := nil;
   end;
+end;
+
+procedure SetReadRandom;
+var I: Integer; B: Boolean;
+begin
+  GSet := TIntSet.Create;
+  try
+    for I := 0 to GItemCount - 1 do
+      GSet.Add(I);
+    for I := 0 to GItemCount - 1 do
+      B := GSet.Contains(GRandomOrder[I]);
+  finally
+    GSet.Free;
+    GSet := nil;
+  end;
+  B := B;
+end;
+
+var
+  GStrSet: TThreadSafeHashSetString;
+
+procedure SetShortStringAdd;
+var I: Integer;
+begin
+  GStrSet := TThreadSafeHashSetString.Create;
+  try
+    for I := 0 to GItemCount - 1 do
+      GStrSet.Add(GShortStrings[I]);
+  finally
+    GStrSet.Free;
+    GStrSet := nil;
+  end;
+end;
+
+procedure SetShortStringContains;
+var I: Integer; B: Boolean;
+begin
+  GStrSet := TThreadSafeHashSetString.Create;
+  try
+    for I := 0 to GItemCount - 1 do
+      GStrSet.Add(GShortStrings[I]);
+    for I := 0 to GItemCount - 1 do
+      B := GStrSet.Contains(GShortStrings[I]);
+  finally
+    GStrSet.Free;
+    GStrSet := nil;
+  end;
+  B := B;
+end;
+
+procedure SetLongStringAdd;
+var I: Integer;
+begin
+  GStrSet := TThreadSafeHashSetString.Create;
+  try
+    for I := 0 to GItemCount - 1 do
+      GStrSet.Add(GLongStrings[I]);
+  finally
+    GStrSet.Free;
+    GStrSet := nil;
+  end;
+end;
+
+procedure SetLongStringContains;
+var I: Integer; B: Boolean;
+begin
+  GStrSet := TThreadSafeHashSetString.Create;
+  try
+    for I := 0 to GItemCount - 1 do
+      GStrSet.Add(GLongStrings[I]);
+    for I := 0 to GItemCount - 1 do
+      B := GStrSet.Contains(GLongStrings[I]);
+  finally
+    GStrSet.Free;
+    GStrSet := nil;
+  end;
+  B := B;
 end;
 
 { Multi-threaded HashSet add }
@@ -626,7 +823,7 @@ var
 begin
   GSet := TIntSet.Create;
   try
-    PerThread := ITEM_COUNT div THREAD_COUNT;
+    PerThread := GItemCount div THREAD_COUNT;
     for I := 0 to THREAD_COUNT - 1 do
       Threads[I] := TSetAddThread.Create(I * PerThread, PerThread);
     for I := 0 to THREAD_COUNT - 1 do
@@ -681,7 +878,7 @@ var
 begin
   GSet := TIntSet.Create;
   try
-    PerThread := ITEM_COUNT div THREAD_COUNT;
+    PerThread := GItemCount div THREAD_COUNT;
     for I := 0 to THREAD_COUNT - 1 do
       Threads[I] := TSetMixedThread.Create(I * PerThread, PerThread);
     for I := 0 to THREAD_COUNT - 1 do
@@ -709,7 +906,7 @@ var I: Integer;
 begin
   GDeque := TIntDeque.Create;
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GDeque.PushBack(GIntegers[I]);
   finally
     GDeque.Free;
@@ -722,7 +919,7 @@ var I: Integer;
 begin
   GDeque := TIntDeque.Create;
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GDeque.PushFront(GIntegers[I]);
   finally
     GDeque.Free;
@@ -735,9 +932,9 @@ var I, V: Integer;
 begin
   GDeque := TIntDeque.Create;
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GDeque.PushBack(GIntegers[I]);
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       V := GDeque.PopBack;
   finally
     GDeque.Free;
@@ -751,9 +948,9 @@ var I, V: Integer;
 begin
   GDeque := TIntDeque.Create;
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GDeque.PushBack(GIntegers[I]);
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       V := GDeque.PopFront;
   finally
     GDeque.Free;
@@ -769,7 +966,7 @@ var
 begin
   GDeque := TIntDeque.Create;
   try
-    for I := 0 to ITEM_COUNT - 1 do
+    for I := 0 to GItemCount - 1 do
       GDeque.PushBack(GIntegers[I]);
     Iter := GDeque.GetEnumerator;
     try
@@ -816,7 +1013,7 @@ var
 begin
   GDeque := TIntDeque.Create;
   try
-    PerThread := ITEM_COUNT div THREAD_COUNT;
+    PerThread := GItemCount div THREAD_COUNT;
     for I := 0 to THREAD_COUNT - 1 do
       Threads[I] := TDequePushThread.Create(I * PerThread, PerThread);
     for I := 0 to THREAD_COUNT - 1 do
@@ -890,8 +1087,8 @@ var
   HalfThreads, PerProducer, PerConsumer, I: Integer;
 begin
   HalfThreads := THREAD_COUNT div 2;
-  PerProducer  := ITEM_COUNT div HalfThreads;
-  PerConsumer  := ITEM_COUNT div HalfThreads;
+  PerProducer  := GItemCount div HalfThreads;
+  PerConsumer  := GItemCount div HalfThreads;
 
   GDeque := TIntDeque.Create;
   try
@@ -911,68 +1108,112 @@ begin
 end;
 
 { ============================================================
+  RunAllScenarios — runs every benchmark at current GItemCount
+  ============================================================ }
+
+procedure RunAllScenarios;
+var
+  Avg, Best: Int64;  // microseconds
+  T: string;
+begin
+  T := IntToStr(GItemCount);
+  WriteLn;
+  WriteLn('════════════════════════════════════════════════════');
+  WriteLn('  N = ', GItemCount, ' items');
+  WriteLn('════════════════════════════════════════════════════');
+
+  { ---- List ---- }
+  Separator('TThreadSafeList<Integer>  —  single-threaded');
+  RunScenario(@ListAdd,            Avg, Best); PrintResult('List', 'Add',             GItemCount,     Avg, Best);
+  RunScenario(@ListContains,       Avg, Best); PrintResult('List', 'Contains (1%)',   GContainsCount, Avg, Best);
+  RunScenario(@ListReadSequential, Avg, Best); PrintResult('List', 'Read sequential', GItemCount,     Avg, Best);
+  RunScenario(@ListReadRandom,     Avg, Best); PrintResult('List', 'Read random',     GItemCount,     Avg, Best);
+  RunScenario(@ListSort,           Avg, Best); PrintResult('List', 'Sort',            GItemCount,     Avg, Best);
+  RunScenario(@ListIterate,        Avg, Best); PrintResult('List', 'Iterate',         GItemCount,     Avg, Best);
+  RunScenario(@ListDelete,         Avg, Best); PrintResult('List', 'Delete (all)',    GItemCount,     Avg, Best);
+
+  Separator('TThreadSafeList  —  MT ' + T + ' items / ' + IntToStr(THREAD_COUNT) + ' threads');
+  RunScenario(@ListMTAdd, Avg, Best); PrintResult('List', 'MT Add', GItemCount, Avg, Best);
+
+  { ---- Dictionary ---- }
+  Separator('TThreadSafeDictionary  —  single-threaded');
+  RunScenario(@DictAdd,            Avg, Best); PrintResult('Dictionary', 'Add (~10 char keys)',  GItemCount, Avg, Best);
+  RunScenario(@DictTryGet,         Avg, Best); PrintResult('Dictionary', 'TryGetValue',          GItemCount, Avg, Best);
+  RunScenario(@DictReadSequential, Avg, Best); PrintResult('Dictionary', 'Read sequential',      GItemCount, Avg, Best);
+  RunScenario(@DictReadRandom,     Avg, Best); PrintResult('Dictionary', 'Read random',          GItemCount, Avg, Best);
+  RunScenario(@DictShortStringAdd, Avg, Best); PrintResult('Dictionary', 'Add (8 char keys)',    GItemCount, Avg, Best);
+  RunScenario(@DictShortStringRead,Avg, Best); PrintResult('Dictionary', 'Read (8 char keys)',   GItemCount, Avg, Best);
+  RunScenario(@DictLongStringAdd,  Avg, Best); PrintResult('Dictionary', 'Add (200 char keys)',  GItemCount, Avg, Best);
+  RunScenario(@DictLongStringRead, Avg, Best); PrintResult('Dictionary', 'Read (200 char keys)', GItemCount, Avg, Best);
+  RunScenario(@DictIterate,        Avg, Best); PrintResult('Dictionary', 'Iterate',              GItemCount, Avg, Best);
+  RunScenario(@DictRemove,         Avg, Best); PrintResult('Dictionary', 'Remove',               GItemCount, Avg, Best);
+
+  Separator('TThreadSafeDictionary  —  MT ' + T + ' items / ' + IntToStr(THREAD_COUNT) + ' threads');
+  RunScenario(@DictMTAdd,   Avg, Best); PrintResult('Dictionary', 'MT Add',        GItemCount, Avg, Best);
+  RunScenario(@DictMTMixed, Avg, Best); PrintResult('Dictionary', 'MT Add+TryGet', GItemCount, Avg, Best);
+
+  { ---- HashSet ---- }
+  Separator('TThreadSafeHashSet<Integer>  —  single-threaded');
+  RunScenario(@SetAdd,             Avg, Best); PrintResult('HashSet', 'Add (int)',           GItemCount, Avg, Best);
+  RunScenario(@SetContains,        Avg, Best); PrintResult('HashSet', 'Contains (int)',       GItemCount, Avg, Best);
+  RunScenario(@SetReadRandom,      Avg, Best); PrintResult('HashSet', 'Contains random',      GItemCount, Avg, Best);
+  RunScenario(@SetIterate,         Avg, Best); PrintResult('HashSet', 'Iterate',              GItemCount, Avg, Best);
+  RunScenario(@SetRemove,          Avg, Best); PrintResult('HashSet', 'Remove',               GItemCount, Avg, Best);
+
+  Separator('TThreadSafeHashSet<string>  —  single-threaded');
+  RunScenario(@SetShortStringAdd,      Avg, Best); PrintResult('HashSet', 'Add (8 char)',        GItemCount, Avg, Best);
+  RunScenario(@SetShortStringContains, Avg, Best); PrintResult('HashSet', 'Contains (8 char)',   GItemCount, Avg, Best);
+  RunScenario(@SetLongStringAdd,       Avg, Best); PrintResult('HashSet', 'Add (200 char)',       GItemCount, Avg, Best);
+  RunScenario(@SetLongStringContains,  Avg, Best); PrintResult('HashSet', 'Contains (200 char)',  GItemCount, Avg, Best);
+
+  Separator('TThreadSafeHashSet  —  MT ' + T + ' items / ' + IntToStr(THREAD_COUNT) + ' threads');
+  RunScenario(@SetMTAdd,   Avg, Best); PrintResult('HashSet', 'MT Add',          GItemCount, Avg, Best);
+  RunScenario(@SetMTMixed, Avg, Best); PrintResult('HashSet', 'MT Add+Contains', GItemCount, Avg, Best);
+
+  { ---- Deque ---- }
+  Separator('TThreadSafeDeque<Integer>  —  single-threaded');
+  RunScenario(@DequePushBack,  Avg, Best); PrintResult('Deque', 'PushBack',  GItemCount, Avg, Best);
+  RunScenario(@DequePushFront, Avg, Best); PrintResult('Deque', 'PushFront', GItemCount, Avg, Best);
+  RunScenario(@DequePopFront,  Avg, Best); PrintResult('Deque', 'PopFront',  GItemCount, Avg, Best);
+  RunScenario(@DequePopBack,   Avg, Best); PrintResult('Deque', 'PopBack',   GItemCount, Avg, Best);
+  RunScenario(@DequeIterate,   Avg, Best); PrintResult('Deque', 'Iterate',   GItemCount, Avg, Best);
+
+  Separator('TThreadSafeDeque  —  MT ' + T + ' items / ' + IntToStr(THREAD_COUNT) + ' threads');
+  RunScenario(@DequeMTPush,             Avg, Best); PrintResult('Deque', 'MT PushBack',          GItemCount, Avg, Best);
+  RunScenario(@DequeMTProducerConsumer, Avg, Best); PrintResult('Deque', 'MT Producer/Consumer',  GItemCount, Avg, Best);
+end;
+
+{ ============================================================
   Main
   ============================================================ }
 
 var
-  Avg, Best: Int64;
+  CsvFilename: string;
+  SizeIdx: Integer;
 
 begin
+  QueryPerformanceFrequency(GPerfFreq);
+  GTimestamp  := FormatDateTime('yyyymmdd_hhnnss', Now);
+  CsvFilename := 'benchmark_' + GTimestamp + '.csv';
+
+  AssignFile(GCsvFile, CsvFilename);
+  Rewrite(GCsvFile);
+  WriteLn(GCsvFile, 'timestamp,collection,scenario,items,avg_us,best_us,ops_per_sec');
+
   WriteLn('ThreadSafeCollections-FP Benchmark');
   WriteLn('====================================');
-  WriteLn(Format('  Items per run : %d', [ITEM_COUNT]));
-  WriteLn(Format('  Runs          : %d  (trimming best+worst %d each)', [RUNS, TRIM]));
+  WriteLn(Format('  Sizes         : 1k / 10k / 100k / 1M', []));
+  WriteLn(Format('  Runs per size : %d  (trimming best+worst %d each)', [RUNS, TRIM]));
   WriteLn(Format('  Threads (MT)  : %d', [THREAD_COUNT]));
-  WriteLn;
+  WriteLn(Format('  CSV output    : %s', [CsvFilename]));
 
-  BuildData;
-
-  { ---- List ---- }
-  Separator('TThreadSafeList<Integer>  —  single-threaded');
-  RunScenario(@ListAdd,      Avg, Best); PrintResult('List', 'Add',          ITEM_COUNT, Avg, Best);
-  RunScenario(@ListContains, Avg, Best); PrintResult('List', 'Contains (1k)', CONTAINS_COUNT, Avg, Best);
-  RunScenario(@ListSort,     Avg, Best); PrintResult('List', 'Sort',         ITEM_COUNT, Avg, Best);
-  RunScenario(@ListIterate,  Avg, Best); PrintResult('List', 'Iterate',      ITEM_COUNT, Avg, Best);
-  RunScenario(@ListDelete,   Avg, Best); PrintResult('List', 'Delete (all)', ITEM_COUNT, Avg, Best);
-
-  Separator('TThreadSafeList<Integer>  —  multi-threaded (' + IntToStr(THREAD_COUNT) + ' threads)');
-  RunScenario(@ListMTAdd,    Avg, Best); PrintResult('List', 'MT Add',         ITEM_COUNT, Avg, Best);
-  RunScenario(@ListMTMixed,  Avg, Best); PrintResult('List', 'MT Add (4 threads)', ITEM_COUNT, Avg, Best);
-
-  { ---- Dictionary ---- }
-  Separator('TThreadSafeDictionary<string,Integer>  —  single-threaded');
-  RunScenario(@DictAdd,     Avg, Best); PrintResult('Dictionary', 'Add',        ITEM_COUNT, Avg, Best);
-  RunScenario(@DictTryGet,  Avg, Best); PrintResult('Dictionary', 'TryGetValue',ITEM_COUNT, Avg, Best);
-  RunScenario(@DictIterate, Avg, Best); PrintResult('Dictionary', 'Iterate',    ITEM_COUNT, Avg, Best);
-  RunScenario(@DictRemove,  Avg, Best); PrintResult('Dictionary', 'Remove',     ITEM_COUNT, Avg, Best);
-
-  Separator('TThreadSafeDictionary<string,Integer>  —  multi-threaded (' + IntToStr(THREAD_COUNT) + ' threads)');
-  RunScenario(@DictMTAdd,   Avg, Best); PrintResult('Dictionary', 'MT Add',         ITEM_COUNT, Avg, Best);
-  RunScenario(@DictMTMixed, Avg, Best); PrintResult('Dictionary', 'MT Add+TryGet',  ITEM_COUNT, Avg, Best);
-
-  { ---- HashSet ---- }
-  Separator('TThreadSafeHashSet<Integer>  —  single-threaded');
-  RunScenario(@SetAdd,      Avg, Best); PrintResult('HashSet', 'Add',      ITEM_COUNT, Avg, Best);
-  RunScenario(@SetContains, Avg, Best); PrintResult('HashSet', 'Contains', ITEM_COUNT, Avg, Best);
-  RunScenario(@SetIterate,  Avg, Best); PrintResult('HashSet', 'Iterate',  ITEM_COUNT, Avg, Best);
-  RunScenario(@SetRemove,   Avg, Best); PrintResult('HashSet', 'Remove',   ITEM_COUNT, Avg, Best);
-
-  Separator('TThreadSafeHashSet<Integer>  —  multi-threaded (' + IntToStr(THREAD_COUNT) + ' threads)');
-  RunScenario(@SetMTAdd,    Avg, Best); PrintResult('HashSet', 'MT Add',         ITEM_COUNT, Avg, Best);
-  RunScenario(@SetMTMixed,  Avg, Best); PrintResult('HashSet', 'MT Add+Contains',ITEM_COUNT, Avg, Best);
-
-  { ---- Deque ---- }
-  Separator('TThreadSafeDeque<Integer>  —  single-threaded');
-  RunScenario(@DequePushBack,  Avg, Best); PrintResult('Deque', 'PushBack',  ITEM_COUNT, Avg, Best);
-  RunScenario(@DequePushFront, Avg, Best); PrintResult('Deque', 'PushFront', ITEM_COUNT, Avg, Best);
-  RunScenario(@DequePopFront,  Avg, Best); PrintResult('Deque', 'PopFront',  ITEM_COUNT, Avg, Best);
-  RunScenario(@DequePopBack,   Avg, Best); PrintResult('Deque', 'PopBack',   ITEM_COUNT, Avg, Best);
-  RunScenario(@DequeIterate,   Avg, Best); PrintResult('Deque', 'Iterate',   ITEM_COUNT, Avg, Best);
-
-  Separator('TThreadSafeDeque<Integer>  —  multi-threaded (' + IntToStr(THREAD_COUNT) + ' threads)');
-  RunScenario(@DequeMTPush,             Avg, Best); PrintResult('Deque', 'MT PushBack',        ITEM_COUNT, Avg, Best);
-  RunScenario(@DequeMTProducerConsumer, Avg, Best); PrintResult('Deque', 'MT Producer/Consumer',ITEM_COUNT, Avg, Best);
+  for SizeIdx := 0 to High(SIZES) do
+  begin
+    BuildData(SIZES[SizeIdx]);
+    RunAllScenarios;
+  end;
 
   WriteLn;
-  WriteLn('Done.');
+  WriteLn('Done. Results saved to: ', CsvFilename);
+  CloseFile(GCsvFile);
 end.
