@@ -33,17 +33,21 @@ Current State:
 - ✅ Thread safety verified through testing
 - ✅ Memory management stable
 - ✅ Thread-Safe Iterator Support
-   - Iterators use RAII-style locking through interface counting
-   - Thread-safe iteration with automatic lock management
-   - Each iterator maintains its own lock token
+   - List, HashSet, Deque: RAII-style locking — lock held for the full `for…in` loop
+   - Dictionary (v0.8.2): snapshot-based — lock released immediately after entry copy; concurrent modifications are safe but not visible to the iterator
 - ✅ Bulk operations support
-- ✅ **NEW in v0.8.2**: Critical bug fixes — deadlocks, memory safety, and correctness
+- ✅ **NEW in v0.8.2**: Critical bug fixes and performance optimisations
   - Fixed re-entrant lock deadlocks in List, HashSet, and Dictionary on POSIX platforms
   - Fixed managed-type memory safety (`string`/`interface`) in List and Deque
   - Fixed ABBA cross-collection deadlock in `HashSet.IntersectWith`
   - Fixed `IntersectWith` incorrect item removal
   - Fixed `IntegerComparer` overflow, `Sort`/`IsSorted` direction tracking
   - Removed dead `DEBUG_LOGGING` code from Dictionary; unified locking API
+  - **Slab allocator** for Dictionary and HashSet `TEntry` records — 256-entry blocks with freelist recycling; 19–41% faster Dictionary ops, 15–19% faster HashSet Add at 1 M items
+  - **4-lane XXHash32** — strings ≥ 16 bytes processed across four independent accumulators; 19–23% faster for long string keys
+  - **Dictionary type dispatch caching** — `TKeyKind` enum cached at construction, eliminating per-call `TypeInfo` comparisons
+  - **Binary search for sorted lists** — `Contains`/`IndexOf` automatically use O(log n) binary search after `Sort()`
+  - **Dictionary iterator is now snapshot-based** — lock released immediately after copying; other threads may modify concurrently
 - ✅ **v0.8.1**: Code maintainability improvements
   - Algorithm complexity annotations (Big-O) on all 80+ methods
   - Centralized error messages (14 constants)
@@ -88,7 +92,7 @@ begin
   // List := specialize TThreadSafeList<Real>.Create(@RealComparer);       // For reals
   
   // 2. With initial capacity (for better performance)
-  List := specialize TThreadSafeList<Integer>.Create(1000, @IntegerComparer);
+  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer, 1000);
   
   try
     List.Add(42);  // Simple to use!
@@ -431,32 +435,40 @@ end;
 
 ### Performance Characteristics
 
-Performance benchmarks on **Dell Inspiron 15 7510** (Intel i7-11800H @ 2.30GHz, 8 cores, 16GB RAM, Windows 11):
+Benchmarks on **Dell Inspiron 15 7510** (Intel i7-11800H @ 2.30 GHz, 8 cores, 16 GB RAM, Windows 11).
+
+> [!NOTE]
+> v0.8.2 introduced three performance improvements that affect these figures:
+> slab allocator (19–41% faster Dictionary ops, 15–19% faster HashSet Add at 1 M items),
+> 4-lane XXHash32 (19–23% faster for long string keys), and
+> binary search for sorted lists (Contains/IndexOf become O(log n) after `Sort()`).
 
 **List Operations:**
 
-| Operation            | Time (ms) | Items   | Notes           |
-|----------------------|-----------|---------|-----------------|
-| Sort Integers        | < 1       | 100,000 | Quicksort       |
-| Sort Strings         | 94        | 100,000 | Quicksort       |
-| Sort Students (Name) | 157       | 100,000 | Custom comparer |
-| Sort Students (ID)   | 94        | 100,000 | Custom comparer |
+| Operation            | Time (ms) | Items   | Notes                                  |
+|----------------------|-----------|---------|----------------------------------------|
+| Sort Integers        | 47        | 100,000 | QuickSort                              |
+| Sort Strings         | 235       | 100,000 | QuickSort                              |
+| Sort Students (Name) | 312       | 100,000 | Custom comparer                        |
+| Sort Students (ID)   | 234       | 100,000 | Custom comparer                        |
+| Contains (unsorted)  | O(n)      | —       | Linear scan                            |
+| Contains (sorted)    | O(log n)  | —       | Binary search — automatic after Sort() |
 
 **Dictionary Operations:**
 
-| Operation | Time (ms) | Items   | Notes              |
-|-----------|-----------|---------|---------------------|
-| Add       | 63        | 100,000 | Bulk insert         |
-| Find      | 265       | 100,000 | Sequential lookups  |
+| Operation | Time (ms) | Items   | Notes                         |
+|-----------|-----------|---------|-------------------------------|
+| Add       | 672       | 100,000 | Bulk insert (v0.8.2 allocator)|
+| Find      | 63        | 100,000 | Sequential lookups            |
 
 **HashSet Operations:**
 
-| Operation        | Time (ms) | Items   | Notes            |
-|------------------|-----------|---------|------------------|
-| Add              | 31        | 100,000 | Bulk insert      |
-| Find             | 47        | 100,000 | Contains checks  |
-| Stress Test      | 172       | 100,000 | Mixed operations |
-| Hash Collisions  | 3,468     | 10,000  | Forced collisions|
+| Operation       | Time (ms) | Items   | Notes             |
+|-----------------|-----------|---------|-------------------|
+| Add             | 31        | 100,000 | Bulk insert       |
+| Find            | 47        | 100,000 | Contains checks   |
+| Stress Test     | 172       | 100,000 | Mixed operations  |
+| Hash Collisions | 3,468     | 10,000  | Forced collisions |
 
 > [!TIP]
 > Use bulk operations (AddRange, RemoveRange) for better performance when working with multiple items.
@@ -583,7 +595,8 @@ begin
     Dict.Add('two', 2);    // Thread 2
     Dict.Remove('one');    // Thread 3
     
-    // Safe iteration with RAII locking
+    // Snapshot-based iteration (v0.8.2): lock released immediately after copy;
+    // other threads may modify the dictionary during the loop
     for Pair in Dict do
       WriteLn(Pair.Key, ': ', Pair.Value);
   finally
@@ -605,16 +618,16 @@ end;
 
 ## 🔄 Feature Comparison
 
-| Feature                   | List | Deque | Dictionary  | HashSet |
-|--------------------------|------|-------|-------------|---------|
-| Thread-Safe Operations   |  ✅  |  ✅   |    ✅      |   ✅    |
-| RAII Iterator Locking    |  ✅  |  ✅   |    ✅      |   ✅    |
-| Automatic Resizing       |  ✅  |  ✅   |    ✅      |   ✅    |
-| Collision Resolution     |  N/A |  N/A  |    ✅      |   ✅    |
-| Specialized Types        |  ✅  |  ❌   |    ❌      |   ✅    |
-| Custom Comparers         |  ✅  |  ❌   |    ✅      |   ✅    |
-| Bulk Operations          |  ✅  |  ✅   |    ✅      |   ✅    |
-| Set Operations          |  N/A |  N/A  |    N/A     |   ✅    |
+| Feature                   | List | Deque | Dictionary       | HashSet |
+|---------------------------|------|-------|------------------|---------|
+| Thread-Safe Operations    |  ✅  |  ✅   |       ✅         |   ✅    |
+| Iterator Locking          |  ✅  |  ✅   | Snapshot (v0.8.2)|   ✅    |
+| Automatic Resizing        |  ✅  |  ✅   |       ✅         |   ✅    |
+| Collision Resolution      |  N/A |  N/A  |       ✅         |   ✅    |
+| Specialized Types         |  ✅  |  ❌   |       ❌         |   ✅    |
+| Custom Comparers          |  ✅  |  ❌   |       ✅         |   ✅    |
+| Bulk Operations           |  ✅  |  ✅   |       ✅         |   ✅    |
+| Set Operations            |  N/A |  N/A  |      N/A         |   ✅    |
 
 ## 🧪 Testing
 
@@ -640,10 +653,10 @@ end;
 - [DictionaryIterator](examples/DictionaryIterator/DictionaryIterator.lpr) - Demonstrates using `TThreadSafeDictionary` with an iterator.
 - [DictionaryWithCustomType](examples/DictionaryWithCustomType/DictionaryWithCustomType.lpr) - Demonstrates using `TThreadSafeDictionary` with a custom type and a custom comparer.
 - [SimpleHashSet](examples/SimpleHashSet/SimpleHashSet.lpr) - Demonstrates using `TThreadSafeHashSet` with the built-in integer comparer.
-- [SimpleHashSet](examples/SimpleHashSet/SimpleHashSet.lpr) - Demonstrates using `TThreadSafeHashSet` with a custom type and a custom comparer.
 - [HashSetClientDemo](examples/HashSetClientDemo/HashSetClientDemo.lpr) - Demonstrates using `TThreadSafeHashSet` with a custom type and a custom comparer.
-- [SimpleDeque](examples/SimpleDeque/SimpleDeque.lpr) - Demonstrates using `TThreadSafeDeque` with a custom type and a custom comparer.
-- [DequeWithCustomType](examples/DequeWithCustomType/DequeWithCustomType.lpr) - Demonstrates using `TThreadSafeDeque` with a custom type and a custom comparer.
+- [SimpleDeque](examples/SimpleDeque/SimpleDeque.lpr) - Demonstrates using `TThreadSafeDeque` with basic push/pop operations.
+- [DequeWithCustomType](examples/DequeWithCustomType/DequeWithCustomType.lpr) - Demonstrates using `TThreadSafeDeque` with a custom type.
+- [Benchmark](examples/Benchmark/Benchmark.lpr) - Microsecond-precision benchmark suite covering all four collections at 1k, 10k, 100k and 1M items. Supports `--affinity` flag to pin the timing thread to CPU core 0 for stable measurements.
 
 ## 🤝 Contributing
 
