@@ -79,7 +79,7 @@ type
         property Current: T read GetCurrent;            // Read-only property to access the current element.
       end;
 
-      { 
+      {
         Local array type for internal use only
         Using specialize TArray<T> for better compatibility with FPC's generic collections
       }
@@ -89,6 +89,28 @@ type
       INITIAL_BUCKET_COUNT = 16;   // Default number of buckets in the hash table upon initialization.
       LOAD_FACTOR = 0.75;          // Threshold ratio to determine when to resize the hash table (75% full).
       MIN_BUCKET_COUNT = 4;        // Minimum number of buckets allowed to prevent excessive shrinking.
+      ENTRY_BLOCK_SIZE = 256;      // Entries per allocator block
+
+    type
+      // Block allocator for TEntry records.
+      // Allocates entries in flat blocks of ENTRY_BLOCK_SIZE to avoid per-entry heap
+      // calls and improve cache locality.  Freed entries are recycled via a freelist.
+      // No internal lock — callers must hold FLock.
+      PEntryBlock = ^TEntryBlock;
+      TEntryBlock = record
+        Entries: array[0..ENTRY_BLOCK_SIZE - 1] of TEntry;
+        Next: PEntryBlock;
+      end;
+
+      TEntryAllocator = record
+        FBlocks:      PEntryBlock;
+        FFreeList:    PEntry;
+        FUsedInBlock: Integer;
+        procedure Init;
+        function  Alloc: PEntry;
+        procedure RecycleEntry(Entry: PEntry);
+        procedure ReleaseAll;
+      end;
 
     private
       FBuckets: array of PEntry;   // Dynamic array holding pointers to the head of each bucket's entry chain.
@@ -96,6 +118,7 @@ type
       FLock: TCriticalSection;     // Critical section to synchronize access and ensure thread safety.
       FEqualityComparer: specialize TEqualityComparer<T>;  // Delegate for comparing two items for equality.
       FHashFunction: specialize THashFunction<T>;          // Delegate for computing the hash code of an item.
+      FAllocator: TEntryAllocator; // Slab allocator for TEntry records
 
       { 
         GetBucketIndex: 
@@ -532,6 +555,64 @@ function RealHash(const Value: Real): Cardinal;
 
 implementation
 
+{ TEntryAllocator implementation }
+
+procedure TThreadSafeHashSet.TEntryAllocator.Init;
+begin
+  FBlocks      := nil;
+  FFreeList    := nil;
+  FUsedInBlock := ENTRY_BLOCK_SIZE;
+end;
+
+function TThreadSafeHashSet.TEntryAllocator.Alloc: PEntry;
+var
+  NewBlock: PEntryBlock;
+begin
+  if FFreeList <> nil then
+  begin
+    Result    := FFreeList;
+    FFreeList := FFreeList^.Next;
+    Initialize(Result^);
+    Exit;
+  end;
+  if FUsedInBlock >= ENTRY_BLOCK_SIZE then
+  begin
+    New(NewBlock);
+    NewBlock^.Next := FBlocks;
+    FBlocks        := NewBlock;
+    FUsedInBlock   := 0;
+  end;
+  Result := @FBlocks^.Entries[FUsedInBlock];
+  Inc(FUsedInBlock);
+end;
+
+procedure TThreadSafeHashSet.TEntryAllocator.RecycleEntry(Entry: PEntry);
+begin
+  Finalize(Entry^);
+  Entry^.Next := FFreeList;
+  FFreeList   := Entry;
+end;
+
+procedure TThreadSafeHashSet.TEntryAllocator.ReleaseAll;
+var
+  Block, NextBlock: PEntryBlock;
+  I: Integer;
+begin
+  Block := FBlocks;
+  while Block <> nil do
+  begin
+    NextBlock := Block^.Next;
+    for I := 0 to ENTRY_BLOCK_SIZE - 1 do
+      Finalize(Block^.Entries[I]);
+    FreeMem(Block, SizeOf(TEntryBlock));
+    Block := NextBlock;
+  end;
+  FBlocks      := nil;
+  FFreeList    := nil;
+  FUsedInBlock := ENTRY_BLOCK_SIZE;
+end;
+
+
 { TThreadSafeHashSet }
 
 // Basic equality comparers - straightforward comparisons
@@ -589,6 +670,7 @@ constructor TThreadSafeHashSet.Create(AEqualityComparer: specialize TEqualityCom
 begin
   // Initialize with thread safety and hash functions
   FLock := TCriticalSection.Create;
+  FAllocator.Init;
   FEqualityComparer := AEqualityComparer;
   FHashFunction := AHashFunction;
   FCount := 0;
@@ -619,7 +701,7 @@ begin
   BucketIdx := GetBucketIndex(Hash);
   if FindEntry(Item, Hash, BucketIdx) <> nil then
     Exit;
-  New(Entry);
+  Entry := FAllocator.Alloc;
   Entry^.Value := Item;
   Entry^.Hash := Hash;
   Entry^.Next := FBuckets[BucketIdx];
@@ -649,7 +731,7 @@ begin
         FBuckets[BucketIdx] := Current^.Next
       else
         Previous^.Next := Current^.Next;
-      Dispose(Current);
+      FAllocator.RecycleEntry(Current);
       Dec(FCount);
       Result := True;
       Exit;
@@ -887,12 +969,13 @@ begin
       while Current <> nil do
       begin
         Next := Current^.Next;
-        Dispose(Current);
+        FAllocator.RecycleEntry(Current);
         Current := Next;
       end;
       FBuckets[I] := nil;
     end;
     FCount := 0;
+    FAllocator.ReleaseAll;
   finally
     FLock.Release;
   end;

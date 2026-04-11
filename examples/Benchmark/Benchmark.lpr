@@ -1188,13 +1188,29 @@ end;
   ============================================================ }
 
 var
-  CsvFilename: string;
-  SizeIdx: Integer;
+  CsvFilename:  string;
+  SizeIdx:      Integer;
+  I:            Integer;
+  AffinityMode: Boolean;
 
 begin
   QueryPerformanceFrequency(GPerfFreq);
   GTimestamp  := FormatDateTime('yyyymmdd_hhnnss', Now);
   CsvFilename := 'benchmark_' + GTimestamp + '.csv';
+
+  // Parse --affinity flag: pins the main (timing) thread to CPU core 0 only.
+  // Worker threads for MT scenarios remain free to run on any core so that
+  // multi-threaded scenarios still exercise real parallelism.
+  AffinityMode := False;
+  for I := 1 to ParamCount do
+    if LowerCase(ParamStr(I)) = '--affinity' then
+      AffinityMode := True;
+
+  if AffinityMode then
+  begin
+    if SetThreadAffinityMask(GetCurrentThread, 1) = 0 then
+      WriteLn(Format('Warning: SetThreadAffinityMask failed (error %d)', [GetLastError]));
+  end;
 
   AssignFile(GCsvFile, CsvFilename);
   Rewrite(GCsvFile);
@@ -1205,6 +1221,10 @@ begin
   WriteLn(Format('  Sizes         : 1k / 10k / 100k / 1M', []));
   WriteLn(Format('  Runs per size : %d  (trimming best+worst %d each)', [RUNS, TRIM]));
   WriteLn(Format('  Threads (MT)  : %d', [THREAD_COUNT]));
+  if AffinityMode then
+    WriteLn('  CPU affinity  : main thread pinned to core 0')
+  else
+    WriteLn('  CPU affinity  : not pinned (use --affinity to stabilise 1M results)');
   WriteLn(Format('  CSV output    : %s', [CsvFilename]));
 
   for SizeIdx := 0 to High(SIZES) do
