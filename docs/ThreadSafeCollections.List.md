@@ -56,6 +56,7 @@ This implementation requires:
 - **Smart growth strategy (v0.8)** - Optimized for both small and large lists
 - **Pre-allocation for better performance (v0.8)** - Specify initial capacity
 - **Default initial capacity of 16 (v0.8)** - Avoids early resizes
+- **Binary search after Sort() (v0.8.2)** - Contains/IndexOf become O(log n) on sorted lists
 - Support for custom comparers
 - Sorting capabilities with custom ordering
 - Bulk operations support with intelligent pre-allocation
@@ -435,6 +436,7 @@ Provides various search capabilities:
 - Forward and backward searching
 - Range-limited searches
 - Uses the provided comparer for equality checks
+- **Binary search (v0.8.2):** After calling `Sort()`, `Contains` and `IndexOf`/`IndexOfItem` automatically route through `InternalBinarySearch` — O(log n) instead of O(n). The sorted flag is cleared if items are added or the list is modified after sorting.
 
 Examples:
 ```pascal
@@ -625,10 +627,10 @@ end;
 ### Complexity Analysis
 - Add: O(1) amortized
 - Delete: O(n)
-- IndexOf: O(n)
+- IndexOf: O(n) unsorted; **O(log n) after `Sort()`** (binary search)
 - Sort: O(n log n)
 - Range operations: O(n) with single lock acquisition
-- Search operations: O(n) in unsorted lists
+- Search operations: O(n) in unsorted lists; **O(log n) in sorted lists** (Contains, IndexOf, IndexOfItem)
 - Extract operations: O(n) combining find and remove in single lock
 
 ### Memory Management
@@ -706,10 +708,11 @@ Starting with capacity 16:
    List.TrimExcess;  // Free unused capacity
    ```
 
-5. **Optimize Searches**
+5. **Optimize Searches (v0.8.2)**
    ```pascal
-   // For frequent searches, keep list sorted
+   // After Sort(), Contains/IndexOf/IndexOfItem use binary search: O(log n) instead of O(n)
    List.Sort;
+   if List.Contains(42) then ...  // O(log n)
    ```
 
 6. **Minimize Lock Contention**
