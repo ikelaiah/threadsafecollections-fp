@@ -5,7 +5,49 @@ All notable changes to ThreadSafeCollections-FP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.2] - 2026-04-10
+## [0.8.2] - 2026-04-11
+
+### Added
+
+#### Benchmark Example
+
+- **`examples/Benchmark/`**: New standalone benchmark program covering all four collection types
+  (`TThreadSafeList`, `TThreadSafeDictionary`, `TThreadSafeHashSet`, `TThreadSafeDeque`).
+  - Single-threaded and multi-threaded scenarios for each collection.
+  - Each scenario runs 5 times; best and worst trimmed before averaging.
+  - Reports avg µs, best µs, and ops/sec per scenario.
+  - Runs across four collection sizes (1k, 10k, 100k, 1M) to show scaling behaviour.
+  - Microsecond-level timing via `QueryPerformanceCounter` (Windows).
+  - Optional `--affinity` flag pins the timing thread to CPU core 0 to reduce scheduler noise.
+  - Results written to CSV for offline analysis.
+
+### Changed
+
+#### Performance Improvements
+
+- **HashFunctions `XXHash32`**: Added full 4-lane path for strings ≥ 16 bytes, processing 16 bytes
+  per iteration across four independent accumulators. Strings < 16 bytes retain the original
+  single-lane path. Benchmarks show 19–23% faster Dictionary key operations at 1M items.
+- **Dictionary key dispatch**: `TypeInfo(TKey)` is now evaluated once at construction time and
+  cached as a `TKeyKind` enum, replacing two `TypeInfo` pointer comparisons on every hash call
+  with a single `case` branch. Benefits `Add`, `TryGetValue`, `Remove`, and `ContainsKey`.
+- **Dictionary / HashSet slab allocator**: Replaced per-entry `New`/`Dispose` with a
+  `TEntryAllocator` slab allocator that hands out `TEntry` records from flat blocks of 256.
+  Freed entries are recycled via an intrusive freelist. `Clear`/`Destroy` bulk-free all backing
+  blocks. Benchmarks show 19–41% faster Dictionary operations and 15–19% faster HashSet `Add`
+  at 1M items.
+- **List `InternalIndexOf` → binary search**: When `FSorted = True`, `InternalIndexOf` routes
+  through a new `InternalBinarySearch`, reducing `Contains` from O(n) to O(log n) for sorted
+  lists. Activates automatically after any `Sort` call.
+- **`HashFunctions.pas`**: All constants converted to typed `Cardinal` to prevent FPC inferring
+  large literals as `Int64`; entire implementation wrapped in `{$PUSH}{$R-}/{$POP}` to allow
+  intentional modular 32-bit arithmetic without `ERangeError`.
+
+#### Documentation Updates
+
+- Updated all per-collection documentation in `docs/` (Deque, Dictionary, HashSet, List, RAII
+  locking guide) to reflect v0.8.2 changes.
+- Updated `README.md` with current feature set, performance notes, and v0.8.2 highlights.
 
 ### Fixed
 
@@ -72,7 +114,7 @@ locked methods call them.
 - **Dictionary**: standardised all locking calls from `FLock.Enter`/`FLock.Leave`
   to `FLock.Acquire`/`FLock.Release`, consistent with List, Deque, and HashSet.
 
-#### Performance
+#### Performance Fix
 
 - **Deque `PushRangeBack` / `PushRangeFront`**: previously computed the target
   capacity in an outer loop but then called `Grow` (which copies the full buffer each
