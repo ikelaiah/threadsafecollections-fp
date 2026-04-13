@@ -2,7 +2,9 @@
 
 ## What is TLockToken?
 
-The TLockToken provides RAII-style locking through interface reference counting, ensuring the lock is released when the enumerator is destroyed. This is a key part of the thread-safe iteration mechanism.
+The TLockToken provides RAII-style locking through interface reference counting, ensuring the lock is released when the enumerator is destroyed. This is the core thread-safe iteration mechanism for **List, HashSet, and Deque**.
+
+> **v0.8.2 note — Dictionary uses a different approach:** `TThreadSafeDictionary`'s enumerator takes a **snapshot** of all entries at construction, releases the lock immediately, then iterates over the snapshot. Other threads may modify the dictionary concurrently with an active `for…in` loop. See [Iteration models across collections](#iteration-models-across-collections) below.
 
 ## Why is it useful?
 
@@ -224,3 +226,43 @@ The magic happens because:
 4. Which releases the lock via `FLock.Release`
 
 This is all automatic due to Pascal's interface reference counting!
+
+## Iteration Models Across Collections
+
+Not all collections use the RAII-held-lock model for iteration. As of v0.8.2:
+
+| Collection | Iteration model | Concurrent modifications during iteration |
+|---|---|---|
+| `TThreadSafeList` | RAII lock held for full `for…in` | Blocked — other threads wait |
+| `TThreadSafeHashSet` | RAII lock held for full `for…in` | Blocked — other threads wait |
+| `TThreadSafeDeque` | RAII lock held for full `for…in` | Blocked — other threads wait |
+| `TThreadSafeDictionary` | **Snapshot** — lock released after copy | Allowed — not visible to the iterator |
+
+### Dictionary snapshot iteration (v0.8.2)
+
+The Dictionary's `TEnumerator` builds a snapshot of all entries into a plain array at construction time, releasing the lock immediately:
+
+```pascal
+constructor TThreadSafeDictionary.TEnumerator.Create(ADictionary: TThreadSafeDictionary);
+var
+  LockToken: ILockToken;
+begin
+  inherited Create;
+  FSnapshotIndex := -1;
+
+  // Acquire lock only long enough to copy all entries into a snapshot.
+  // Releasing it immediately means concurrent modifications during iteration
+  // are allowed but will not cause dangling-pointer access violations.
+  LockToken := ADictionary.Lock;
+  try
+    // ... copy all key-value pairs into FSnapshot ...
+  finally
+    LockToken := nil; // Release lock — snapshot is self-contained
+  end;
+end;
+```
+
+Consequences:
+- The iterator never holds the lock during `MoveNext` or `Current` access — no deadlock risk if you call dictionary methods inside the loop
+- Changes made by other threads after the snapshot was taken are **not** visible to the iterator
+- The snapshot is a separate copy — no dangling pointer risk even if the dictionary is cleared or resized mid-iteration

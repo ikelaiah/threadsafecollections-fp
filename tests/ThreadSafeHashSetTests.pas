@@ -552,12 +552,12 @@ begin
   // Verify collisions before adding items
   WriteLn('Verifying hash collisions in first group:');
   Hash1 := ForceCollisionHash(CollisionKeys[0]);
-  WriteLn(Format('First item (Group 0): "%s" -> Hash: %.8x', 
-    [CollisionKeys[0], Hash1]));
-    
+  WriteLn(Format('First item (Group 0): "%s" -> Hash: %s',
+    [CollisionKeys[0], IntToHex(Hash1, 8)]));
+
   Hash2 := ForceCollisionHash(CollisionKeys[COLLISION_GROUPS]);
-  WriteLn(Format('Second item (Group 0): "%s" -> Hash: %.8x', 
-    [CollisionKeys[COLLISION_GROUPS], Hash2]));
+  WriteLn(Format('Second item (Group 0): "%s" -> Hash: %s',
+    [CollisionKeys[COLLISION_GROUPS], IntToHex(Hash2, 8)]));
     
   if Hash1 = Hash2 then
     WriteLn('SUCCESS: Hash collision confirmed!')
@@ -684,7 +684,7 @@ begin
   WriteLn('Verifying hash collisions:');
   Hash1 := ForceCollisionHash(CollisionKeys[0]);
   Hash2 := ForceCollisionHash(CollisionKeys[1]);
-  WriteLn(Format('Group A hash: %.8x, Group B hash: %.8x', [Hash1, Hash2]));
+  WriteLn(Format('Group A hash: %s, Group B hash: %s', [IntToHex(Hash1, 8), IntToHex(Hash2, 8)]));
   AssertEquals('Hashes should be equal for collision test', Hash1, Hash2);
   
   // Create a new set with our collision-forcing hash function

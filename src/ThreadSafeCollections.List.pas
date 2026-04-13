@@ -75,6 +75,15 @@ type
     //   Index: The index to check
     procedure RaiseIfOutOfBounds(Index: Integer);
 
+    // Internal unlocked helpers — must only be called while FLock is already held.
+    // These exist to allow locked public methods to call each other without re-acquiring
+    // the lock (which would deadlock on non-reentrant TCriticalSection on POSIX).
+    procedure InternalSetCapacity(const Value: Integer);
+    procedure InternalDelete(Index: Integer);
+    function  InternalIndexOf(const Item: T): Integer;
+    // Binary search — only valid when FSorted = True. Returns index of Item or -1.
+    function  InternalBinarySearch(const Item: T): Integer;
+
   public
     // Constructor
     // Initializes the thread-safe list with a provided comparer for sorting
@@ -310,7 +319,10 @@ implementation
 // Basic comparers implementation
 function IntegerComparer(const A, B: Integer): Integer;
 begin
-  Result := A - B;
+  // Safe comparison: A - B overflows when A=MaxInt and B<0
+  if A < B then Result := -1
+  else if A > B then Result := 1
+  else Result := 0;
 end;
 
 function StringComparer(const A, B: string): Integer;
@@ -432,36 +444,20 @@ begin
 end;
 
 procedure TThreadSafeList.Delete(Index: Integer);
-var
-  I: Integer;
 begin
   FLock.Acquire;                                       // Enter critical section
   try
-    if (Index < 0) or (Index >= FCount) then
-      raise Exception.Create(ERR_INDEX_OUT_OF_BOUNDS);
-
-    // Shift elements to remove the item
-    for I := Index to FCount - 2 do
-      FList[I] := FList[I + 1];
-    Dec(FCount);
+    InternalDelete(Index);
   finally
     FLock.Release;                                     // Exit critical section
   end;
 end;
 
 function TThreadSafeList.IndexOf(const Item: T): Integer;
-var
-  I: Integer;
 begin
-  Result := -1;
   FLock.Acquire;                                       // Enter critical section
   try
-    for I := 0 to FCount - 1 do
-      if FComparer(FList[I], Item) = 0 then
-      begin
-        Result := I;
-        Break;                                          // Item found, exit loop
-      end;
+    Result := InternalIndexOf(Item);
   finally
     FLock.Release;                                     // Exit critical section
   end;
@@ -634,30 +630,95 @@ begin
   end;
 end;
 
+// Internal: resize without acquiring the lock. Caller must hold FLock.
+procedure TThreadSafeList.InternalSetCapacity(const Value: Integer);
+begin
+  if Value < FCount then
+    raise EArgumentOutOfRangeException.Create(ERR_CAPACITY_LESS_THAN_COUNT);
+  if Value <> FCapacity then
+  begin
+    SetLength(FList, Value);
+    FCapacity := Value;
+  end;
+end;
+
+// Internal: delete element at Index without acquiring the lock. Caller must hold FLock.
+procedure TThreadSafeList.InternalDelete(Index: Integer);
+var
+  I: Integer;
+begin
+  if (Index < 0) or (Index >= FCount) then
+    raise Exception.Create(ERR_INDEX_OUT_OF_BOUNDS);
+  for I := Index to FCount - 2 do
+    FList[I] := FList[I + 1];
+  FList[FCount - 1] := Default(T);  // clear last slot to release managed-type references
+  Dec(FCount);
+end;
+
+// Internal: find index of Item without acquiring the lock. Caller must hold FLock.
+function TThreadSafeList.InternalIndexOf(const Item: T): Integer;
+var
+  I: Integer;
+begin
+  if FSorted then
+    Result := InternalBinarySearch(Item)
+  else
+  begin
+    Result := -1;
+    for I := 0 to FCount - 1 do
+      if FComparer(FList[I], Item) = 0 then
+      begin
+        Result := I;
+        Break;
+      end;
+  end;
+end;
+
+// Internal: binary search on a sorted list. Caller must hold FLock and FSorted must be True.
+function TThreadSafeList.InternalBinarySearch(const Item: T): Integer;
+var
+  Lo, Hi, Mid, Cmp: Integer;
+begin
+  Result := -1;
+  Lo := 0;
+  Hi := FCount - 1;
+  while Lo <= Hi do
+  begin
+    Mid := Lo + (Hi - Lo) shr 1;
+    Cmp := FComparer(FList[Mid], Item);
+    if Cmp = 0 then
+    begin
+      Result := Mid;
+      Exit;
+    end
+    else if Cmp < 0 then
+      Lo := Mid + 1
+    else
+      Hi := Mid - 1;
+  end;
+end;
+
 procedure TThreadSafeList.SetCapacity(const Value: Integer);
 begin
   FLock.Acquire;                                           // Enter critical section
   try
-    if Value < FCount then
-      raise EArgumentOutOfRangeException.Create(ERR_CAPACITY_LESS_THAN_COUNT);
-
-    if Value <> FCapacity then
-    begin
-      SetLength(FList, Value);                             // Resize the internal array
-      FCapacity := Value;                                  // Update capacity
-    end;
+    InternalSetCapacity(Value);
   finally
     FLock.Release;                                         // Exit critical section
   end;
 end;
 
 function TThreadSafeList.ToArray: specialize TArray<T>;
+var
+  I: Integer;
 begin
   FLock.Acquire;                                           // Enter critical section
   try
-    SetLength(Result, FCount);                             // Initialize the result array
-    if FCount > 0 then
-      Move(FList[0], Result[0], FCount * SizeOf(T));       // Copy items to the result array
+    SetLength(Result, FCount);
+    // Element-wise assignment so managed types (string, interface, etc.)
+    // have their reference counts updated correctly.
+    for I := 0 to FCount - 1 do
+      Result[I] := FList[I];
   finally
     FLock.Release;                                         // Exit critical section
   end;
@@ -665,18 +726,21 @@ end;
 
 procedure TThreadSafeList.FromArray(const Values: array of T);
 var
-  NewCount: Integer;
+  NewCount, I: Integer;
 begin
   FLock.Acquire;                                            // Enter critical section
   try
     NewCount := Length(Values);
     if NewCount > FCapacity then
-      SetCapacity(NewCount);                                // Ensure enough capacity
-
-    if NewCount > 0 then
-      Move(Values[0], FList[0], NewCount * SizeOf(T));      // Copy items from the input array
-    FCount := NewCount;                                     // Update the count
-    FSorted := False;                                       // Reset sorted flag as order is unknown
+      InternalSetCapacity(NewCount);                        // Use internal helper — lock already held
+    // Element-wise assignment for managed-type safety
+    for I := 0 to NewCount - 1 do
+      FList[I] := Values[I];
+    // Clear any leftover slots to release managed-type references
+    for I := NewCount to FCount - 1 do
+      FList[I] := Default(T);
+    FCount := NewCount;
+    FSorted := False;
   finally
     FLock.Release;                                          // Exit critical section
   end;
@@ -704,7 +768,7 @@ begin
         RequiredCapacity := ((RequiredCapacity + (ARRAY_ALIGNMENT - 1)) div ARRAY_ALIGNMENT) * ARRAY_ALIGNMENT  // Round to nearest alignment
       else
         RequiredCapacity := ((RequiredCapacity * GROWTH_FACTOR_LARGE_NUMERATOR) div GROWTH_FACTOR_LARGE_DENOMINATOR);  // 50% extra buffer
-      SetCapacity(RequiredCapacity);
+      InternalSetCapacity(RequiredCapacity);   // Use internal helper — lock already held
     end;
 
     // Copy items efficiently
@@ -735,7 +799,7 @@ end;
 
 procedure TThreadSafeList.InsertRange(Index: Integer; const Values: array of T);
 var
-  InsertCount: Integer;
+  InsertCount, J, K: Integer;
 begin
   FLock.Acquire;                                           // Enter critical section
   try
@@ -746,16 +810,20 @@ begin
     if InsertCount = 0 then
       Exit;                                                 // Nothing to insert
 
-    // Ensure capacity
+    // Ensure capacity — use internal helper, lock already held
     if FCount + InsertCount > FCapacity then
-      SetCapacity(FCount + InsertCount);
+      InternalSetCapacity(FCount + InsertCount);
 
-    // Move existing items to make space for new items
+    // Shift existing items right to make room.
+    // Iterate from the end to avoid overwriting elements before they are moved.
+    // Element-wise for managed-type safety (reference counts must be maintained).
     if Index < FCount then
-      Move(FList[Index], FList[Index + InsertCount], (FCount - Index) * SizeOf(T));
+      for J := FCount - 1 downto Index do
+        FList[J + InsertCount] := FList[J];
 
-    // Copy new items into the list
-    Move(Values[0], FList[Index], InsertCount * SizeOf(T));
+    // Copy new items — element-wise for managed-type safety
+    for K := 0 to InsertCount - 1 do
+      FList[Index + K] := Values[K];
     Inc(FCount, InsertCount);                               // Update the count
     FSorted := False;                                       // List is no longer sorted
   finally
@@ -776,7 +844,7 @@ end;
 
 procedure TThreadSafeList.DeleteRange(AIndex, ACount: Integer);
 var
-  OldCount: Integer;
+  OldCount, I: Integer;
 begin
   FLock.Acquire;                                           // Enter critical section
   try
@@ -787,11 +855,12 @@ begin
       Exit;                                                 // Nothing to delete
 
     OldCount := FCount;
-    if AIndex + ACount < OldCount then
-      Move(FList[AIndex + ACount], 
-           FList[AIndex], 
-           (OldCount - (AIndex + ACount)) * SizeOf(T));    // Shift remaining items to fill the gap
-
+    // Shift remaining items left — element-wise for managed-type safety
+    for I := AIndex to OldCount - ACount - 1 do
+      FList[I] := FList[I + ACount];
+    // Clear vacated slots to release managed-type references
+    for I := OldCount - ACount to OldCount - 1 do
+      FList[I] := Default(T);
     Dec(FCount, ACount);                                   // Update the count
   finally
     FLock.Release;                                         // Exit critical section
@@ -839,7 +908,9 @@ end;
 
 function TThreadSafeList.LastIndexOf(const Item: T; StartIndex: Integer): Integer;
 begin
-  Result := LastIndexOf(Item, StartIndex, StartIndex + 1);    // Delegate to overloaded method
+  // Search backward from StartIndex through all elements 0..StartIndex.
+  // ACount = StartIndex+1 means "search up to StartIndex+1 elements starting from StartIndex".
+  Result := LastIndexOf(Item, StartIndex, StartIndex + 1);
 end;
 
 function TThreadSafeList.LastIndexOf(const Item: T; StartIndex, ACount: Integer): Integer;
@@ -870,6 +941,7 @@ end;
 procedure TThreadSafeList.MoveItem(CurIndex, NewIndex: Integer);
 var
   Item: T;
+  I: Integer;
 begin
   FLock.Acquire;                                               // Enter critical section
   try
@@ -880,15 +952,17 @@ begin
     if CurIndex <> NewIndex then
     begin
       Item := FList[CurIndex];                                 // Store the item to move
+      // Element-wise shift for managed-type safety
       if NewIndex < CurIndex then
-        Move(FList[NewIndex], 
-             FList[NewIndex + 1], 
-             (CurIndex - NewIndex) * SizeOf(T))                // Shift items to make space
+      begin
+        for I := CurIndex downto NewIndex + 1 do
+          FList[I] := FList[I - 1];
+      end
       else
-        Move(FList[CurIndex + 1], 
-             FList[CurIndex], 
-             (NewIndex - CurIndex) * SizeOf(T));                // Shift items to fill the gap
-
+      begin
+        for I := CurIndex to NewIndex - 1 do
+          FList[I] := FList[I + 1];
+      end;
       FList[NewIndex] := Item;                                  // Place the item at the new index
       FSorted := False;                                         // List is no longer sorted
     end;
@@ -906,6 +980,8 @@ begin
 end;
 
 procedure TThreadSafeList.Insert(Index: Integer; const Item: T);
+var
+  I: Integer;
 begin
   FLock.Acquire;                                               // Enter critical section
   try
@@ -915,9 +991,10 @@ begin
     if FCount = FCapacity then
       Grow;                                                   // Grow the list if capacity is reached
 
+    // Shift items right — element-wise for managed-type safety
     if Index < FCount then
-      System.Move(FList[Index], FList[Index + 1], (FCount - Index) * SizeOf(T));
-                                                              // Shift items to make space for the new item
+      for I := FCount - 1 downto Index do
+        FList[I + 1] := FList[I];
 
     FList[Index] := Item;                                     // Insert the new item
     Inc(FCount);                                              // Update the count
@@ -974,11 +1051,11 @@ var
 begin
   FLock.Acquire;                                               // Enter critical section
   try
-    Index := IndexOf(Item);                                    // Find the item's index
+    Index := InternalIndexOf(Item);                            // Use internal helper — lock already held
     if Index = -1 then
       raise EArgumentOutOfRangeException.Create(ERR_ITEM_NOT_FOUND);
-    Result := FList[Index];                                    // Retrieve the item
-    Delete(Index);                                             // Remove the item from the list
+    Result := FList[Index];
+    InternalDelete(Index);                                     // Use internal helper — lock already held
   finally
     FLock.Release;                                             // Exit critical section
   end;
@@ -988,9 +1065,9 @@ function TThreadSafeList.ExtractAt(Index: Integer): T;
 begin
   FLock.Acquire;                                               // Enter critical section
   try
-    RaiseIfOutOfBounds(Index);                                 // Validate index
-    Result := FList[Index];                                    // Retrieve the item
-    Delete(Index);                                             // Remove the item from the list
+    RaiseIfOutOfBounds(Index);
+    Result := FList[Index];
+    InternalDelete(Index);                                     // Use internal helper — lock already held
   finally
     FLock.Release;                                             // Exit critical section
   end;
@@ -1001,7 +1078,7 @@ begin
   FLock.Acquire;                                               // Enter critical section
   try
     if FCount < FCapacity then
-      SetCapacity(FCount);                                     // Reduce capacity to match the count
+      InternalSetCapacity(FCount);                             // Use internal helper — lock already held
   finally
     FLock.Release;                                             // Exit critical section
   end;

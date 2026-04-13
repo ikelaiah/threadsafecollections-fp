@@ -153,6 +153,8 @@ classDiagram
         -integer FCount
         -THashFunction~TKey~ FHashFunc
         -TEqualityComparison~TKey~ FEqualityComparer
+        -TKeyKind FKeyKind
+        -TEntryAllocator FAllocator
         +Create()
         +Create(InitialCapacity: integer)
         +Create(HashFunc: THashFunction~TKey~, EqualityComparer: TEqualityComparison~TKey~)
@@ -195,10 +197,8 @@ classDiagram
     }
     
     class TEnumerator {
-        -FDictionary: TThreadSafeDictionary
-        -FCurrentBucket: Integer
-        -FCurrentEntry: PEntry
-        -FLockToken: ILockToken
+        -FSnapshot: TSnapshot
+        -FSnapshotIndex: Integer
         +Create(ADictionary: TThreadSafeDictionary)
         +Destroy()
         +MoveNext(): Boolean
@@ -222,7 +222,6 @@ classDiagram
     TThreadSafeDictionary *-- TEnumerator : contains
     TThreadSafeDictionary *-- TDictionaryEntry : uses internally
     TThreadSafeDictionary --> TPair : returns in enumerator
-    TEnumerator --> ILockToken : uses
     TThreadSafeDictionary --> ILockToken : creates
     TLockToken ..|> ILockToken
 ```
@@ -383,12 +382,10 @@ end;
 
 #### Iterator Characteristics
 - Returns key-value pairs during iteration
-- Thread-safe through RAII locking
-- Automatic lock acquisition and release
-- Exception-safe lock management
+- **Snapshot-based** (v0.8.2): the enumerator copies all entries into an internal snapshot at construction time, then releases the lock immediately
+- Other threads **may** modify the dictionary while you iterate — they will not block, and the iterator will not see those changes
 - Forward-only iteration
-- Protected from modifications during iteration (via RAII lock)
-- Other threads must wait for iteration to complete before modifying
+- Exception-safe: snapshot is a plain array, no dangling-pointer risk
 
 ### Maintenance Methods
 | Method/Property | Description | Type | Thread-Safe |
@@ -406,6 +403,7 @@ const
   INITIAL_BUCKET_COUNT = 16;     // Default initial size
   LOAD_FACTOR = 0.75;           // Resize threshold
   MIN_BUCKET_COUNT = 4;         // Minimum bucket count
+  ENTRY_BLOCK_SIZE = 256;       // Entries per slab allocator block (~8 KB for <string,int>)
 ```
 
 ## Implementation Details
@@ -422,11 +420,21 @@ The dictionary includes efficient built-in hash functions for common types:
 
 For basic types, just use `Create` or `Create(capacity)` - no need to provide hash functions.
 
+**XXHash32 (v0.8.2 — 4-lane parallel):** For strings ≥ 16 bytes the implementation processes 16 bytes per iteration across four independent accumulators (`V1`–`V4`), allowing the CPU to pipeline all four multiply+rotate chains simultaneously. Strings < 16 bytes use a single-lane path that preserves good distribution for short sequential keys (e.g. `"key00001"`…`"key01000"`). This delivers roughly a 19–23% throughput improvement for long string keys at 1 M items.
+
+### Key Type Dispatch (v0.8.2)
+
+The `TKeyKind` enum (`kkString`, `kkInteger`, `kkOther`) is evaluated once at construction from `TypeInfo(TKey)` and cached in `FKeyKind`. Every subsequent hash call uses a single `case` branch instead of two `TypeInfo` pointer comparisons, benefiting all operations (Add, TryGetValue, Remove, ContainsKey).
+
+### Slab Allocator (v0.8.2)
+
+`TEntry` records are allocated by `TEntryAllocator` in flat blocks of `ENTRY_BLOCK_SIZE` (256) entries rather than via individual heap calls. Freed entries are recycled through an internal freelist (reusing the entry's own `Next` pointer as the freelist link). The allocator has no internal lock — callers must hold `FLock`. This reduces per-operation heap overhead and improves cache locality, delivering a 19–41% improvement on dictionary operations at 1 M items.
+
 ### Thread Safety
 - Uses TCriticalSection for synchronization
-- RAII-style locking with ILockToken
+- RAII-style locking with ILockToken for all mutating operations and `Lock()`
 - All public methods are thread-safe
-- Automatic lock management during iteration
+- **Iteration is snapshot-based** (v0.8.2): the lock is held only during the initial snapshot copy, then released — other threads may modify the dictionary concurrently with an active enumerator
 
 ### Load Factor and Resizing
 - Load factor threshold: 0.75
@@ -590,7 +598,10 @@ begin
     Dict.Add('one', 1);
     Dict.Add('two', 2);
     
-    // Using iterator
+    // Snapshot-based iteration (v0.8.2):
+    // The enumerator takes a snapshot of all entries at construction and releases
+    // the lock immediately. Other threads may modify the dictionary during the loop
+    // but changes will NOT be visible to this iterator.
     for Pair in Dict do
       WriteLn(Format('%s: %d', [Pair.Key, Pair.Value]));
   finally

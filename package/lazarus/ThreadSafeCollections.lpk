@@ -3,7 +3,6 @@
   <Package Version="5">
     <PathDelim Value="\"/>
     <Name Value="ThreadSafeCollections"/>
-    <Type Value="RunAndDesignTime"/>
     <Author Value="ikelaiah"/>
     <CompilerOptions>
       <Version Value="11"/>
@@ -12,6 +11,9 @@
         <OtherUnitFiles Value="..\..\src"/>
         <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
+      <Other>
+        <CustomOptions Value="-FcUTF8"/>
+      </Other>
     </CompilerOptions>
     <Description Value="# 🔒 ThreadSafeCollections-FP
 
@@ -37,7 +39,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."/>
-    <Version Minor="8" Release="1"/>
+    <Version Minor="8" Release="2"/>
     <Files>
       <Item>
         <Filename Value="..\..\src\HashFunctions.pas"/>

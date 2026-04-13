@@ -254,7 +254,8 @@ type
   private
     FDeque: TThreadSafeDeque;
     FCurrent: T;
-    FCurrentNode: PNode;
+    FCurrentIndex: Integer;   // v0.8: index into circular array (replaces linked-list FCurrentNode)
+    FLockToken: ILockToken;
   public
     constructor Create(ADeque: TThreadSafeDeque);
     destructor Destroy; override;
@@ -484,7 +485,8 @@ type
   private
     FDeque: TThreadSafeDeque;
     FCurrent: T;
-    FCurrentNode: PNode;
+    FCurrentIndex: Integer;   // v0.8: index into circular array (replaces linked-list FCurrentNode)
+    FLockToken: ILockToken;
   public
     constructor Create(ADeque: TThreadSafeDeque);
     destructor Destroy; override;

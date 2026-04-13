@@ -56,6 +56,7 @@
 - Specialized implementations for common types
 - RAII-style locking mechanism
 - Thread-safe iteration support
+- **Slab allocator for TEntry records (v0.8.2)** — entries allocated in blocks of 256 with freelist recycling, reducing heap overhead and improving cache locality
 
 ## Quick Start
 
@@ -276,23 +277,29 @@ property Count: Integer read GetCount;
 ### Constants
 ```pascal
 const
-  INITIAL_BUCKET_COUNT = 16;
-  LOAD_FACTOR = 0.75;
-  MIN_BUCKET_COUNT = 4;
+  INITIAL_BUCKET_COUNT = 16;   // Default number of buckets
+  LOAD_FACTOR = 0.75;          // Resize threshold (75% full)
+  MIN_BUCKET_COUNT = 4;        // Minimum bucket count
+  ENTRY_BLOCK_SIZE = 256;      // Entries per slab allocator block
 ```
 
 ## Implementation Details
 
 ### Built-in Hash Functions
 - Integer: Multiplicative hash
-- String: XXHash32
+- String: XXHash32 (v0.8.2: 4-lane parallel for strings ≥ 16 bytes, single-lane for shorter strings)
 - Boolean: Direct value hash
 - Real: Fixed-point conversion hash
+
+### Slab Allocator (v0.8.2)
+
+`TEntry` records are managed by `TEntryAllocator`, which allocates in flat blocks of `ENTRY_BLOCK_SIZE` (256) entries. Freed entries are recycled via an internal freelist (reusing the entry's own `Next` pointer as the freelist link) instead of calling `Dispose`. The allocator has no internal lock — callers must hold `FLock`. This reduces per-Add heap overhead and improves cache locality (15–19% improvement on Add operations at 1 M items).
 
 ### Thread Safety
 - Uses `TCriticalSection` for synchronization
 - RAII-style locking through `ILockToken`
 - All operations are mutually exclusive
+- Iteration holds the lock for the full duration (enumerator uses `FLockToken` — other threads block until the `for…in` loop completes)
 
 ### Load Factor and Resizing
 - Triggers resize at 75% capacity
@@ -310,7 +317,8 @@ const
 - Resize: O(n)
 
 ### Performance Characteristics
-Based on test results with FPC 3.2.2 (Windows 11, 11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz, 2304 Mhz, 8 Core(s), 16 Logical Processors, 32 Gb RAM):
+
+> **Note:** The figures below are pre-v0.8.2 baselines (FPC 3.2.2, Windows 11, 11th Gen Intel Core i7-11800H @ 2.30 GHz, 8 cores / 16 logical processors, 32 GB RAM). The v0.8.2 slab allocator delivers a further **15–19% improvement** on Add operations at 1 M items; the 4-lane XXHash32 delivers **19–23% improvement** for long string keys.
 
 | Operation | Time (ms) | Items | Notes |
 |-----------|-----------|-------|-------|
