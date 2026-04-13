@@ -1,6 +1,6 @@
 # ThreadSafeCollections-FP v0.8.2 Release Notes
 
-**Release Date**: 2026-04-11
+**Release Date**: 2026-04-14
 
 ## Overview
 
