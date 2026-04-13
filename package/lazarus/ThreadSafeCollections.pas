@@ -11,14 +11,8 @@ uses
   HashFunctions, ThreadSafeCollections.Deque, 
   ThreadSafeCollections.Dictionary, ThreadSafeCollections.HashSet, 
   ThreadSafeCollections.Interfaces, ThreadSafeCollections.List, 
-  LazarusPackageIntf;
+  ThreadSafeCollections.ErrorMessages;
 
 implementation
 
-procedure Register;
-begin
-end;
-
-initialization
-  RegisterPackage('ThreadSafeCollections', @Register);
 end.
