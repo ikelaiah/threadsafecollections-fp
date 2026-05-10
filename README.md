@@ -37,16 +37,16 @@ Current State:
    - Dictionary (v0.8.2): snapshot-based — lock released immediately after entry copy; concurrent modifications are safe but not visible to the iterator
 - ✅ Bulk operations support
 - ✅ **NEW in v0.8.2**: Critical bug fixes and performance optimisations
-  - Fixed re-entrant lock deadlocks in List, HashSet, and Dictionary on POSIX platforms
+  - Fixed several re-entrant lock deadlocks in List, HashSet, and Dictionary on POSIX platforms
   - Fixed managed-type memory safety (`string`/`interface`) in List and Deque
   - Fixed ABBA cross-collection deadlock in `HashSet.IntersectWith`
   - Fixed `IntersectWith` incorrect item removal
-  - Fixed `IntegerComparer` overflow, `Sort`/`IsSorted` direction tracking
+  - Fixed `IntegerComparer` overflow
   - Removed dead `DEBUG_LOGGING` code from Dictionary; unified locking API
   - **Slab allocator** for Dictionary and HashSet `TEntry` records — 256-entry blocks with freelist recycling; 19–41% faster Dictionary ops, 15–19% faster HashSet Add at 1 M items
   - **4-lane XXHash32** — strings ≥ 16 bytes processed across four independent accumulators; 19–23% faster for long string keys
   - **Dictionary type dispatch caching** — `TKeyKind` enum cached at construction, eliminating per-call `TypeInfo` comparisons
-  - **Binary search for sorted lists** — `Contains`/`IndexOf` automatically use O(log n) binary search after `Sort()`
+  - **Binary search for ascending sorted lists** — `Contains`/`IndexOf` use O(log n) binary search after `Sort(True)`
   - **Dictionary iterator is now snapshot-based** — lock released immediately after copying; other threads may modify concurrently
 - ✅ **v0.8.1**: Code maintainability improvements
   - Algorithm complexity annotations (Big-O) on all 80+ methods
@@ -145,7 +145,7 @@ begin
     Dict.Add('one', 1);
     Dict.Add('two', 2);
     
-    if Dict.Contains('one') then
+    if Dict.ContainsKey('one') then
       WriteLn('Found: ', Dict['one']);
   finally
     Dict.Free;
@@ -373,15 +373,22 @@ end;
 
 var
   UniquePoints: specialize TThreadSafeHashSet<TPoint>;
+  Point: TPoint;
 begin
   UniquePoints := specialize TThreadSafeHashSet<TPoint>.Create(@PointEquals, @PointHash);
   try
     // Add unique points
-    UniquePoints.Add(TPoint.Create(1, 1));
-    UniquePoints.Add(TPoint.Create(2, 2));
+    Point.X := 1;
+    Point.Y := 1;
+    UniquePoints.Add(Point);
+
+    Point.X := 2;
+    Point.Y := 2;
+    UniquePoints.Add(Point);
     
     // Check for existence
-    var Point := TPoint.Create(1, 1);
+    Point.X := 1;
+    Point.Y := 1;
     if UniquePoints.Contains(Point) then
       WriteLn('Point (1,1) exists');
   finally
@@ -441,7 +448,7 @@ Benchmarks on **Dell Inspiron 15 7510** (Intel i7-11800H @ 2.30 GHz, 8 cores, 16
 > v0.8.2 introduced three performance improvements that affect these figures:
 > slab allocator (19–41% faster Dictionary ops, 15–19% faster HashSet Add at 1 M items),
 > 4-lane XXHash32 (19–23% faster for long string keys), and
-> binary search for sorted lists (Contains/IndexOf become O(log n) after `Sort()`).
+> binary search for ascending sorted lists (`Contains`/`IndexOf` become O(log n) after `Sort(True)`).
 
 **List Operations:**
 
@@ -452,7 +459,7 @@ Benchmarks on **Dell Inspiron 15 7510** (Intel i7-11800H @ 2.30 GHz, 8 cores, 16
 | Sort Students (Name) | 312       | 100,000 | Custom comparer                        |
 | Sort Students (ID)   | 234       | 100,000 | Custom comparer                        |
 | Contains (unsorted)  | O(n)      | —       | Linear scan                            |
-| Contains (sorted)    | O(log n)  | —       | Binary search — automatic after Sort() |
+| Contains (ascending sorted) | O(log n)  | —       | Binary search — automatic after Sort(True) |
 
 **Dictionary Operations:**
 
@@ -642,7 +649,7 @@ end;
 - [ThreadSafeCollections.Dictionary.md](docs/ThreadSafeCollections.Dictionary.md)
 - [ThreadSafeCollections.HashSet.md](docs/ThreadSafeCollections.HashSet.md)
 - [RAII-style locking through interface counting](docs/RAII-style-locking-through-interface-counting.md)
-- [Latest Test Output](docs/Latest-Test-Output.md)
+- [Latest Test Output](tests/LatestTestOutput.md)
 
 ## 📁 Examples
 

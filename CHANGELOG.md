@@ -37,8 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   blocks. Benchmarks show 19–41% faster Dictionary operations and 15–19% faster HashSet `Add`
   at 1M items.
 - **List `InternalIndexOf` → binary search**: When `FSorted = True`, `InternalIndexOf` routes
-  through a new `InternalBinarySearch`, reducing `Contains` from O(n) to O(log n) for sorted
-  lists. Activates automatically after any `Sort` call.
+  through a new `InternalBinarySearch`, reducing `Contains` and `IndexOf` from O(n) to O(log n)
+  for ascending sorted lists. In the current code this path is reliable after `Sort(True)`;
+  the binary search assumes ascending comparer order.
 - **`HashFunctions.pas`**: All constants converted to typed `Cardinal` to prevent FPC inferring
   large literals as `Int64`; entire implementation wrapped in `{$PUSH}{$R-}/{$POP}` to allow
   intentional modular 32-bit arithmetic without `ERangeError`.
@@ -97,8 +98,9 @@ locked methods call them.
 
 - **List `IntegerComparer`**: `Result := A - B` overflows for `A = MaxInt, B < 0`.
   Replaced with safe three-way comparison.
-- **List `Sort`**: `FSorted` was always set to `True` regardless of sort direction,
-  making `IsSorted` meaningless after a descending sort. Now `FSorted := Ascending`.
+- **List `Sort`**: `FSorted` is a Boolean sorted-state flag in the current code. It does not
+  store sort direction; descending sort order should not be used with the binary-search lookup
+  path.
 
 #### Low — Correctness
 

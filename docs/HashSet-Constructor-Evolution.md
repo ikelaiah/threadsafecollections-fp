@@ -66,19 +66,22 @@ The working solution uses derived classes for each specific type:
 ```pascal
 type
   // Base generic class
-  generic TThreadSafeHashSet<T> = class
-  constructor Create(AEqualityComparer: specialize TEqualityComparer<T>;
-  AHashFunction: specialize THashFunction<T>);
+generic TThreadSafeHashSet<T> = class
+constructor Create(AEqualityComparer: specialize TEqualityComparer<T>;
+  AHashFunction: specialize THashFunction<T>;
+  AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
   // ...
 end;
 
 // Specialized classes with simple constructors
 TThreadSafeHashSetInteger = class(specialize TThreadSafeHashSet<Integer>)
-  constructor Create; overload;
+  constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
 end;
 
 TThreadSafeHashSetString = class(specialize TThreadSafeHashSet<string>)
-  constructor Create; overload;
+  constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
+  constructor Create(AHashFunction: specialize THashFunction<string>;
+    AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;
 end;
 ```
 
@@ -133,7 +136,7 @@ end;
 2. Inheritance can solve problems that generics alone cannot
 3. Creating specialized classes is better than type aliases for adding functionality
 4. RTTI-based solutions can be problematic with generics
-5. Following OOP principles leads to cleaner solutions 👈
+5. Following OOP principles leads to cleaner solutions
 
 ## References
 

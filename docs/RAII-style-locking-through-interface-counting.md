@@ -1,140 +1,74 @@
 # RAII-Style Locking Through Interface Counting
 
-## What is TLockToken?
+This project uses `ILockToken` and `TLockToken` to tie a `TCriticalSection` lock to an interface reference lifetime.
 
-The TLockToken provides RAII-style locking through interface reference counting, ensuring the lock is released when the enumerator is destroyed. This is the core thread-safe iteration mechanism for **List, HashSet, and Deque**.
+`TLockToken.Create` acquires the critical section. `TLockToken.Destroy` releases it if it is still held. `Release` can also release it explicitly before the interface reference is destroyed.
 
-> **v0.8.2 note — Dictionary uses a different approach:** `TThreadSafeDictionary`'s enumerator takes a **snapshot** of all entries at construction, releases the lock immediately, then iterates over the snapshot. Other threads may modify the dictionary concurrently with an active `for…in` loop. See [Iteration models across collections](#iteration-models-across-collections) below.
+The implementation is in `src/ThreadSafeCollections.Interfaces.pas`:
 
-## Why is it useful?
-
-The RAII (Resource Acquisition Is Initialization) pattern is a powerful concept in object-oriented programming where resources are automatically released when an object is destroyed. In the context of thread-safe collections, TLockToken ensures that locks are released when the enumerator is destroyed, preventing deadlocks and simplifying resource management.
-
-
-1. RAII Pattern
 ```pascal
 TLockToken = class(TInterfacedObject, ILockToken)
 private
   FLock: TCriticalSection;
-   public
-     constructor Create(ALock: TCriticalSection);  // Acquires lock
-     destructor Destroy; override;                 // Releases lock
-  end;
+public
+  constructor Create(ALock: TCriticalSection);
+  destructor Destroy; override;
+  procedure Release;
+end;
+
+constructor TLockToken.Create(ALock: TCriticalSection);
+begin
+  inherited Create;
+  FLock := ALock;
+  FLock.Acquire;
+end;
+
+destructor TLockToken.Destroy;
+begin
+  if Assigned(FLock) then
+    FLock.Release;
+  inherited;
+end;
 ```
 
-2. Automatic Lock Management through Interface
-```pascal
-FLockToken: ILockToken;  // In TEnumerator
-``` 
+## Current Iteration Models
 
-- When FLockToken goes out of scope, the interface reference count drops to 0
-- This automatically triggers TLockToken's destructor
-- Lock is released automatically, even if an exception occurs!
+Not every collection uses the token in the same way.
 
-3. Clear Iterator Implementation
+| Collection | Iteration model | Concurrent modification during `for..in` |
+|---|---|---|
+| `TThreadSafeList` | Enumerator holds `ILockToken` for the full loop | Blocked until enumeration ends |
+| `TThreadSafeHashSet` | Enumerator holds `ILockToken` for the full loop | Blocked until enumeration ends |
+| `TThreadSafeDeque` | Enumerator holds `ILockToken` for the full loop | Blocked until enumeration ends |
+| `TThreadSafeDictionary` | Enumerator snapshots entries, then releases the lock | Allowed, but changes are not visible to that iterator |
+
+## List, HashSet, and Deque Iterators
+
+These enumerators acquire the collection lock in the enumerator constructor and release it in the enumerator destructor.
+
+Current `TThreadSafeDeque` example:
 
 ```pascal
 constructor TThreadSafeDeque.TEnumerator.Create(ADeque: TThreadSafeDeque);
 begin
   inherited Create;
-     FDeque := ADeque;
-  FLockToken := FDeque.Lock;  // Lock is acquired and managed automatically
-  FCurrentNode := nil;
+  FDeque := ADeque;
+  FLockToken := FDeque.Lock;
+  FCurrentIndex := -1;
 end;
-```
 
-This pattern provides:
-
-- Exception safety
-- No need for `try..finally` blocks in the iterator
-- Self-cleaning resources
-- Thread-safe iteration
-
-It's a very neat solution that leverages Free Pascal's interface reference counting to manage thread synchronization!
-
-## More on TLockToken
-
-The RAII pattern is commonly used in C++, and this specific implementation is also seen in Free Pascal within Delphi/FPC codebases and documentation. The key insight is that Free Pascal's interfaces (IInterface) provide automatic reference counting and cleanup, similar to C++'s RAII mechanism.
-
-While the RAII pattern through interface counting is not commonly seen in Pascal codebases, it provides significant benefits:
-
-- Automatic cleanup through reference counting
-- Exception safety without explicit `try..finally` blocks
-- Clear resource ownership semantics
-
-Our implementation in ThreadSafeCollections demonstrates these benefits, as shown by the test results across all collections.
-
-The beauty of using ILockToken for this purpose remains valid:
-
-- Reference counting is automatic
-- Cleanup is guaranteed even if an exception occurs
-- The scope of the lock is clear and explicit
-- No need for explicit `try..finally` blocks
-
-## Test Results on RAII Locking - 2024-11-30
-
-Our test suite includes specific tests for the RAII locking mechanism across all collections:
-
-```
-TThreadSafeListTest.TestLockingMechanism:      33.159 ms
-TThreadSafeDictionaryTest.TestLockingMechanism: 32.749 ms
-TThreadSafeHashSetTest.Test14_LockingMechanism: 32.497 ms
-TThreadSafeDequeTest.TestLockingMechanism:      31.239 ms
-```
-
-Each test:
-
-- Creates 4 concurrent threads
-- Each thread performs 1000 lock/unlock cycles
-- Verifies that all 4000 lock operations succeed
-- Measures time taken for lock acquisition and release
-
-The consistent timing (~32ms) across different collections demonstrates:
-
-1. Reliable lock acquisition and release
-2. No lock leaks or deadlocks
-3. Consistent performance regardless of collection type
-4. Effective automatic cleanup through interface reference counting
-
-The test code shows how simple the locking mechanism is to use:
-
-```pascal
-procedure TLockTestThread.Execute;
-var
-  I: Integer;
-  LockToken: ILockToken;
+destructor TThreadSafeDeque.TEnumerator.Destroy;
 begin
-  for I := 1 to FIterations do
-  begin
-    try
-      // Get lock token - automatically managed!
-      LockToken := FList.Lock;
-      
-      // Simulate some work
-      Sleep(Random(2));
-      
-      // Lock will be automatically released when LockToken goes out of scope
-      Inc(FLockCount);
-    except
-      on E: Exception do
-        WriteLn('Lock failed: ', E.Message);
-    end;
-  end;
+  FLockToken := nil;
+  inherited;
 end;
 ```
 
-Even in this stress test scenario with multiple threads competing for locks, the RAII pattern through interface counting ensures:
+The deque is circular-array based. The old linked-list `FCurrentNode` field is no longer present.
 
-- No resource leaks
-- Proper lock release even with exceptions
-- Clean, maintainable code without explicit lock management
-
-
-## Example of TLockToken in `ThreadSafeCollections.List.pas`
+Current `TThreadSafeList` example:
 
 ```pascal
-{ TThreadSafeList.TEnumerator }
-
 constructor TThreadSafeList.TEnumerator.Create(AList: specialize TThreadSafeList<T>);
 begin
   inherited Create;
@@ -145,102 +79,16 @@ end;
 
 destructor TThreadSafeList.TEnumerator.Destroy;
 begin
-  FLockToken := nil; // Release lock
+  FLockToken := nil;
   inherited;
 end;
-
-function TThreadSafeList.TEnumerator.MoveNext: Boolean;
-begin
-  Inc(FIndex);
-  if FIndex < FList.FCount then
-  begin
-    FCurrent := FList.FList[FIndex];
-    Result := True;
-  end
-  else
-    Result := False;
-end;
-
-function TThreadSafeList.GetEnumerator: TEnumerator;
-begin
-  Result := TEnumerator.Create(Self);
-end;
-
-function TThreadSafeList.Lock: ILockToken;
-begin
-  Result := TLockToken.Create(FLock);
-end;
-``` 
-
-The RAII lock reference counting happens through several parts:
-
-1. Lock Acquisition - In the constructor:
-
-```pascal
-constructor TThreadSafeList.TEnumerator.Create(AList: specialize TThreadSafeList<T>);
-begin
-  inherited Create;
-  FList := AList;
-  FLockToken := FList.Lock;  // Here! Lock() returns ILockToken
-  FIndex := -1;
-end;
 ```
 
-2. Lock Creation - In the Lock method:
+While such an enumerator exists, other public methods that need the same collection lock must wait.
 
-```pascal
-function TThreadSafeList.Lock: ILockToken;
-begin
-  Result := TLockToken.Create(FLock);  // Creates TLockToken which acquires the lock
-end;
-```
+## Dictionary Snapshot Iteration
 
-3. Reference Counting - Through ILockToken interface:
-
-```pascal
-// In ThreadSafeCollections.Interfaces.pas
-TLockToken = class(TInterfacedObject, ILockToken)
-private
-  FLock: TCriticalSection;
-public
-  constructor Create(ALock: TCriticalSection);  // Acquires lock
-  destructor Destroy; override;                 // Releases lock
-end;
-```
-
-4. Lock Release - In the destructor:
-
-```pascal
-destructor TThreadSafeList.TEnumerator.Destroy;
-begin
-  FLockToken := nil;  // Here! Setting to nil decrements ref count
-  inherited;          // When ref count hits 0, TLockToken is destroyed
-end;                  // Which releases the lock
-``` 
-
-The magic happens because:
-
-1. `FLockToken` is an interface type (ILockToken)
-2. When we set it to `nil`, the reference count drops to 0
-3. This triggers `TLockToken.Destroy`
-4. Which releases the lock via `FLock.Release`
-
-This is all automatic due to Pascal's interface reference counting!
-
-## Iteration Models Across Collections
-
-Not all collections use the RAII-held-lock model for iteration. As of v0.8.2:
-
-| Collection | Iteration model | Concurrent modifications during iteration |
-|---|---|---|
-| `TThreadSafeList` | RAII lock held for full `for…in` | Blocked — other threads wait |
-| `TThreadSafeHashSet` | RAII lock held for full `for…in` | Blocked — other threads wait |
-| `TThreadSafeDeque` | RAII lock held for full `for…in` | Blocked — other threads wait |
-| `TThreadSafeDictionary` | **Snapshot** — lock released after copy | Allowed — not visible to the iterator |
-
-### Dictionary snapshot iteration (v0.8.2)
-
-The Dictionary's `TEnumerator` builds a snapshot of all entries into a plain array at construction time, releasing the lock immediately:
+`TThreadSafeDictionary` does not hold the lock for the full loop. Its enumerator copies all entries into an array while locked, then releases the lock immediately:
 
 ```pascal
 constructor TThreadSafeDictionary.TEnumerator.Create(ADictionary: TThreadSafeDictionary);
@@ -250,19 +98,58 @@ begin
   inherited Create;
   FSnapshotIndex := -1;
 
-  // Acquire lock only long enough to copy all entries into a snapshot.
-  // Releasing it immediately means concurrent modifications during iteration
-  // are allowed but will not cause dangling-pointer access violations.
   LockToken := ADictionary.Lock;
   try
-    // ... copy all key-value pairs into FSnapshot ...
+    // Copy key-value pairs into FSnapshot.
   finally
-    LockToken := nil; // Release lock — snapshot is self-contained
+    LockToken := nil;
   end;
 end;
 ```
 
 Consequences:
-- The iterator never holds the lock during `MoveNext` or `Current` access — no deadlock risk if you call dictionary methods inside the loop
-- Changes made by other threads after the snapshot was taken are **not** visible to the iterator
-- The snapshot is a separate copy — no dangling pointer risk even if the dictionary is cleared or resized mid-iteration
+
+- `MoveNext` and `Current` read from the snapshot, not the live dictionary.
+- Other threads may add, remove, clear, or resize the dictionary during iteration.
+- Changes made after the snapshot are not visible to the active iterator.
+- The iterator is safe against dangling entry pointers because it does not retain bucket-entry pointers.
+
+## Manual Lock Usage
+
+Use manual `Lock()` with care. Free Pascal's `TCriticalSection` is not re-entrant on POSIX platforms, and the public collection methods already acquire the same lock internally.
+
+Do not acquire a token and then call public methods on the same collection while that token is held:
+
+```pascal
+Token := List.Lock;
+try
+  // Avoid this pattern: Add also tries to acquire List's lock.
+  List.Add(42);
+finally
+  Token := nil;
+end;
+```
+
+If a local token variable is reused in a loop, release it before the next iteration. Creating a new token while the old token still holds the same lock can deadlock on non-reentrant implementations.
+
+```pascal
+for I := 1 to Iterations do
+begin
+  LockToken := List.Lock;
+  try
+    // Work that does not call List's locking public methods.
+  finally
+    LockToken := nil;
+  end;
+end;
+```
+
+The collections themselves use private unlocked helpers, such as `InternalAdd`, `InternalRemove`, `InternalDelete`, and `InternalSetCapacity`, when a public method already holds the lock. That is how the implementation avoids re-acquiring the same critical section internally.
+
+## What This Pattern Provides
+
+- Exception-safe lock release when the token is released or destroyed.
+- A clean way for enumerators to hold a lock for their lifetime.
+- Consistent exclusive locking across the collections.
+
+It does not provide concurrent reads, lock-free behavior, or safe nested calls into the same collection's public API while a manual token is held.
