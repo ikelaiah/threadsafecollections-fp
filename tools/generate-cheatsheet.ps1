@@ -88,6 +88,59 @@ function Get-InterfaceMembers {
     }
   }
 
+  $accessorComplexity = @{}
+  foreach ($member in $members) {
+    if (-not $member.Complexity) {
+      continue
+    }
+
+    $declaration = [string]$member.Declaration
+    if ($declaration -cmatch '^(function|procedure)\s+([A-Za-z_][A-Za-z0-9_]*)\b') {
+      $accessorComplexity[$matches[2]] = $member.Complexity
+    }
+  }
+
+  foreach ($member in $members) {
+    if ($member.Complexity) {
+      continue
+    }
+
+    $declaration = [string]$member.Declaration
+    if ($declaration -cnotmatch '^property\s+') {
+      continue
+    }
+
+    $readComplexity = $null
+    $writeComplexity = $null
+    if ($declaration -cmatch '\bread\s+([A-Za-z_][A-Za-z0-9_]*)') {
+      $readName = $matches[1]
+      if ($accessorComplexity.ContainsKey($readName)) {
+        $readComplexity = $accessorComplexity[$readName]
+      }
+    }
+    if ($declaration -cmatch '\bwrite\s+([A-Za-z_][A-Za-z0-9_]*)') {
+      $writeName = $matches[1]
+      if ($accessorComplexity.ContainsKey($writeName)) {
+        $writeComplexity = $accessorComplexity[$writeName]
+      }
+    }
+
+    if ($readComplexity -and $writeComplexity) {
+      if ($readComplexity -eq $writeComplexity) {
+        $member.Complexity = $readComplexity
+      }
+      else {
+        $member.Complexity = "read $readComplexity, write $writeComplexity"
+      }
+    }
+    elseif ($readComplexity) {
+      $member.Complexity = $readComplexity
+    }
+    elseif ($writeComplexity) {
+      $member.Complexity = $writeComplexity
+    }
+  }
+
   $members
 }
 

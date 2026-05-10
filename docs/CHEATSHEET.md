@@ -35,7 +35,7 @@ Package version: `0.8.3`
 | O(1) | `function IsEmpty: Boolean;` |
 | O(n) where n is the number of elements | `procedure Clear;` |
 | O(1) | `function Lock: ILockToken;` |
-|  | `property Count: Integer read GetCount;` |
+| O(1) | `property Count: Integer read GetCount;` |
 
 ### IThreadSafeList<T>
 
@@ -73,8 +73,8 @@ Package version: `0.8.3`
 | O(n) search + O(n) deletion | `function Extract(const Item: T): T;` |
 | O(n) due to element shifting | `function ExtractAt(Index: Integer): T;` |
 | O(n) when resizing | `procedure TrimExcess;` |
-|  | `property Items[Index: Integer]: T read GetItem write SetItem; default;` |
-|  | `property Capacity: Integer read GetCapacity write SetCapacity;` |
+| O(1) | `property Items[Index: Integer]: T read GetItem write SetItem; default;` |
+| read O(1), write O(n) when resizing | `property Capacity: Integer read GetCapacity write SetCapacity;` |
 
 ### IThreadSafeDeque<T>
 
@@ -115,8 +115,8 @@ Package version: `0.8.3`
 | O(m) where m is array length | `procedure AddRange(const AArray: specialize TPairArray<TKey, TValue>); overload;` |
 | O(n) | `function ToArray: specialize TPairArray<TKey, TValue>;` |
 | O(n) | `function ContainsValue(const Value: TValue): Boolean;` |
-|  | `property Items[const Key: TKey]: TValue read GetItem write SetItem; default;` |
-|  | `property Count: Integer read GetCount;` |
+| O(1) average case | `property Items[const Key: TKey]: TValue read GetItem write SetItem; default;` |
+| O(1) | `property Count: Integer read GetCount;` |
 
 ### IThreadSafeHashSet<T>
 
