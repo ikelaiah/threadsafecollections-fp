@@ -649,6 +649,7 @@ end;
 - [ThreadSafeCollections.Dictionary.md](docs/ThreadSafeCollections.Dictionary.md)
 - [ThreadSafeCollections.HashSet.md](docs/ThreadSafeCollections.HashSet.md)
 - [RAII-style locking through interface counting](docs/RAII-style-locking-through-interface-counting.md)
+- [Generated Cheat Sheet](docs/CHEATSHEET.md)
 - [Latest Test Output](tests/LatestTestOutput.md)
 
 ## 📁 Examples
