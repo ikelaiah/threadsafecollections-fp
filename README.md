@@ -25,7 +25,7 @@ A thread-safe generic collections library for Free Pascal, designed for learning
 
 ## 🚧 Development Status
 
-**Latest Release: v0.8.3** - Documentation and Package Metadata Release
+**Latest Release: v0.8.3** - Documentation and List Search Fix Release
 
 Current State:
 
@@ -41,6 +41,7 @@ Current State:
   - Generated API cheat sheet available at [docs/CHEATSHEET.md](docs/CHEATSHEET.md)
   - PowerShell generator available at [tools/generate-cheatsheet.ps1](tools/generate-cheatsheet.ps1)
   - Documentation refreshed against the current source code
+  - Fixed sorted-list `IndexOf` with duplicate values so it returns the first matching index
 - ✅ **v0.8.2**: Critical bug fixes and performance optimisations
   - Fixed several re-entrant lock deadlocks in List, HashSet, and Dictionary on POSIX platforms
   - Fixed managed-type memory safety (`string`/`interface`) in List and Deque
@@ -704,6 +705,7 @@ end;
 - [ThreadSafeCollections.HashSet.md](docs/ThreadSafeCollections.HashSet.md)
 - [RAII-style locking through interface counting](docs/RAII-style-locking-through-interface-counting.md)
 - [Generated Cheat Sheet](docs/CHEATSHEET.md)
+- [Release Notes v0.8.3](RELEASE-NOTES-v0.8.3.md)
 - [Latest Test Output](tests/LatestTestOutput.md)
 
 ## 📁 Examples

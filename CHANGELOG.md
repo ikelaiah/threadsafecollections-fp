@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `docs/CHEATSHEET.md`, a generated API cheat sheet for quick reference.
 - Added `tools/generate-cheatsheet.ps1` to regenerate the cheat sheet from source and package metadata without using AI.
+- Added `RELEASE-NOTES-v0.8.3.md`.
+- Updated `tests/LatestTestOutput.md` with the current 116-test run summary.
 
 ### Changed
 
@@ -21,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - current List binary-search behavior after ascending `Sort(True)`;
   - current Dictionary and HashSet allocator, snapshot, and bulk-operation caveats.
 - Updated README documentation links to include the generated cheat sheet.
+
+### Fixed
+
+- Fixed `TThreadSafeList.IndexOf` on sorted lists with duplicate values so the binary-search path
+  returns the first matching index, matching the documented `IndexOf` contract.
 
 ## [0.8.2] - 2026-04-11
 

@@ -689,7 +689,7 @@ begin
     if Cmp = 0 then
     begin
       Result := Mid;
-      Exit;
+      Hi := Mid - 1;
     end
     else if Cmp < 0 then
       Lo := Mid + 1
