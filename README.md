@@ -5,7 +5,7 @@
 [![Lazarus](https://img.shields.io/badge/Lazarus-4.0+-60A5FA.svg)](https://www.lazarus-ide.org/)
 ![Supports Windows](https://img.shields.io/badge/support-Windows-F59E0B?logo=Windows)
 ![Supports Linux](https://img.shields.io/badge/support-Linux-F59E0B?logo=Linux)
-[![Version](https://img.shields.io/badge/version-0.8.3-8B5CF6.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.8.4-8B5CF6.svg)](CHANGELOG.md)
 ![No Dependencies](https://img.shields.io/badge/dependencies-none-10B981.svg)
 [![Documentation](https://img.shields.io/badge/Docs-Available-brightgreen.svg)](docs/)
 [![Status](https://img.shields.io/badge/Status-Stable-brightgreen.svg)]()
@@ -25,7 +25,7 @@ A thread-safe generic collections library for Free Pascal, designed for learning
 
 ## 🚧 Development Status
 
-**Latest Release: v0.8.3** - Documentation and List Search Fix Release
+**Latest Release: v0.8.4** - Correctness and POSIX Portability Release
 
 Current State:
 
@@ -36,6 +36,12 @@ Current State:
    - List, HashSet, Deque: RAII-style locking — lock held for the full `for…in` loop
    - Dictionary (v0.8.2): snapshot-based — lock released immediately after entry copy; concurrent modifications are safe but not visible to the iterator
 - ✅ Bulk operations support
+- ✅ **NEW in v0.8.4**: Correctness and POSIX portability fixes
+  - Direction-aware O(log n) `IndexOf`/`Contains` after both ascending and descending sort
+  - Dictionary and HashSet collection bulk operations now snapshot their source without nested locks
+  - Dictionary default key equality and `ContainsValue` now use Free Pascal's type-aware comparers
+  - Repaired broken links caused by moving release and maintenance documents into `docs/`
+  - Full FPCUnit suite: 117 tests, 0 errors, 0 failures
 - ✅ **NEW in v0.8.3**: Documentation and tooling refresh
   - Lazarus package metadata updated to 0.8.3
   - Generated API cheat sheet available at [docs/CHEATSHEET.md](docs/CHEATSHEET.md)
@@ -52,7 +58,7 @@ Current State:
   - **Slab allocator** for Dictionary and HashSet `TEntry` records — 256-entry blocks with freelist recycling; 19–41% faster Dictionary ops, 15–19% faster HashSet Add at 1 M items
   - **4-lane XXHash32** — strings ≥ 16 bytes processed across four independent accumulators; 19–23% faster for long string keys
   - **Dictionary type dispatch caching** — `TKeyKind` enum cached at construction, eliminating per-call `TypeInfo` comparisons
-  - **Binary search for ascending sorted lists** — `Contains`/`IndexOf` use O(log n) binary search after `Sort(True)`
+  - **Binary search for sorted lists** — `Contains`/`IndexOf` use O(log n) binary search after `Sort`; v0.8.4 added descending-order support
   - **Dictionary iterator is now snapshot-based** — lock released immediately after copying; other threads may modify concurrently
 - ✅ **v0.8.1**: Code maintainability improvements
   - Algorithm complexity annotations (Big-O) on all 80+ methods
@@ -483,7 +489,7 @@ Benchmarks on **Dell Inspiron 15 7510** (Intel i7-11800H @ 2.30 GHz, 8 cores, 16
 > v0.8.2 introduced three performance improvements that affect these figures:
 > slab allocator (19–41% faster Dictionary ops, 15–19% faster HashSet Add at 1 M items),
 > 4-lane XXHash32 (19–23% faster for long string keys), and
-> binary search for ascending sorted lists (`Contains`/`IndexOf` become O(log n) after `Sort(True)`).
+> binary search for sorted lists (`Contains`/`IndexOf` become O(log n) after `Sort(True)` or `Sort(False)`).
 
 **List Operations:**
 
@@ -494,7 +500,7 @@ Benchmarks on **Dell Inspiron 15 7510** (Intel i7-11800H @ 2.30 GHz, 8 cores, 16
 | Sort Students (Name) | 312       | 100,000 | Custom comparer                        |
 | Sort Students (ID)   | 234       | 100,000 | Custom comparer                        |
 | Contains (unsorted)  | O(n)      | —       | Linear scan                            |
-| Contains (ascending sorted) | O(log n)  | —       | Binary search — automatic after Sort(True) |
+| Contains (sorted)  | O(log n)  | —       | Direction-aware binary search after `Sort` |
 
 **Dictionary Operations:**
 
@@ -705,7 +711,8 @@ end;
 - [ThreadSafeCollections.HashSet.md](docs/ThreadSafeCollections.HashSet.md)
 - [RAII-style locking through interface counting](docs/RAII-style-locking-through-interface-counting.md)
 - [Generated Cheat Sheet](docs/CHEATSHEET.md)
-- [Release Notes v0.8.3](RELEASE-NOTES-v0.8.3.md)
+- [Release Notes v0.8.4](docs/RELEASE-NOTES-v0.8.4.md)
+- [Release Notes v0.8.3](docs/RELEASE-NOTES-v0.8.3.md)
 - [Latest Test Output](tests/LatestTestOutput.md)
 
 ## 📁 Examples

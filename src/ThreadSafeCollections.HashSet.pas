@@ -1037,16 +1037,15 @@ end;
 
 procedure TThreadSafeHashSet.AddRange(const Collection: specialize IThreadSafeHashSet<T>);
 var
-  LockToken: ILockToken;
   LocalArray: _TArray;
 begin
   if Collection = nil then
     Exit;
-    
-  LockToken := Collection.Lock;
+
+  // ToArray takes a self-contained snapshot while holding the source lock.
+  // An additional manual source lock would deadlock on non-reentrant POSIX
+  // critical sections when ToArray tries to acquire that same lock.
   LocalArray := Collection.ToArray;
-  LockToken := nil;
-  
   AddRange(LocalArray);
 end;
 
@@ -1071,16 +1070,13 @@ end;
 
 function TThreadSafeHashSet.RemoveRange(const Collection: specialize IThreadSafeHashSet<T>): Integer;
 var
-  LockToken: ILockToken;
   LocalArray: _TArray;
 begin
   if Collection = nil then
     Exit(0);
-    
-  LockToken := Collection.Lock;
+
+  // Snapshot first, then mutate this set without holding the source lock.
   LocalArray := Collection.ToArray;
-  LockToken := nil;
-  
   Result := RemoveRange(LocalArray);
 end;
 

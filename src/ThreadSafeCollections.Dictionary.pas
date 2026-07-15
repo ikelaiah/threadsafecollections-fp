@@ -3,7 +3,7 @@
 {       Thread-safe Dictionary Implementation           }
 {                                                       }
 {       Copyright (C) 2024                              }
-{       Version: 0.8.2                                  }
+{       Version: 0.8.4                                  }
 {                                                       }
 {*******************************************************}
 
@@ -52,7 +52,7 @@ unit ThreadSafeCollections.Dictionary;
 interface
 
 uses
-  SysUtils, Classes, SyncObjs, HashFunctions, TypInfo,
+  SysUtils, Classes, SyncObjs, HashFunctions, TypInfo, Generics.Defaults,
   ThreadSafeCollections.Interfaces, ThreadSafeCollections.ErrorMessages,
   Generics.Collections;
 
@@ -192,6 +192,8 @@ type
     FCount: integer;             // Current number of key-value pairs stored in the dictionary
     FHashFunc: specialize THashFunction<TKey>;             // Custom hash function for hashing keys
     FEqualityComparer: specialize TEqualityComparison<TKey>; // Custom equality comparison function for keys
+    FDefaultKeyComparer: specialize IEqualityComparer<TKey>; // Type-aware fallback equality for keys
+    FValueComparer: specialize IEqualityComparer<TValue>;  // Type-aware default equality for values
     FKeyKind: TKeyKind;          // Cached key type to avoid TypeInfo comparisons per call
     FAllocator: TEntryAllocator; // Slab allocator for TEntry records
 
@@ -276,7 +278,7 @@ type
       
       Notes:
         - Must be called within a lock
-        - Performs byte-by-byte comparison }
+        - Uses the RTL's type-aware default equality comparer }
     function FindValue(const Value: TValue): Boolean;
 
     // Calculates the next power of two greater than or equal to the provided value
@@ -768,6 +770,8 @@ begin
   // Store the custom functions or use defaults
   FHashFunc := AHashFunc;
   FEqualityComparer := AEqualityComparer;
+  FDefaultKeyComparer := specialize TEqualityComparer<TKey>.Default;
+  FValueComparer := specialize TEqualityComparer<TValue>.Default;
 
   // Cache key type once so GetHashValue uses a fast case branch instead of
   // TypeInfo pointer comparisons on every single hash call.
@@ -1173,7 +1177,7 @@ begin
   if Assigned(FEqualityComparer) then
     Result := FEqualityComparer(Left, Right)
   else
-    Result := CompareByte(Left, Right, SizeOf(TKey)) = 0;
+    Result := FDefaultKeyComparer.Equals(Left, Right);
 end;
 
 function TThreadSafeDictionary.GetCount: Integer;
@@ -1320,26 +1324,14 @@ begin
 end;
 
 procedure TThreadSafeDictionary.AddRange(const ADictionary: specialize IThreadSafeDictionary<TKey, TValue>);
-var
-  LockToken: ILockToken;
-  Keys: specialize TArray<TKey>;
-  I: Integer;
-  Value: TValue;
 begin
   if ADictionary = nil then
     Exit;
-    
-  LockToken := ADictionary.Lock;
-  try
-    Keys := ADictionary.GetKeys;
-    for I := 0 to Length(Keys) - 1 do
-    begin
-      if ADictionary.TryGetValue(Keys[I], Value) then
-        AddOrSetValue(Keys[I], Value);
-    end;
-  finally
-    LockToken := nil;
-  end;
+
+  // ToArray acquires the source lock only while creating the snapshot.
+  // Do not manually lock the source and then call its public methods: FPC's
+  // TCriticalSection is non-reentrant on POSIX and that pattern deadlocks.
+  AddRange(ADictionary.ToArray);
 end;
 
 procedure TThreadSafeDictionary.AddRange(const AArray: specialize TPairArray<TKey, TValue>);
@@ -1417,7 +1409,7 @@ begin
     Entry := FBuckets[I];
     while Entry <> nil do
     begin
-      if CompareByte(Entry^.Value, Value, SizeOf(TValue)) = 0 then
+      if FValueComparer.Equals(Entry^.Value, Value) then
         Exit(True);
       Entry := Entry^.Next;
     end;

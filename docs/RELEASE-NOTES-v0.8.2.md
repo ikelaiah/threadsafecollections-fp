@@ -173,5 +173,5 @@ directly addresses that class of bug.
 ## Resources
 
 - **Repository**: https://github.com/ikelaiah/threadsafecollections-fp
-- **Full Changelog**: [CHANGELOG.md](CHANGELOG.md)
+- **Full Changelog**: [CHANGELOG.md](../CHANGELOG.md)
 - **Issues**: https://github.com/ikelaiah/threadsafecollections-fp/issues

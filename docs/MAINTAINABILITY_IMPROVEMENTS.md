@@ -24,7 +24,7 @@ This document summarizes all maintainability improvements made to the ThreadSafe
 
 #### Changes Made
 
-**List Constants** ([ThreadSafeCollections.List.pas:24-30](src/ThreadSafeCollections.List.pas#L24-L30)):
+**List Constants** ([ThreadSafeCollections.List.pas:24-30](../src/ThreadSafeCollections.List.pas#L24-L30)):
 ```pascal
 const
   DEFAULT_INITIAL_CAPACITY = 16;      // Default number of elements to allocate initially
@@ -36,7 +36,7 @@ const
   ARRAY_ALIGNMENT = 16;               // Alignment boundary for small arrays
 ```
 
-**Deque Constants** ([ThreadSafeCollections.Deque.pas:28-31](src/ThreadSafeCollections.Deque.pas#L28-L31)):
+**Deque Constants** ([ThreadSafeCollections.Deque.pas:28-31](../src/ThreadSafeCollections.Deque.pas#L28-L31)):
 ```pascal
 const
   DEFAULT_INITIAL_CAPACITY = 16;  // Default number of elements to allocate initially
@@ -63,8 +63,8 @@ const
 **Solution:** Added comprehensive cross-reference documentation.
 
 **Changes:**
-- [ThreadSafeCollections.Dictionary.pas:24-26](src/ThreadSafeCollections.Dictionary.pas#L24-L26)
-- [ThreadSafeCollections.HashSet.pas:37-39](src/ThreadSafeCollections.HashSet.pas#L37-L39)
+- [ThreadSafeCollections.Dictionary.pas:24-26](../src/ThreadSafeCollections.Dictionary.pas#L24-L26)
+- [ThreadSafeCollections.HashSet.pas:37-39](../src/ThreadSafeCollections.HashSet.pas#L37-L39)
 
 ```pascal
 NOTE: This implementation shares common hash table patterns with ThreadSafeCollections.[Dictionary/HashSet].
@@ -136,7 +136,7 @@ procedure IntersectWith(const Collection: specialize IThreadSafeHashSet<T>);
 - ✅ Educational value
 - ✅ Helps identify optimization opportunities
 
-**File:** [ThreadSafeCollections.Interfaces.pas](src/ThreadSafeCollections.Interfaces.pas)
+**File:** [ThreadSafeCollections.Interfaces.pas](../src/ThreadSafeCollections.Interfaces.pas)
 
 ---
 
@@ -228,7 +228,7 @@ Heap dump by heaptrc unit of C:\...\TestRunner.exe
 ```
 
 **Leak Identified:**
-- Location: [tests/threadsafelisttests.pas:288](tests/threadsafelisttests.pas#L288)
+- Location: [tests/threadsafelisttests.pas:288](../tests/threadsafelisttests.pas#L288)
 - Cause: `Test07_FirstLast` created a new list without freeing the old one
 - Impact: 200 bytes (3 allocations: object + TCriticalSection + array)
 

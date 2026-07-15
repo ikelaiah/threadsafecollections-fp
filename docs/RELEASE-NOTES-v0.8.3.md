@@ -17,7 +17,7 @@ source code, a generated cheat sheet has been added for quick API lookup, and so
 
 ### Generated API Cheat Sheet
 
-Added [docs/CHEATSHEET.md](docs/CHEATSHEET.md), a generated quick reference covering:
+Added [docs/CHEATSHEET.md](CHEATSHEET.md), a generated quick reference covering:
 
 - collection types and their storage/iteration models;
 - shared interface members and complexity annotations;
@@ -31,7 +31,7 @@ using AI or manually copying API declarations.
 
 ### Cheat Sheet Generator
 
-Added [tools/generate-cheatsheet.ps1](tools/generate-cheatsheet.ps1).
+Added [tools/generate-cheatsheet.ps1](../tools/generate-cheatsheet.ps1).
 
 Run it from the repository root:
 
@@ -122,7 +122,7 @@ The v0.8.3 release branch was validated with the full FPCUnit test runner:
 | **Passed** | 116 |
 | **Errors / Failures** | 0 / 0 |
 
-See [tests/LatestTestOutput.md](tests/LatestTestOutput.md) for the current run summary.
+See [tests/LatestTestOutput.md](../tests/LatestTestOutput.md) for the current run summary.
 
 ---
 
@@ -155,6 +155,6 @@ the updated package version.
 ## Resources
 
 - **Repository**: https://github.com/ikelaiah/threadsafecollections-fp
-- **Full Changelog**: [CHANGELOG.md](CHANGELOG.md)
-- **Generated Cheat Sheet**: [docs/CHEATSHEET.md](docs/CHEATSHEET.md)
+- **Full Changelog**: [CHANGELOG.md](../CHANGELOG.md)
+- **Generated Cheat Sheet**: [docs/CHEATSHEET.md](CHEATSHEET.md)
 - **Issues**: https://github.com/ikelaiah/threadsafecollections-fp/issues

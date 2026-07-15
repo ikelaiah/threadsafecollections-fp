@@ -145,8 +145,8 @@ No installation changes - same as previous versions:
 ## 🔗 Resources
 
 - **Repository**: https://github.com/ikelaiah/threadsafecollections-fp
-- **Documentation**: See [README.md](README.md)
-- **Full Changelog**: See [CHANGELOG.md](CHANGELOG.md)
+- **Documentation**: See [README.md](../README.md)
+- **Full Changelog**: See [CHANGELOG.md](../CHANGELOG.md)
 - **Issues**: https://github.com/ikelaiah/threadsafecollections-fp/issues
 
 ## 🙏 Acknowledgments
