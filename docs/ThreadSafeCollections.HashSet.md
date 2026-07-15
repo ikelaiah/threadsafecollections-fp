@@ -171,7 +171,7 @@ Private helpers such as `InternalAdd` and `InternalRemove` assume the caller alr
 
 Manual `Lock()` is advanced usage. Do not hold a token and then call public methods on the same set, because those methods try to acquire the same critical section again.
 
-Current caveat: `AddRange(Collection)` and `RemoveRange(Collection)` acquire `Collection.Lock` and then call `Collection.ToArray` while that source lock is still held. On platforms where `TCriticalSection` is not re-entrant, that pattern can deadlock. Prefer array overloads with a snapshot you created outside any held collection lock when POSIX portability matters.
+`AddRange(Collection)` and `RemoveRange(Collection)` call `Collection.ToArray` directly. The source lock is held only while creating the snapshot and is released before this set is mutated, avoiding nested source-lock acquisition on non-reentrant POSIX critical sections.
 
 ## Iteration
 
@@ -194,7 +194,7 @@ During a `for..in` loop, other public operations on the same set wait until enum
 
 `IntersectWith` snapshots the other collection with `ToArray` before acquiring this set's lock. That avoids the ABBA lock-order deadlock that would happen if two threads called `A.IntersectWith(B)` and `B.IntersectWith(A)`.
 
-`ExceptWith`, `Overlaps`, and `SetEquals` also use `ToArray` snapshots of the other collection.
+`AddRange`, `RemoveRange`, `ExceptWith`, `Overlaps`, and `SetEquals` also use `ToArray` snapshots of the other collection.
 
 ## Hashing
 

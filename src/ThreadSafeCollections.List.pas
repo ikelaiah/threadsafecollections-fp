@@ -37,6 +37,7 @@ type
     FLock: TCriticalSection;                       // Critical section to manage thread synchronization
     FComparer: specialize TComparer<T>;            // Comparer function to define the sorting logic
     FSorted: Boolean;                              // Indicates whether the list is currently sorted
+    FSortAscending: Boolean;                       // Direction represented when FSorted is true
 
     // Increases the capacity of the internal array when needed
     procedure Grow;
@@ -81,7 +82,8 @@ type
     procedure InternalSetCapacity(const Value: Integer);
     procedure InternalDelete(Index: Integer);
     function  InternalIndexOf(const Item: T): Integer;
-    // Binary search — only valid when FSorted = True. Returns index of Item or -1.
+    // Direction-aware binary search — only valid when FSorted = True.
+    // Returns the first matching index, or -1 when Item is not present.
     function  InternalBinarySearch(const Item: T): Integer;
 
   public
@@ -368,6 +370,7 @@ begin
   FCapacity := AInitialCapacity;         // Set initial capacity
   SetLength(FList, FCapacity);           // Pre-allocate buffer to reduce early resizes
   FSorted := True;                       // Initially, the list is considered sorted
+  FSortAscending := True;                // Empty lists use ascending as their default direction
 end;
 
 destructor TThreadSafeList.Destroy;
@@ -436,8 +439,11 @@ begin
     Inc(FCount);
 
     // Update the sorted flag if necessary
-    if FCount > 1 then
-      FSorted := FSorted and (FComparer(FList[FCount-2], Item) <= 0);
+    if (FCount > 1) and FSorted then
+      if FSortAscending then
+        FSorted := FComparer(FList[FCount-2], Item) <= 0
+      else
+        FSorted := FComparer(FList[FCount-2], Item) >= 0;
   finally
     FLock.Release;                                     // Exit critical section
   end;
@@ -494,6 +500,7 @@ begin
     if FCount > 1 then
       QuickSort(0, FCount - 1, Ascending);             // Perform quicksort
     FSorted := True;                                   // Mark the list as sorted
+    FSortAscending := Ascending;                       // Remember how binary search must compare
   finally
     FLock.Release;                                     // Exit critical section
   end;
@@ -520,10 +527,20 @@ begin
     // Update the sorted flag based on neighboring elements
     if FSorted then
     begin
-      if (Index > 0) and (FComparer(FList[Index-1], Item) > 0) then
-        FSorted := False
-      else if (Index < FCount-1) and (FComparer(Item, FList[Index+1]) > 0) then
-        FSorted := False;
+      if FSortAscending then
+      begin
+        if (Index > 0) and (FComparer(FList[Index-1], Item) > 0) then
+          FSorted := False
+        else if (Index < FCount-1) and (FComparer(Item, FList[Index+1]) > 0) then
+          FSorted := False;
+      end
+      else
+      begin
+        if (Index > 0) and (FComparer(FList[Index-1], Item) < 0) then
+          FSorted := False
+        else if (Index < FCount-1) and (FComparer(Item, FList[Index+1]) < 0) then
+          FSorted := False;
+      end;
     end;
   finally
     FLock.Release;                                     // Exit critical section
@@ -603,6 +620,7 @@ begin
     FCount := 0;                                          // Reset count
     FCapacity := 0;                                       // Reset capacity
     FSorted := True;                                      // Reset sorted status
+    FSortAscending := True;                               // Reset the default sort direction
   finally
     FLock.Release;                                        // Exit critical section
   end;
@@ -674,7 +692,8 @@ begin
   end;
 end;
 
-// Internal: binary search on a sorted list. Caller must hold FLock and FSorted must be True.
+// Internal: direction-aware binary search on a sorted list.
+// Caller must hold FLock and FSorted must be True.
 function TThreadSafeList.InternalBinarySearch(const Item: T): Integer;
 var
   Lo, Hi, Mid, Cmp: Integer;
@@ -691,7 +710,8 @@ begin
       Result := Mid;
       Hi := Mid - 1;
     end
-    else if Cmp < 0 then
+    else if (FSortAscending and (Cmp < 0)) or
+            ((not FSortAscending) and (Cmp > 0)) then
       Lo := Mid + 1
     else
       Hi := Mid - 1;
@@ -778,7 +798,10 @@ begin
       Inc(FCount);
       // Update the sorted flag if necessary
       if (FCount > 1) and FSorted then
-        FSorted := FComparer(FList[FCount-2], FList[FCount-1]) <= 0;
+        if FSortAscending then
+          FSorted := FComparer(FList[FCount-2], FList[FCount-1]) <= 0
+        else
+          FSorted := FComparer(FList[FCount-2], FList[FCount-1]) >= 0;
     end;
   finally
     FLock.Release;                                 // Exit critical section

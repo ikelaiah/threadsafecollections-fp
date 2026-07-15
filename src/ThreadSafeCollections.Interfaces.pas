@@ -54,7 +54,7 @@ type
     procedure Delete(Index: Integer);
 
     /// <summary>Finds the index of the first occurrence of an item</summary>
-    /// <complexity>O(n) linear search</complexity>
+    /// <complexity>O(n) unsorted; O(log n) after ascending or descending Sort</complexity>
     function IndexOf(const Item: T): Integer;
 
     /// <summary>Returns the first element in the list</summary>
@@ -113,7 +113,7 @@ type
     procedure DeleteRange(AIndex, ACount: Integer);
 
     // Search operations
-    /// <complexity>O(n)</complexity>
+    /// <complexity>O(n) unsorted; O(log n) after ascending or descending Sort</complexity>
     function Contains(const Value: T): Boolean;
     /// <complexity>O(n)</complexity>
     function IndexOfItem(const Item: T; StartIndex: Integer): Integer; overload;

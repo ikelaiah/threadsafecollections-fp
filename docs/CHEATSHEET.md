@@ -4,7 +4,7 @@
 >
 > Regenerate with: `pwsh tools/generate-cheatsheet.ps1`
 
-Package version: `0.8.3`
+Package version: `0.8.4`
 
 ## Source Inputs
 
@@ -43,7 +43,7 @@ Package version: `0.8.3`
 |---|---|
 | O(1) amortized, O(n) worst case during resize | `function Add(const Item: T): Integer;` |
 | O(n) due to element shifting | `procedure Delete(Index: Integer);` |
-| O(n) linear search | `function IndexOf(const Item: T): Integer;` |
+| O(n) unsorted; O(log n) after ascending or descending Sort | `function IndexOf(const Item: T): Integer;` |
 | O(1) | `function First: T;` |
 | O(1) | `function Last: T;` |
 | O(n log n) average case, O(n²) worst case | `procedure Sort(Ascending: Boolean = True);` |
@@ -60,7 +60,7 @@ Package version: `0.8.3`
 | O(n+m) due to element shifting | `procedure InsertRange(Index: Integer; const Values: array of T); overload;` |
 | O(n+m) due to element shifting | `procedure InsertRange(Index: Integer; const Collection: specialize IThreadSafeList<T>); overload;` |
 | O(n) due to element shifting | `procedure DeleteRange(AIndex, ACount: Integer);` |
-| O(n) | `function Contains(const Value: T): Boolean;` |
+| O(n) unsorted; O(log n) after ascending or descending Sort | `function Contains(const Value: T): Boolean;` |
 | O(n) | `function IndexOfItem(const Item: T; StartIndex: Integer): Integer; overload;` |
 | O(n) | `function IndexOfItem(const Item: T; StartIndex, ACount: Integer): Integer; overload;` |
 | O(n) | `function LastIndexOf(const Item: T): Integer; overload;` |
@@ -212,9 +212,9 @@ Package version: `0.8.3`
 - List, HashSet, and Deque iterators hold the lock for the full loop.
 - Dictionary iterators copy a snapshot, release the lock, then iterate over the snapshot.
 
-## Current Caveats
+## Behaviour Notes
 
-- `TThreadSafeList` binary search is used by `IndexOf` and `Contains` when `FSorted = True`; the current binary-search code assumes ascending comparer order.
-- `TThreadSafeDictionary.ContainsValue` scans entries and compares values bytewise with `CompareByte`.
-- `TThreadSafeDictionary.AddRange(ADictionary)` and `TThreadSafeHashSet.AddRange(Collection)` / `RemoveRange(Collection)` currently lock the source collection and then call public methods on it; prefer array snapshots for POSIX portability.
+- `TThreadSafeList` uses direction-aware binary search for `IndexOf` and `Contains` after either ascending or descending `Sort`.
+- Dictionary default key equality and `ContainsValue` use RTL type-aware default equality comparers.
+- Dictionary and HashSet collection bulk overloads snapshot the source before mutating the destination, avoiding nested source locks on POSIX.
 - `TThreadSafeDeque.PushRangeFront` prepends values in input order, so the last input item becomes the front item.

@@ -368,11 +368,11 @@ $lines.Add('- Do not hold a manual token and then call public methods on the sam
 $lines.Add('- List, HashSet, and Deque iterators hold the lock for the full loop.')
 $lines.Add('- Dictionary iterators copy a snapshot, release the lock, then iterate over the snapshot.')
 $lines.Add('')
-$lines.Add('## Current Caveats')
+$lines.Add('## Behaviour Notes')
 $lines.Add('')
-$lines.Add('- `TThreadSafeList` binary search is used by `IndexOf` and `Contains` when `FSorted = True`; the current binary-search code assumes ascending comparer order.')
-$lines.Add('- `TThreadSafeDictionary.ContainsValue` scans entries and compares values bytewise with `CompareByte`.')
-$lines.Add('- `TThreadSafeDictionary.AddRange(ADictionary)` and `TThreadSafeHashSet.AddRange(Collection)` / `RemoveRange(Collection)` currently lock the source collection and then call public methods on it; prefer array snapshots for POSIX portability.')
+$lines.Add('- `TThreadSafeList` uses direction-aware binary search for `IndexOf` and `Contains` after either ascending or descending `Sort`.')
+$lines.Add('- Dictionary default key equality and `ContainsValue` use RTL type-aware default equality comparers.')
+$lines.Add('- Dictionary and HashSet collection bulk overloads snapshot the source before mutating the destination, avoiding nested source locks on POSIX.')
 $lines.Add('- `TThreadSafeDeque.PushRangeFront` prepends values in input order, so the last input item becomes the front item.')
 
 $outputDir = Split-Path -Parent $OutputPath

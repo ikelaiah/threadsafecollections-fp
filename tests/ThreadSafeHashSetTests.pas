@@ -1022,6 +1022,9 @@ begin
     AssertEquals(Format('Count should be %d', [TEST_SIZE]), TEST_SIZE, FIntSet.Count);
     for I := 0 to TEST_SIZE - 1 do
       AssertTrue(Format('Should contain %d', [I]), FIntSet.Contains(I));
+
+    FIntSet.AddRange(FIntSet);
+    AssertEquals('Self AddRange should preserve the set', TEST_SIZE, FIntSet.Count);
   finally
     OtherSet.Free;
   end;
@@ -1065,6 +1068,10 @@ begin
     for I := 0 to INITIAL_SIZE - 1 do
       AssertEquals(Format('Item %d should %s', [I, ShouldExist(I)]),
         I mod 2 = 1, FIntSet.Contains(I));
+
+    AssertEquals('Self RemoveRange should remove every remaining item',
+      INITIAL_SIZE - REMOVE_SIZE, FIntSet.RemoveRange(FIntSet));
+    AssertEquals('Self RemoveRange should leave the set empty', 0, FIntSet.Count);
   finally
     OtherSet.Free;
   end;

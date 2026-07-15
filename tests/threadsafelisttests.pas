@@ -110,6 +110,7 @@ type
     procedure Test44_Reverse;
     procedure Test45_Extract;
     procedure Test46_ExtractAt;
+    procedure Test47_DescendingSearch;
     
   end;
 
@@ -343,6 +344,32 @@ begin
   AssertTrue('List should be sorted', FIntList.IsSorted);
   AssertEquals('First element should be largest', 3, FIntList[0]);
   AssertEquals('Last element should be smallest', 1, FIntList[2]);
+end;
+
+procedure TThreadSafeListTest.Test47_DescendingSearch;
+begin
+  FIntList.Add(1);
+  FIntList.Add(3);
+  FIntList.Add(2);
+  FIntList.Add(3);
+
+  FIntList.Sort(False);
+
+  AssertEquals('Descending binary search should return the first duplicate',
+    0, FIntList.IndexOf(3));
+  AssertEquals('Descending binary search should find a middle value',
+    2, FIntList.IndexOf(2));
+  AssertTrue('Contains should work after descending sort', FIntList.Contains(1));
+  AssertFalse('Contains should reject a missing value after descending sort',
+    FIntList.Contains(4));
+
+  FIntList.Add(0);
+  AssertTrue('Appending a smaller item should preserve descending order',
+    FIntList.IsSorted);
+
+  FIntList.Add(4);
+  AssertFalse('Appending a larger item should invalidate descending order',
+    FIntList.IsSorted);
 end;
 
 procedure TThreadSafeListTest.Test11_IsSorted;

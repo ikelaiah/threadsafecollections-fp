@@ -150,9 +150,9 @@ end;
 
 ## Sorting and Searching
 
-`Sort(True)` sorts ascending. `Sort(False)` sorts descending. `IsSorted` returns the current `FSorted` flag.
+`Sort(True)` sorts ascending. `Sort(False)` sorts descending. `IsSorted` returns the current `FSorted` flag, while the private `FSortAscending` field records the active direction.
 
-Current binary-search behavior is narrower than some older docs described:
+Current binary-search behavior:
 
 - `IndexOf` calls `InternalIndexOf`.
 - `Contains` calls `IndexOf`.
@@ -160,9 +160,7 @@ Current binary-search behavior is narrower than some older docs described:
 - `IndexOfItem` overloads remain linear scans.
 - `LastIndexOf` overloads remain linear scans.
 
-`InternalBinarySearch` compares as if the list is in ascending comparer order. The current implementation does not store sort direction separately. Use `Sort(True)` before relying on the O(log n) path for `IndexOf` or `Contains`.
-
-If you call `Sort(False)`, the data is sorted descending and `IsSorted` is true, but `IndexOf`/`Contains` are not documented as reliable binary-search lookups for that descending order in the current code.
+`InternalBinarySearch` uses `FSortAscending` to select the correct comparison direction. It returns the first matching index for duplicate values in either direction. Appending or replacing an item preserves `FSorted` only when the new value respects the active sort direction.
 
 ## Capacity and Memory
 
@@ -194,7 +192,7 @@ Growth strategy:
 | `First`, `Last`, indexed get/set, `Count`, `IsEmpty` | O(1) |
 | `Sort` | O(n log n) average |
 | `IndexOf`, `Contains` unsorted | O(n) |
-| `IndexOf`, `Contains` after ascending `Sort(True)` | O(log n) |
+| `IndexOf`, `Contains` after `Sort(True)` or `Sort(False)` | O(log n) |
 | `IndexOfItem`, `LastIndexOf` | O(n) |
 | `ToArray`, `FromArray`, `Reverse`, `Clear` | O(n) |
 | `TrimExcess` | O(n) when shrinking |
@@ -204,5 +202,5 @@ Growth strategy:
 - One exclusive lock protects the entire list; there are no reader/writer locks.
 - Iteration blocks other public operations until the enumerator is destroyed.
 - The list does not detect concurrent modification during iteration because concurrent public modification is blocked.
-- Search optimization currently assumes ascending sorted order.
+- Sorted search supports both ascending and descending comparer order.
 - There is no `DEBUG_LOGGING` constant or runtime debug logging switch in this unit.

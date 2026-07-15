@@ -5,13 +5,50 @@ All notable changes to ThreadSafeCollections-FP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.4] - 2026-07-16
+
+### Changed
+
+- `TThreadSafeList` now records its active sort direction. `IndexOf` and `Contains` use
+  direction-aware O(log n) binary search after either `Sort(True)` or `Sort(False)`.
+- Default Dictionary key equality and `ContainsValue` now use
+  `Generics.Defaults.TEqualityComparer<T>.Default` instead of raw byte comparison.
+- Updated Lazarus package metadata to version 0.8.4.
+- Updated the generated API cheat sheet and collection documentation for the corrected behavior.
+
+### Fixed
+
+- Fixed `TThreadSafeList.IndexOf` and `Contains` returning incorrect results after descending sort.
+  The descending binary-search path also returns the first matching duplicate.
+- Fixed sorted-state maintenance when appending or replacing values in a descending list.
+- Fixed POSIX deadlocks in `TThreadSafeDictionary.AddRange(ADictionary)` and
+  `TThreadSafeHashSet.AddRange(Collection)` / `RemoveRange(Collection)`. These overloads now
+  snapshot the source without holding a manual source lock around public source calls.
+- Fixed `TThreadSafeDictionary.ContainsValue` treating equal, separately allocated managed values
+  such as strings as different values.
+- Fixed default Dictionary lookup treating equal, separately allocated managed keys such as
+  strings as different keys.
+- Fixed broken relative links in the README, historical release notes, and maintainability guide
+  after the documents were moved into `docs/` for v0.8.3.
+
+### Added
+
+- Added regression coverage for descending sorted-list lookup, semantic managed-string key/value
+  equality, and self-source Dictionary/HashSet bulk operations.
+- Added `docs/RELEASE-NOTES-v0.8.4.md`.
+
+### Testing
+
+- Full FPCUnit suite: 117 tests passed with 0 errors and 0 failures on FPC 3.2.2 / Win64.
+- Lazarus package compiled successfully as `ThreadSafeCollections 0.8.4`.
+
 ## [0.8.3] - 2026-07-16
 
 ### Added
 
 - Added `docs/CHEATSHEET.md`, a generated API cheat sheet for quick reference.
 - Added `tools/generate-cheatsheet.ps1` to regenerate the cheat sheet from source and package metadata without using AI.
-- Added `RELEASE-NOTES-v0.8.3.md`.
+- Added `docs/RELEASE-NOTES-v0.8.3.md`.
 - Updated `tests/LatestTestOutput.md` with the current 116-test run summary.
 
 ### Changed

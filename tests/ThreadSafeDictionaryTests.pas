@@ -11,6 +11,7 @@ uses
 type
   TIntStringDictionary = specialize TThreadSafeDictionary<integer, string>;
   TStringIntDictionary = specialize TThreadSafeDictionary<string, integer>;
+  TStringStringDictionary = specialize TThreadSafeDictionary<string, string>;
   TStringObjectDictionary = specialize TThreadSafeDictionary<string, TObject>;
   TStringIntPair = specialize TPair<string, Integer>;
 
@@ -325,6 +326,8 @@ end;
 
 
 procedure TThreadSafeDictionaryTest.Test4_GetItem;
+var
+  StoredKey, LookupKey: string;
 begin
   WriteLn('Starting TestGetItem');
   IncrementTestCounter;
@@ -334,6 +337,19 @@ begin
 
     AssertEquals('Should find correct value', 1, FStrDict.GetItem('test1'));
     AssertEquals('Should find correct value', 2, FStrDict.GetItem('test2'));
+
+    StoredKey := 'managed-key-' + IntToStr(42);
+    LookupKey := StoredKey;
+    UniqueString(LookupKey);
+    AssertTrue('Test keys should use separate string allocations',
+      Pointer(StoredKey) <> Pointer(LookupKey));
+    FStrDict.Add(StoredKey, 42);
+    AssertTrue('Equal strings with different allocations should match as keys',
+      FStrDict.ContainsKey(LookupKey));
+    AssertEquals('A separately allocated equal key should retrieve its value',
+      42, FStrDict.GetItem(LookupKey));
+    AssertTrue('A separately allocated equal key should remove its entry',
+      FStrDict.Remove(LookupKey));
 
     try
       FStrDict.GetItem('nonexistent');
@@ -1441,6 +1457,11 @@ begin
       AssertEquals('First value should match', 1, Value);
       AssertTrue('Should copy second item', FStrDict.TryGetValue('other2', Value));
       AssertEquals('Second value should match', 2, Value);
+
+      // A source snapshot makes self-copy safe even when critical sections are
+      // non-reentrant, and existing keys should simply retain their values.
+      FStrDict.AddRange(FStrDict);
+      AssertEquals('Self AddRange should not duplicate keys', 2, FStrDict.Count);
     finally
       OtherDict.Free;
     end;
@@ -1506,6 +1527,9 @@ begin
 end;
 
 procedure TThreadSafeDictionaryTest.Test38_ContainsValue;
+var
+  StringDict: TStringStringDictionary;
+  StoredValue, LookupValue: string;
 begin
   WriteLn('Starting Test38_ContainsValue');
   IncrementTestCounter;
@@ -1516,6 +1540,25 @@ begin
     AssertTrue('Should find existing value', FStrDict.ContainsValue(42));
     AssertTrue('Should find another existing value', FStrDict.ContainsValue(100));
     AssertFalse('Should not find non-existent value', FStrDict.ContainsValue(999));
+
+    // Ensure semantic string equality is used rather than comparing the
+    // managed string pointers stored in the generic value fields.
+    StringDict := TStringStringDictionary.Create;
+    try
+      StoredValue := 'managed-value-' + IntToStr(42);
+      LookupValue := StoredValue;
+      UniqueString(LookupValue);
+      AssertTrue('Test values should use separate string allocations',
+        Pointer(StoredValue) <> Pointer(LookupValue));
+
+      StringDict.Add('key', StoredValue);
+      AssertTrue('Equal strings with different allocations should match',
+        StringDict.ContainsValue(LookupValue));
+      AssertFalse('A different string value should not match',
+        StringDict.ContainsValue('managed-value-99'));
+    finally
+      StringDict.Free;
+    end;
     
     WriteLn('TestContainsValue completed');
   except

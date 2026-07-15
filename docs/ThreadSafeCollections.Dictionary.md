@@ -52,7 +52,7 @@ constructor Create(
 
 Default bucket count is 16. Capacity is rounded to a power of two and is at least 4.
 
-For `string` and `integer` keys, the default constructor selects a built-in hash path. For custom key types, provide both a hash function and an equality comparer.
+For `string` and `integer` keys, the default constructor selects a built-in hash path. Default key equality uses `Generics.Defaults.TEqualityComparer<TKey>.Default`, so managed keys such as separately allocated equal strings compare semantically. For custom key types, provide both a hash function and an equality comparer when the RTL default is not the desired contract.
 
 ```pascal
 type
@@ -147,7 +147,7 @@ Most public operations acquire `FLock` directly and release it in `finally`.
 
 `Lock()` returns an `ILockToken`, but manual use is advanced. Do not hold a token and then call public methods on the same dictionary, because those methods try to acquire the same critical section again.
 
-Current caveat: `AddRange(ADictionary)` acquires `ADictionary.Lock` and then calls public methods on that same source dictionary. On platforms where `TCriticalSection` is not re-entrant, that pattern can deadlock. Prefer `AddRange(AArray)` with a source snapshot when portability across POSIX platforms matters.
+`AddRange(ADictionary)` calls `ADictionary.ToArray` to create a source snapshot, releases the source lock, and then applies that snapshot to the destination. It does not hold a source lock while calling other public source methods, so the collection overload is safe with non-reentrant `TCriticalSection` implementations on POSIX.
 
 ## Iteration
 
@@ -201,9 +201,7 @@ ENTRY_BLOCK_SIZE = 256;
 
 ## ContainsValue
 
-`ContainsValue` scans every entry and delegates to `FindValue`. The current implementation uses `CompareByte(Entry^.Value, Value, SizeOf(TValue))`.
-
-This is a bytewise comparison, not a custom equality comparer for `TValue`.
+`ContainsValue` scans every entry and delegates to `FindValue`. Values are compared with `Generics.Defaults.TEqualityComparer<TValue>.Default`, which provides type-aware equality for managed values such as strings as well as scalar values.
 
 ## Complexity
 
@@ -216,7 +214,7 @@ This is a bytewise comparison, not a custom equality comparer for `TValue`.
 | `GetKeys`, `GetValues`, `ToArray`, snapshot enumerator construction | O(n) |
 | `ContainsValue` | O(n) |
 | `AddRange(AArray)` | O(m) average, plus resize costs |
-| `AddRange(ADictionary)` | O(m) average, with the locking caveat noted above |
+| `AddRange(ADictionary)` | O(m) average after taking a source snapshot |
 
 ## Usage Examples
 
@@ -281,5 +279,5 @@ end;
 - Iteration is snapshot-based, not live.
 - Entry order is implementation-dependent and follows bucket/chaining layout.
 - `First` and `Last` are not insertion-order operations.
-- `ContainsValue` is a full scan and uses bytewise value comparison.
+- `ContainsValue` is a full scan using the RTL's type-aware default equality comparer.
 - There is no `DEBUG_LOGGING` constant or runtime debug logging switch in this unit.
