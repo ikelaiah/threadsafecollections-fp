@@ -5,7 +5,7 @@
 [![Lazarus](https://img.shields.io/badge/Lazarus-4.0+-60A5FA.svg)](https://www.lazarus-ide.org/)
 ![Supports Windows](https://img.shields.io/badge/support-Windows-F59E0B?logo=Windows)
 ![Supports Linux](https://img.shields.io/badge/support-Linux-F59E0B?logo=Linux)
-[![Version](https://img.shields.io/badge/version-0.8.2-8B5CF6.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.8.3-8B5CF6.svg)](CHANGELOG.md)
 ![No Dependencies](https://img.shields.io/badge/dependencies-none-10B981.svg)
 [![Documentation](https://img.shields.io/badge/Docs-Available-brightgreen.svg)](docs/)
 [![Status](https://img.shields.io/badge/Status-Stable-brightgreen.svg)]()
@@ -25,7 +25,7 @@ A thread-safe generic collections library for Free Pascal, designed for learning
 
 ## 🚧 Development Status
 
-**Latest Release: v0.8.2** - Bug Fix and Safety Release
+**Latest Release: v0.8.3** - Documentation and List Search Fix Release
 
 Current State:
 
@@ -36,17 +36,23 @@ Current State:
    - List, HashSet, Deque: RAII-style locking — lock held for the full `for…in` loop
    - Dictionary (v0.8.2): snapshot-based — lock released immediately after entry copy; concurrent modifications are safe but not visible to the iterator
 - ✅ Bulk operations support
-- ✅ **NEW in v0.8.2**: Critical bug fixes and performance optimisations
-  - Fixed re-entrant lock deadlocks in List, HashSet, and Dictionary on POSIX platforms
+- ✅ **NEW in v0.8.3**: Documentation and tooling refresh
+  - Lazarus package metadata updated to 0.8.3
+  - Generated API cheat sheet available at [docs/CHEATSHEET.md](docs/CHEATSHEET.md)
+  - PowerShell generator available at [tools/generate-cheatsheet.ps1](tools/generate-cheatsheet.ps1)
+  - Documentation refreshed against the current source code
+  - Fixed sorted-list `IndexOf` with duplicate values so it returns the first matching index
+- ✅ **v0.8.2**: Critical bug fixes and performance optimisations
+  - Fixed several re-entrant lock deadlocks in List, HashSet, and Dictionary on POSIX platforms
   - Fixed managed-type memory safety (`string`/`interface`) in List and Deque
   - Fixed ABBA cross-collection deadlock in `HashSet.IntersectWith`
   - Fixed `IntersectWith` incorrect item removal
-  - Fixed `IntegerComparer` overflow, `Sort`/`IsSorted` direction tracking
+  - Fixed `IntegerComparer` overflow
   - Removed dead `DEBUG_LOGGING` code from Dictionary; unified locking API
   - **Slab allocator** for Dictionary and HashSet `TEntry` records — 256-entry blocks with freelist recycling; 19–41% faster Dictionary ops, 15–19% faster HashSet Add at 1 M items
   - **4-lane XXHash32** — strings ≥ 16 bytes processed across four independent accumulators; 19–23% faster for long string keys
   - **Dictionary type dispatch caching** — `TKeyKind` enum cached at construction, eliminating per-call `TypeInfo` comparisons
-  - **Binary search for sorted lists** — `Contains`/`IndexOf` automatically use O(log n) binary search after `Sort()`
+  - **Binary search for ascending sorted lists** — `Contains`/`IndexOf` use O(log n) binary search after `Sort(True)`
   - **Dictionary iterator is now snapshot-based** — lock released immediately after copying; other threads may modify concurrently
 - ✅ **v0.8.1**: Code maintainability improvements
   - Algorithm complexity annotations (Big-O) on all 80+ methods
@@ -73,6 +79,39 @@ Planned Features:
 
 ## 🎓 Getting Started
 
+If you are new to Object Pascal generics, start with a complete program like this:
+
+```pascal
+program HelloThreadSafeList;
+
+{$mode objfpc}{$H+}{$J-}
+
+uses
+  SysUtils,
+  ThreadSafeCollections.List;
+
+var
+  Numbers: specialize TThreadSafeList<Integer>;
+begin
+  Numbers := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  try
+    Numbers.Add(42);
+    Numbers.Add(17);
+    Numbers.Sort;
+
+    WriteLn('First number: ', Numbers[0]);
+    WriteLn('Count: ', Numbers.Count);
+  finally
+    Numbers.Free;
+  end;
+end.
+```
+
+Two Object Pascal details matter in most examples:
+
+- `specialize TThreadSafeList<Integer>` creates a concrete list type from the generic list.
+- Lists need a comparer, such as `@IntegerComparer`, because sorting and searching depend on type-specific comparison.
+
 This library provides four main collection types:
 
 1. **ThreadSafeList**: Like an array that can grow
@@ -83,16 +122,12 @@ uses
 var
   List: specialize TThreadSafeList<Integer>;
 begin
-  // Two ways to create a list:
-  
-  // 1. Basic creation (using built-in comparers)
+  // Basic creation using a built-in comparer
   List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);    // For integers
   // List := specialize TThreadSafeList<string>.Create(@StringComparer);   // For strings
   // List := specialize TThreadSafeList<Boolean>.Create(@BooleanComparer); // For booleans
   // List := specialize TThreadSafeList<Real>.Create(@RealComparer);       // For reals
-  
-  // 2. With initial capacity (for better performance)
-  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer, 1000);
+  // List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer, 1000); // With initial capacity
   
   try
     List.Add(42);  // Simple to use!
@@ -145,7 +180,7 @@ begin
     Dict.Add('one', 1);
     Dict.Add('two', 2);
     
-    if Dict.Contains('one') then
+    if Dict.ContainsKey('one') then
       WriteLn('Found: ', Dict['one']);
   finally
     Dict.Free;
@@ -373,15 +408,22 @@ end;
 
 var
   UniquePoints: specialize TThreadSafeHashSet<TPoint>;
+  Point: TPoint;
 begin
   UniquePoints := specialize TThreadSafeHashSet<TPoint>.Create(@PointEquals, @PointHash);
   try
     // Add unique points
-    UniquePoints.Add(TPoint.Create(1, 1));
-    UniquePoints.Add(TPoint.Create(2, 2));
+    Point.X := 1;
+    Point.Y := 1;
+    UniquePoints.Add(Point);
+
+    Point.X := 2;
+    Point.Y := 2;
+    UniquePoints.Add(Point);
     
     // Check for existence
-    var Point := TPoint.Create(1, 1);
+    Point.X := 1;
+    Point.Y := 1;
     if UniquePoints.Contains(Point) then
       WriteLn('Point (1,1) exists');
   finally
@@ -395,6 +437,7 @@ end;
 ```pascal
 var
   SetA, SetB: TThreadSafeHashSetInteger;
+  Numbers: array of Integer;
 begin
   SetA := TThreadSafeHashSetInteger.Create;
   SetB := TThreadSafeHashSetInteger.Create;
@@ -418,7 +461,6 @@ begin
     SetA.ExceptWith(SetB);     // SetA now contains {1}
     
     // Bulk operations
-    var Numbers: array of Integer;
     SetLength(Numbers, 3);
     Numbers[0] := 5;
     Numbers[1] := 6;
@@ -441,7 +483,7 @@ Benchmarks on **Dell Inspiron 15 7510** (Intel i7-11800H @ 2.30 GHz, 8 cores, 16
 > v0.8.2 introduced three performance improvements that affect these figures:
 > slab allocator (19–41% faster Dictionary ops, 15–19% faster HashSet Add at 1 M items),
 > 4-lane XXHash32 (19–23% faster for long string keys), and
-> binary search for sorted lists (Contains/IndexOf become O(log n) after `Sort()`).
+> binary search for ascending sorted lists (`Contains`/`IndexOf` become O(log n) after `Sort(True)`).
 
 **List Operations:**
 
@@ -452,7 +494,7 @@ Benchmarks on **Dell Inspiron 15 7510** (Intel i7-11800H @ 2.30 GHz, 8 cores, 16
 | Sort Students (Name) | 312       | 100,000 | Custom comparer                        |
 | Sort Students (ID)   | 234       | 100,000 | Custom comparer                        |
 | Contains (unsorted)  | O(n)      | —       | Linear scan                            |
-| Contains (sorted)    | O(log n)  | —       | Binary search — automatic after Sort() |
+| Contains (ascending sorted) | O(log n)  | —       | Binary search — automatic after Sort(True) |
 
 **Dictionary Operations:**
 
@@ -475,7 +517,22 @@ Benchmarks on **Dell Inspiron 15 7510** (Intel i7-11800H @ 2.30 GHz, 8 cores, 16
 
 ## 📥 Installation
 
-### Method 1: Using Git
+### Method 1: Lazarus package
+
+1. Clone or download this repository.
+2. In Lazarus, open `package/lazarus/ThreadSafeCollections.lpk`.
+3. Click **Compile**.
+4. Open your project, then use **Project → Project Inspector → Add → New Requirement** and select `ThreadSafeCollections`.
+
+You can then add the units you need in a `uses` clause, for example:
+
+```pascal
+uses
+  ThreadSafeCollections.List,
+  ThreadSafeCollections.Dictionary;
+```
+
+### Method 2: Using Git and FPC
 
 1. Clone the repository:
    ```bash
@@ -493,7 +550,12 @@ Benchmarks on **Dell Inspiron 15 7510** (Intel i7-11800H @ 2.30 GHz, 8 cores, 16
      {$UNITPATH your/path/to/ThreadSafeCollections-FP/src}
      ```
 
-### Method 2: Manual Installation
+   Or compile with `fpc` by adding the source path:
+   ```bash
+   fpc -Fu/path/to/ThreadSafeCollections-FP/src yourprogram.pas
+   ```
+
+### Method 3: Manual Installation
 
 1. Download ZIP from GitHub
 2. Extract to your preferred location
@@ -642,7 +704,9 @@ end;
 - [ThreadSafeCollections.Dictionary.md](docs/ThreadSafeCollections.Dictionary.md)
 - [ThreadSafeCollections.HashSet.md](docs/ThreadSafeCollections.HashSet.md)
 - [RAII-style locking through interface counting](docs/RAII-style-locking-through-interface-counting.md)
-- [Latest Test Output](docs/Latest-Test-Output.md)
+- [Generated Cheat Sheet](docs/CHEATSHEET.md)
+- [Release Notes v0.8.3](RELEASE-NOTES-v0.8.3.md)
+- [Latest Test Output](tests/LatestTestOutput.md)
 
 ## 📁 Examples
 
@@ -651,9 +715,9 @@ end;
 - [SimpleToDoList](examples/SimpleToDoList/SimpleToDoList.lpr) - Shows how to use `TThreadSafeList` with the built-in string comparer.   
 - [ChatMessageQueue](examples/ChatMessageQueue/ChatMessageQueue.lpr) - Demonstrates using `TThreadSafeList` for a multi-threaded chat system.
 - [DictionaryIterator](examples/DictionaryIterator/DictionaryIterator.lpr) - Demonstrates using `TThreadSafeDictionary` with an iterator.
-- [DictionaryWithCustomType](examples/DictionaryWithCustomType/DictionaryWithCustomType.lpr) - Demonstrates using `TThreadSafeDictionary` with a custom type and a custom comparer.
+- [DictionaryWithCustomType](examples/DictionaryWithCustomType/DictionaryWithCustomType.lpr) - Demonstrates using `TThreadSafeDictionary` with a custom key type, hash function, and equality function.
 - [SimpleHashSet](examples/SimpleHashSet/SimpleHashSet.lpr) - Demonstrates using `TThreadSafeHashSet` with the built-in integer comparer.
-- [HashSetClientDemo](examples/HashSetClientDemo/HashSetClientDemo.lpr) - Demonstrates using `TThreadSafeHashSet` with a custom type and a custom comparer.
+- [HashSetClientDemo](examples/HashSetClientDemo/HashSetClientDemo.lpr) - Demonstrates using `TThreadSafeHashSet` with a custom type, hash function, and equality function.
 - [SimpleDeque](examples/SimpleDeque/SimpleDeque.lpr) - Demonstrates using `TThreadSafeDeque` with basic push/pop operations.
 - [DequeWithCustomType](examples/DequeWithCustomType/DequeWithCustomType.lpr) - Demonstrates using `TThreadSafeDeque` with a custom type.
 - [Benchmark](examples/Benchmark/Benchmark.lpr) - Microsecond-precision benchmark suite covering all four collections at 1k, 10k, 100k and 1M items. Supports `--affinity` flag to pin the timing thread to CPU core 0 for stable measurements.

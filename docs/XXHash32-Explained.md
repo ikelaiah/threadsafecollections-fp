@@ -61,14 +61,16 @@ from a different string that happened to land on the same shelf.
 Only **Dictionary** and **HashSet** — they are the only collections that need to map a key
 to a bucket. List and Deque are ordered collections and never hash anything.
 
-| Collection | Key type | Hash function |
+| Collection | Key/value type | Hash function |
 |---|---|---|
 | Dictionary | `string` | XXHash32 |
 | Dictionary | `integer` | MultiplicativeHash |
-| Dictionary | anything else | DefaultHash (FNV-1a on raw bytes) |
+| Dictionary | other key types | custom hash if supplied, otherwise DefaultHash (FNV-1a on raw bytes) |
 | HashSet | `string` | XXHash32 |
 | HashSet | `integer` | MultiplicativeHash |
-| HashSet | anything else | MultiplicativeHash (value cast to Cardinal) |
+| HashSet | `Boolean` | direct value hash |
+| HashSet | `Real` | fixed-point conversion hash |
+| HashSet | custom generic `T` | caller-supplied hash function |
 
 ---
 
@@ -231,7 +233,7 @@ seed = PRIME32_5                    V2 ═══╬═ 4 lanes eat 16 bytes per 
                finalise (avalanche)
                         │
                         ▼
-                    Result 🎲
+                    Result
 ```
 
 The only real difference is that the `>= 16` path runs four mixing chains in parallel before

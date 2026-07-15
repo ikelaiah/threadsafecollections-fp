@@ -72,7 +72,7 @@ exact count.
 | Severity | Location | Issue |
 |----------|----------|-------|
 | Medium | **List `IntegerComparer`** | `A - B` overflows when `A = MaxInt` and `B < 0`. Replaced with safe three-way comparison. |
-| Medium | **List `Sort`** | `FSorted` was always set to `True` regardless of direction, making `IsSorted` meaningless after a descending sort. Fixed to `FSorted := Ascending`. |
+| Medium | **List sorted-state docs** | The current code stores a Boolean `FSorted` flag, not sort direction. Binary-search lookups assume ascending comparer order, so documentation now scopes the O(log n) path to `Sort(True)`. |
 | Low | **`HashFunctions.XXHash32`** | `@Key[1]` formed an invalid pointer on empty string. Added early-exit guard before dereferencing. |
 | Low | **Dictionary** | Removed ~20 dead `DEBUG_LOGGING` `WriteLn` blocks and the `DEBUG_LOGGING` constant itself. |
 | Low | **Dictionary** | Standardised locking calls from `FLock.Enter`/`Leave` to `FLock.Acquire`/`Release`, consistent with all other collections. |
@@ -108,8 +108,10 @@ and are reused before the bump pointer advances. `Clear`/`Destroy` bulk-free all
 ### List — Binary Search on Sorted Lists
 
 `InternalIndexOf` now routes through `InternalBinarySearch` whenever `FSorted = True`, reducing
-`Contains` (and any operation backed by `IndexOf`) from **O(n) to O(log n)** for sorted lists.
-This activates automatically after any `Sort` call — no code changes required.
+`Contains` and `IndexOf` from **O(n) to O(log n)** for ascending sorted lists.
+
+The current binary-search implementation assumes ascending comparer order. Use `Sort(True)`
+before relying on the O(log n) lookup path.
 
 ### Deque — `PushRangeBack` / `PushRangeFront` (Fix + Performance)
 

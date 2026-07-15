@@ -1,10 +1,10 @@
-# The Great Dictionary Resize Mystery - A Debugging Tale
+# The Great Dictionary Resize Mystery - A Historical Debugging Note
 
-This is a classic case of "Have you tried turning it off and on again?" but in software development!
+This note documents an old debugging session. It is not a description of the current `TThreadSafeDictionary.CheckLoadFactor` implementation.
 
 ## Initial Problem
 
-The dictionary would hang when trying to add items after reaching the load factor threshold (0.75). The resize operation appeared to not be working, despite logs in the unit test showing:
+The dictionary appeared to hang when trying to add items after reaching the load factor threshold (0.75). At the time, temporary logs showed:
 
 ```
 ...
@@ -16,7 +16,7 @@ CheckLoadFactor: Resizing needed
 CheckLoadFactor: Resize complete
 ...
 ```
-But the resize wasn't actually happening.
+The conclusion during that session was that the resize was not actually happening.
 
 ## The Journey
 
@@ -25,7 +25,7 @@ But the resize wasn't actually happening.
 3. Added debug logging
 4. Removed and re-added `try..finally` blocks in `procedure TThreadSafeDictionary.CheckLoadFactor;`
 
-Initially, the following code was used and did not work.
+At the time, this temporary debug version was used:
 
 ```pascal
 procedure TThreadSafeDictionary.CheckLoadFactor;
@@ -43,7 +43,7 @@ begin
 end;
 ```
 
-Then, rewrote it as follows and it worked.
+Then it was rewritten as follows and appeared to work:
 
 ```pascal
 procedure TThreadSafeDictionary.CheckLoadFactor;
@@ -76,6 +76,8 @@ end;
 
 At the end, both versions worked.
 
+The current dictionary source no longer contains this temporary `WriteLn` logging and does not define a `DEBUG_LOGGING` constant.
+
 ## Key Learnings
 
 1. Always try a clean build when behavior seems inexplicable
@@ -96,16 +98,13 @@ The `try..finally` block was perfectly fine all along. We were debugging phantom
 2. Don't trust incremental builds during deep debugging sessions
 3. Add "Clean and Build" to your initial debugging checklist
 
-My personal "Hall of Fame" of debugging story! 😄
-
-
 ---
 
 ## Slow Performance Issue - Troubleshooting Log
 
 - Initially saw very slow performance
 - Discovered excessive logging was the culprit
-- Removed/reduced logging for performance tests
+- Removed/reduced temporary logging for performance tests
 - Performance for 100,000 items:
   - Add: 31ms (0.31 microseconds per item)
   - Find: 78ms (0.78 microseconds per item)
