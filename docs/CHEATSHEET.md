@@ -4,7 +4,7 @@
 >
 > Regenerate with: `pwsh tools/generate-cheatsheet.ps1`
 
-Package version: `0.8.4`
+Package version: `0.8.5`
 
 ## Source Inputs
 
@@ -158,7 +158,7 @@ Package version: `0.8.4`
 
 ### HashSet constructors
 
-- `constructor Create(AEqualityComparer: specialize TEqualityComparer<T>; AHashFunction: specialize THashFunction<T>; AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);`
+- `constructor Create(AEqualityComparer: specialize THashSetEqualityComparer<T>; AHashFunction: specialize THashFunction<T>; AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);`
 - `constructor Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;`
 - `constructor Create(AHashFunction: specialize THashFunction<string>; AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); overload;`
 

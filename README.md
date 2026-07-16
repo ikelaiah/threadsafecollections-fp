@@ -717,6 +717,18 @@ end;
 
 ## 📁 Examples
 
+Compile every example from the repository root. Both scripts discover only the
+actual projects at `examples/<project>/*.lpr` and place executables in
+`example-bin/` (with compiler units isolated below `example-bin/units/`).
+
+```powershell
+.\build-examples.ps1 -Configuration Release
+```
+
+```bash
+bash ./build-examples.sh Release
+```
+
 - [SimpleNumberList](examples/SimpleNumberList/SimpleNumberList.lpr) - Shows basic operations in `TThreadSafeList`; Add, Remove, Sort with the built-in integer comparer.
 - [SimpleShoppingCart](examples/SimpleShoppingCart/SimpleShoppingCart.lpr) - Shows how to use `TThreadSafeList` with a custom type and a custom comparer.
 - [SimpleToDoList](examples/SimpleToDoList/SimpleToDoList.lpr) - Shows how to use `TThreadSafeList` with the built-in string comparer.   
@@ -727,7 +739,7 @@ end;
 - [HashSetClientDemo](examples/HashSetClientDemo/HashSetClientDemo.lpr) - Demonstrates using `TThreadSafeHashSet` with a custom type, hash function, and equality function.
 - [SimpleDeque](examples/SimpleDeque/SimpleDeque.lpr) - Demonstrates using `TThreadSafeDeque` with basic push/pop operations.
 - [DequeWithCustomType](examples/DequeWithCustomType/DequeWithCustomType.lpr) - Demonstrates using `TThreadSafeDeque` with a custom type.
-- [Benchmark](examples/Benchmark/Benchmark.lpr) - Microsecond-precision benchmark suite covering all four collections at 1k, 10k, 100k and 1M items. Supports `--affinity` flag to pin the timing thread to CPU core 0 for stable measurements.
+- [Benchmark](examples/Benchmark/Benchmark.lpr) - Microsecond-precision benchmark suite covering all four collections at 1k, 10k, 100k and 1M items, including bulk insertion and HashSet intersection scenarios. Supports `--size=N` for a single-size run and Windows-only `--affinity` to pin the timing thread to CPU core 0 for stable measurements.
 
 ## 🤝 Contributing
 

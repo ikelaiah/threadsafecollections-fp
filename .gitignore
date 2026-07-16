@@ -27,6 +27,10 @@ tests/TestRunner
 tests/TestRunner.exe
 tests/lib/
 
+# Generated example binaries
+example-bin/*
+!example-bin/.gitkeep
+
 # Debug files
 *.dbg
 *.dcu

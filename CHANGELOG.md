@@ -5,6 +5,37 @@ All notable changes to ThreadSafeCollections-FP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.5] - Unreleased
+
+### Added
+
+- Added direct benchmark scenarios for Dictionary `AddRange`, Dictionary
+  `AddOrSetValue`, HashSet `AddRange`, and 50%-overlap HashSet `IntersectWith`.
+- Added `--size=N` to the benchmark runner for quick, reproducible single-size runs.
+- Added large-snapshot, self-source, and empty-source regression coverage for
+  `TThreadSafeHashSet.IntersectWith`.
+
+### Changed
+
+- `TThreadSafeHashSet.IntersectWith` now builds an array-backed hash index over the
+  source snapshot, changing average complexity from O(n*m) to O(n+m) while preserving
+  snapshot-first deadlock safety and the destination set's hash/equality semantics.
+- Dictionary insertion paths now reuse a precomputed hash and bucket lookup in
+  `AddOrSetValue`, `TryAdd`, and `AddRange` instead of repeating that work for new keys.
+
+### Fixed
+
+- Avoided an FPC late-specialization name collision between the HashSet comparer delegate
+  and `Generics.Defaults.TEqualityComparer<T>` in programs that specialize Dictionary and
+  HashSet together. The legacy public comparer name remains available for compatibility.
+
+### Testing
+
+- Focused HashSet intersection and Dictionary insertion tests pass with zero HeapTrc leaks.
+- Debug test runner and O3 Release benchmark projects compile successfully with FPC 3.2.2 / Win64.
+- 50%-overlap HashSet intersection benchmark: 371 us at 10k items and 7,995 us at 100k
+  items on the development machine; setup is excluded from the timed region.
+
 ## [0.8.4] - 2026-07-16
 
 ### Changed

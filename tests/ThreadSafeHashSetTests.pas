@@ -81,6 +81,7 @@ type
     procedure Test17_RemoveRange;           // Bulk remove operations
     procedure Test18_SetOperations;         // Set algebra operations
     procedure Test19_TryGetValue;           // Safe value retrieval
+    procedure Test20_IntersectWithLargeSnapshot; // Linear snapshot-index intersection
   end;
 
 { Special hash set class that forces collisions for testing }
@@ -1164,6 +1165,62 @@ begin
   AssertFalse('Should not find non-existent value', FIntSet.TryGetValue(99, Value));
   
   Log('Test19_TryGetValue completed');
+end;
+
+procedure TThreadSafeHashSetTest.Test20_IntersectWithLargeSnapshot;
+const
+  ITEM_COUNT = 10000;
+  OVERLAP_START = ITEM_COUNT div 2;
+var
+  OtherSet: TThreadSafeHashSetInteger;
+  LegacySet: specialize TThreadSafeHashSet<Integer>;
+  LegacyComparer: specialize TEqualityComparer<Integer>;
+  I: Integer;
+begin
+  Log('Test20_IntersectWithLargeSnapshot starting...');
+
+  // The original public comparer type remains accepted by the constructor.
+  LegacyComparer := @IntegerEquals;
+  LegacySet := specialize TThreadSafeHashSet<Integer>.Create(
+    LegacyComparer, @IntegerHash);
+  try
+    AssertTrue('Legacy comparer type should remain constructor-compatible',
+      LegacySet.Add(1));
+  finally
+    LegacySet.Free;
+  end;
+
+  OtherSet := TThreadSafeHashSetInteger.Create(ITEM_COUNT);
+  try
+    for I := 0 to ITEM_COUNT - 1 do
+      FIntSet.Add(I);
+    for I := OVERLAP_START to OVERLAP_START + ITEM_COUNT - 1 do
+      OtherSet.Add(I);
+
+    FIntSet.IntersectWith(OtherSet);
+    AssertEquals('Half-overlap intersection should retain half the items',
+      ITEM_COUNT div 2, FIntSet.Count);
+    AssertFalse('Item below overlap should be removed',
+      FIntSet.Contains(OVERLAP_START - 1));
+    AssertTrue('First overlapping item should remain',
+      FIntSet.Contains(OVERLAP_START));
+    AssertTrue('Last overlapping item should remain',
+      FIntSet.Contains(ITEM_COUNT - 1));
+
+    // A self-source snapshot must be safe and preserve every current item.
+    FIntSet.IntersectWith(FIntSet);
+    AssertEquals('Self intersection should preserve the set',
+      ITEM_COUNT div 2, FIntSet.Count);
+
+    OtherSet.Clear;
+    FIntSet.IntersectWith(OtherSet);
+    AssertEquals('Intersection with an empty set should clear the destination',
+      0, FIntSet.Count);
+  finally
+    OtherSet.Free;
+  end;
+
+  Log('Test20_IntersectWithLargeSnapshot completed');
 end;
 
 initialization

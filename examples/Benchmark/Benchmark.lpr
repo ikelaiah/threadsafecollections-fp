@@ -30,10 +30,16 @@ program Benchmark;
   Output
     One line per scenario:
       [Collection] [Scenario]  N items  avg X ms  best Y ms  ops/s Z
+
+  Options
+    --size=N       run only one size (1..MAX_ITEMS)
+    --affinity     pin the timing thread to CPU core 0 (Windows only)
 }
 
 uses
-  SysUtils, Classes, DateUtils, Math, SyncObjs, Windows,
+  {$IFDEF UNIX}cthreads,{$ENDIF}
+  SysUtils, Classes, DateUtils, Math, SyncObjs,
+  {$IFDEF MSWINDOWS}Windows,{$ELSE}BaseUnix,{$ENDIF}
   ThreadSafeCollections.List,
   ThreadSafeCollections.Dictionary,
   ThreadSafeCollections.HashSet,
@@ -59,11 +65,28 @@ var
 type
   TTimings = array of Int64;   // milliseconds per run
 
-{ Run AProc RUNS times, return trimmed-mean ms and best ms. }
+{ Run AProc RUNS times, return trimmed-mean microseconds and best microseconds. }
+{$IFDEF MSWINDOWS}
 var
   GPerfFreq: Int64;  // counts per second, initialised once in main block
+{$ENDIF}
 
-procedure RunScenario(AProc: TProcedure; out AvgUs, BestUs: Int64);
+function ReadTimestamp: Int64;
+{$IFDEF MSWINDOWS}
+begin
+  QueryPerformanceCounter(Result);
+end;
+{$ELSE}
+var
+  CurrentTime: TTimeVal;
+begin
+  fpgettimeofday(@CurrentTime, nil);
+  Result := Int64(CurrentTime.tv_sec) * 1000000 + CurrentTime.tv_usec;
+end;
+{$ENDIF}
+
+procedure RunScenario(AProc: TProcedure; out AvgUs, BestUs: Int64;
+  ASetup: TProcedure = nil; ATeardown: TProcedure = nil);
 var
   Timings: TTimings;
   Sorted: TTimings;
@@ -74,10 +97,21 @@ begin
   SetLength(Timings, RUNS);
   for I := 0 to RUNS - 1 do
   begin
-    QueryPerformanceCounter(C0);
-    AProc;
-    QueryPerformanceCounter(C1);
+    if Assigned(ASetup) then
+      ASetup;
+    try
+      C0 := ReadTimestamp;
+      AProc;
+      C1 := ReadTimestamp;
+    finally
+      if Assigned(ATeardown) then
+        ATeardown;
+    end;
+    {$IFDEF MSWINDOWS}
     Timings[I] := Round((C1 - C0) * 1000000.0 / GPerfFreq);
+    {$ELSE}
+    Timings[I] := C1 - C0;
+    {$ENDIF}
   end;
 
   // simple insertion sort for RUNS elements
@@ -159,6 +193,8 @@ var
   GShortStrings: array[0..MAX_ITEMS - 1] of string;
   GLongStrings:  array[0..MAX_ITEMS - 1] of string;
   GRandomOrder:  array[0..MAX_ITEMS - 1] of Integer;
+  GBulkIntegers: array of Integer;
+  GOverlapIntegers: array of Integer;
 
 function MakeString(const Prefix: string; Index, TotalLen: Integer): string;
 var
@@ -177,6 +213,8 @@ var
 begin
   GItemCount     := N;
   GContainsCount := Max(1, N div 100);  // 1% of N, minimum 1
+  SetLength(GBulkIntegers, N);
+  SetLength(GOverlapIntegers, N);
   RandSeed := 42;
   for I := 0 to N - 1 do
   begin
@@ -185,6 +223,8 @@ begin
     GShortStrings[I] := MakeString('k', I, SHORT_STR_LEN);
     GLongStrings[I]  := MakeString('key_', I, LONG_STR_LEN);
     GRandomOrder[I]  := I;
+    GBulkIntegers[I] := I;
+    GOverlapIntegers[I] := I + N div 2;
   end;
   // Shuffle integers (for Sort benchmark)
   for I := N - 1 downto 1 do
@@ -389,6 +429,52 @@ begin
   try
     for I := 0 to GItemCount - 1 do
       GDict.Add(GStrings[I], I);
+  finally
+    GDict.Free;
+    GDict := nil;
+  end;
+end;
+
+var
+  GDictSource: TStrIntDict;
+
+procedure SetupDictAddRange;
+var I: Integer;
+begin
+  GDict := TStrIntDict.Create;
+  try
+    GDictSource := TStrIntDict.Create(GItemCount);
+    for I := 0 to GItemCount - 1 do
+      GDictSource.Add(GStrings[I], I);
+  except
+    GDictSource.Free;
+    GDictSource := nil;
+    GDict.Free;
+    GDict := nil;
+    raise;
+  end;
+end;
+
+procedure DictAddRange;
+begin
+  GDict.AddRange(GDictSource);
+end;
+
+procedure TeardownDictAddRange;
+begin
+  GDictSource.Free;
+  GDictSource := nil;
+  GDict.Free;
+  GDict := nil;
+end;
+
+procedure DictAddOrSet;
+var I: Integer;
+begin
+  GDict := TStrIntDict.Create;
+  try
+    for I := 0 to GItemCount - 1 do
+      GDict.AddOrSetValue(GStrings[I], I);
   finally
     GDict.Free;
     GDict := nil;
@@ -659,6 +745,49 @@ begin
     GSet.Free;
     GSet := nil;
   end;
+end;
+
+procedure SetAddRange;
+begin
+  GSet := TIntSet.Create;
+  try
+    GSet.AddRange(GBulkIntegers);
+  finally
+    GSet.Free;
+    GSet := nil;
+  end;
+end;
+
+var
+  GIntersectOtherSet: TIntSet;
+
+procedure SetupSetIntersect;
+begin
+  GSet := TIntSet.Create(GItemCount);
+  try
+    GIntersectOtherSet := TIntSet.Create(GItemCount);
+    GSet.AddRange(GBulkIntegers);
+    GIntersectOtherSet.AddRange(GOverlapIntegers);
+  except
+    GIntersectOtherSet.Free;
+    GIntersectOtherSet := nil;
+    GSet.Free;
+    GSet := nil;
+    raise;
+  end;
+end;
+
+procedure SetIntersectHalf;
+begin
+  GSet.IntersectWith(GIntersectOtherSet);
+end;
+
+procedure TeardownSetIntersect;
+begin
+  GIntersectOtherSet.Free;
+  GIntersectOtherSet := nil;
+  GSet.Free;
+  GSet := nil;
 end;
 
 procedure SetContains;
@@ -1138,6 +1267,9 @@ begin
   { ---- Dictionary ---- }
   Separator('TThreadSafeDictionary  —  single-threaded');
   RunScenario(@DictAdd,            Avg, Best); PrintResult('Dictionary', 'Add (~10 char keys)',  GItemCount, Avg, Best);
+  RunScenario(@DictAddRange, Avg, Best, @SetupDictAddRange, @TeardownDictAddRange);
+  PrintResult('Dictionary', 'AddRange (collection)', GItemCount, Avg, Best);
+  RunScenario(@DictAddOrSet,       Avg, Best); PrintResult('Dictionary', 'AddOrSetValue (new)',   GItemCount, Avg, Best);
   RunScenario(@DictTryGet,         Avg, Best); PrintResult('Dictionary', 'TryGetValue',          GItemCount, Avg, Best);
   RunScenario(@DictReadSequential, Avg, Best); PrintResult('Dictionary', 'Read sequential',      GItemCount, Avg, Best);
   RunScenario(@DictReadRandom,     Avg, Best); PrintResult('Dictionary', 'Read random',          GItemCount, Avg, Best);
@@ -1155,6 +1287,9 @@ begin
   { ---- HashSet ---- }
   Separator('TThreadSafeHashSet<Integer>  —  single-threaded');
   RunScenario(@SetAdd,             Avg, Best); PrintResult('HashSet', 'Add (int)',           GItemCount, Avg, Best);
+  RunScenario(@SetAddRange,        Avg, Best); PrintResult('HashSet', 'AddRange (array)',    GItemCount, Avg, Best);
+  RunScenario(@SetIntersectHalf, Avg, Best, @SetupSetIntersect, @TeardownSetIntersect);
+  PrintResult('HashSet', 'Intersect (50%)', GItemCount, Avg, Best);
   RunScenario(@SetContains,        Avg, Best); PrintResult('HashSet', 'Contains (int)',       GItemCount, Avg, Best);
   RunScenario(@SetReadRandom,      Avg, Best); PrintResult('HashSet', 'Contains random',      GItemCount, Avg, Best);
   RunScenario(@SetIterate,         Avg, Best); PrintResult('HashSet', 'Iterate',              GItemCount, Avg, Best);
@@ -1192,9 +1327,13 @@ var
   SizeIdx:      Integer;
   I:            Integer;
   AffinityMode: Boolean;
+  RequestedSize: Integer;
+  Arg: string;
 
 begin
+  {$IFDEF MSWINDOWS}
   QueryPerformanceFrequency(GPerfFreq);
+  {$ENDIF}
   GTimestamp  := FormatDateTime('yyyymmdd_hhnnss', Now);
   CsvFilename := 'benchmark_' + GTimestamp + '.csv';
 
@@ -1202,14 +1341,32 @@ begin
   // Worker threads for MT scenarios remain free to run on any core so that
   // multi-threaded scenarios still exercise real parallelism.
   AffinityMode := False;
+  RequestedSize := 0;
   for I := 1 to ParamCount do
-    if LowerCase(ParamStr(I)) = '--affinity' then
-      AffinityMode := True;
+  begin
+    Arg := LowerCase(ParamStr(I));
+    if Arg = '--affinity' then
+      AffinityMode := True
+    else if Pos('--size=', Arg) = 1 then
+    begin
+      if (not TryStrToInt(Copy(Arg, 8, MaxInt), RequestedSize)) or
+         (RequestedSize < 1) or (RequestedSize > MAX_ITEMS) then
+      begin
+        WriteLn(Format('Invalid --size value. Expected 1..%d.', [MAX_ITEMS]));
+        Halt(2);
+      end;
+    end;
+  end;
 
   if AffinityMode then
   begin
+    {$IFDEF MSWINDOWS}
     if SetThreadAffinityMask(GetCurrentThread, 1) = 0 then
       WriteLn(Format('Warning: SetThreadAffinityMask failed (error %d)', [GetLastError]));
+    {$ELSE}
+    WriteLn('Warning: --affinity is currently supported on Windows only.');
+    AffinityMode := False;
+    {$ENDIF}
   end;
 
   AssignFile(GCsvFile, CsvFilename);
@@ -1218,19 +1375,34 @@ begin
 
   WriteLn('ThreadSafeCollections-FP Benchmark');
   WriteLn('====================================');
-  WriteLn(Format('  Sizes         : 1k / 10k / 100k / 1M', []));
+  if RequestedSize > 0 then
+    WriteLn(Format('  Size          : %d', [RequestedSize]))
+  else
+    WriteLn(Format('  Sizes         : 1k / 10k / 100k / 1M', []));
   WriteLn(Format('  Runs per size : %d  (trimming best+worst %d each)', [RUNS, TRIM]));
   WriteLn(Format('  Threads (MT)  : %d', [THREAD_COUNT]));
+  {$IFDEF MSWINDOWS}
   if AffinityMode then
     WriteLn('  CPU affinity  : main thread pinned to core 0')
   else
     WriteLn('  CPU affinity  : not pinned (use --affinity to stabilise 1M results)');
+  {$ELSE}
+  WriteLn('  CPU affinity  : not pinned (--affinity is Windows-only)');
+  {$ENDIF}
   WriteLn(Format('  CSV output    : %s', [CsvFilename]));
 
-  for SizeIdx := 0 to High(SIZES) do
+  if RequestedSize > 0 then
   begin
-    BuildData(SIZES[SizeIdx]);
+    BuildData(RequestedSize);
     RunAllScenarios;
+  end
+  else
+  begin
+    for SizeIdx := 0 to High(SIZES) do
+    begin
+      BuildData(SIZES[SizeIdx]);
+      RunAllScenarios;
+    end;
   end;
 
   WriteLn;

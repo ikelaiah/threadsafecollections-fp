@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  examples-linux:
+    name: Examples / Linux / Bash
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Free Pascal
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes fpc
+
+      - name: Compile all examples
+        run: bash ./build-examples.sh Release
+
+      - name: Upload example binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: example-binaries-linux
+          path: |
+            example-bin/
+            !example-bin/units/
+          if-no-files-found: error
+          retention-days: 7
+
+  examples-windows:
+    name: Examples / Windows / PowerShell
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Lazarus and Free Pascal
+        shell: pwsh
+        run: choco install lazarus --version 4.0.0 --yes --no-progress
+
+      - name: Add Free Pascal to PATH
+        shell: pwsh
+        run: |
+          $Compiler = Get-ChildItem -LiteralPath 'C:\lazarus\fpc' -Recurse -File -Filter 'fpc.exe' |
+            Select-Object -First 1
+          if (-not $Compiler) {
+            throw 'Could not find fpc.exe after installing Lazarus.'
+          }
+          $Compiler.Directory.FullName | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Compile all examples
+        shell: pwsh
+        run: .\build-examples.ps1 -Configuration Release
+
+      - name: Upload example binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: example-binaries-windows
+          path: |
+            example-bin/
+            !example-bin/units/
+          if-no-files-found: error
+          retention-days: 7

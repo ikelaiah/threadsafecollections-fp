@@ -6,6 +6,7 @@ program DictionaryWithCustomType;
 uses
   ThreadSafeCollections.Dictionary,
   HashFunctions,
+  Generics.Collections,
   SysUtils;
 
 type
@@ -37,7 +38,7 @@ type
 
 var
   Dict: specialize TThreadSafeDictionary<TPersonKey, integer>;
-  Pair: specialize TDictionaryPair<TPersonKey, integer>;
+  Pair: specialize TPair<TPersonKey, integer>;
 begin
   Dict := specialize TThreadSafeDictionary<TPersonKey, integer>.Create(
     @HashPerson, @ComparePerson);

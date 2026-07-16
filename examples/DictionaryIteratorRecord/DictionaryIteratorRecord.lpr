@@ -5,6 +5,7 @@ program DictionaryIteratorRecord;
 
 uses
   SysUtils,
+  Generics.Collections,
   ThreadSafeCollections.Dictionary;
 
 type
@@ -33,7 +34,7 @@ type
 
 var
   Clients: specialize TThreadSafeDictionary<integer, TClient>;
-  Pair: specialize TDictionaryPair<integer, TClient>;
+  Pair: specialize TPair<integer, TClient>;
   Client: TClient;
 
 begin
