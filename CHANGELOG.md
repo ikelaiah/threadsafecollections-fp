@@ -5,7 +5,7 @@ All notable changes to ThreadSafeCollections-FP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.5] - Unreleased
+## [0.8.5] - 2026-07-17
 
 ### Added
 
@@ -39,9 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Testing
 
-- Focused HashSet intersection and Dictionary insertion tests pass with zero HeapTrc leaks.
+- Full FPCUnit suite: 118 tests passed with 0 errors, 0 failures, and zero unfreed
+  HeapTrc blocks on FPC 3.2.2 / Win64.
 - Debug test runner and O3 Release benchmark projects compile successfully with FPC 3.2.2 / Win64.
-- Both local example-build scripts compile all 16 projects successfully on Win64.
+- PowerShell and Bash/Git Bash example-build scripts each compile all 16 projects successfully
+  on Win64.
+- All four GitHub Actions example-build checks passed for Linux/Bash and Windows/PowerShell on
+  both `push` and `pull_request` events.
 - 50%-overlap HashSet intersection benchmark: 371 us at 10k items and 7,995 us at 100k
   items on the development machine; setup is excluded from the timed region.
 

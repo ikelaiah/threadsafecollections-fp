@@ -12,7 +12,7 @@
   <a href="https://www.lazarus-ide.org/"><img alt="Lazarus 4.0+" src="https://img.shields.io/badge/Lazarus-4.0+-60A5FA.svg"></a>
   <img alt="Supports Windows" src="https://img.shields.io/badge/support-Windows-F59E0B?logo=Windows">
   <img alt="Supports Linux" src="https://img.shields.io/badge/support-Linux-F59E0B?logo=Linux">
-  <a href="CHANGELOG.md"><img alt="Version 0.8.4" src="https://img.shields.io/badge/version-0.8.4-8B5CF6.svg"></a>
+  <a href="CHANGELOG.md"><img alt="Version 0.8.5" src="https://img.shields.io/badge/version-0.8.5-8B5CF6.svg"></a>
   <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-10B981.svg">
   <a href="docs/"><img alt="Documentation available" src="https://img.shields.io/badge/Docs-Available-brightgreen.svg"></a>
   <img alt="Status: Stable" src="https://img.shields.io/badge/Status-Stable-brightgreen.svg">
@@ -28,11 +28,9 @@
 > 3. [LGenerics](https://github.com/avk959/LGenerics) - Comprehensive generics library
 
 
-## 🚧 Development Status
+## 📦 Release Status
 
-**Latest Release: v0.8.4** - Correctness and POSIX Portability Release
-
-**In Development: v0.8.5** - Performance and Cross-Platform Build Tooling
+**Latest Release: v0.8.5** - Performance and Cross-Platform Build Tooling
 
 - HashSet `IntersectWith` improves from O(n*m) to O(n+m) average complexity.
 - Dictionary new-key insertion reuses precomputed hashes and bucket positions.
@@ -48,6 +46,12 @@ Current State:
    - List, HashSet, Deque: RAII-style locking — lock held for the full `for…in` loop
    - Dictionary (v0.8.2): snapshot-based — lock released immediately after entry copy; concurrent modifications are safe but not visible to the iterator
 - ✅ Bulk operations support
+- ✅ **NEW in v0.8.5**: Performance and cross-platform build tooling
+  - HashSet `IntersectWith` now uses O(n+m) average-time hash-based lookups
+  - Dictionary insertion paths reuse precomputed hashes and bucket positions
+  - PowerShell and Bash scripts compile all 16 examples into `example-bin/`
+  - GitHub Actions validates Linux/Bash and Windows/PowerShell example builds
+  - Full FPCUnit suite: 118 tests, 0 errors, 0 failures, and zero HeapTrc leaks
 - ✅ **NEW in v0.8.4**: Correctness and POSIX portability fixes
   - Direction-aware O(log n) `IndexOf`/`Contains` after both ascending and descending sort
   - Dictionary and HashSet collection bulk operations now snapshot their source without nested locks
