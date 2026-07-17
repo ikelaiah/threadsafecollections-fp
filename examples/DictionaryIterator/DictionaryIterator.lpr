@@ -5,11 +5,12 @@ program DictionaryIterator;
 uses
   Classes,
   SysUtils,
+  Generics.Collections,
   ThreadSafeCollections.Dictionary;
 
 var
   Dict: specialize TThreadSafeDictionary<string, integer>;
-  Pair: specialize TDictionaryPair<string, integer>;
+  Pair: specialize TPair<string, integer>;
 begin
   Dict := specialize TThreadSafeDictionary<string, integer>.Create;
   try

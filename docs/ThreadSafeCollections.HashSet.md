@@ -16,9 +16,15 @@ The current implementation lives in `src/ThreadSafeCollections.HashSet.pas`.
 ## Public Types
 
 ```pascal
+generic THashSetEqualityComparer<T> = function(const A, B: T): Boolean;
 generic TEqualityComparer<T> = function(const A, B: T): Boolean;
 generic THashFunction<T> = function(const Value: T): Cardinal;
 ```
+
+`THashSetEqualityComparer<T>` is the constructor's comparer type. The original
+`TEqualityComparer<T>` name remains assignment-compatible for existing source code;
+the distinct internal name avoids a Free Pascal late-specialization collision with
+`Generics.Defaults.TEqualityComparer<T>`.
 
 Specialized classes:
 
@@ -71,7 +77,7 @@ Generic constructor:
 
 ```pascal
 constructor Create(
-  AEqualityComparer: specialize TEqualityComparer<T>;
+  AEqualityComparer: specialize THashSetEqualityComparer<T>;
   AHashFunction: specialize THashFunction<T>;
   AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
 ```
@@ -192,7 +198,7 @@ During a `for..in` loop, other public operations on the same set wait until enum
 
 ## Set Operations and Snapshots
 
-`IntersectWith` snapshots the other collection with `ToArray` before acquiring this set's lock. That avoids the ABBA lock-order deadlock that would happen if two threads called `A.IntersectWith(B)` and `B.IntersectWith(A)`.
+`IntersectWith` snapshots the other collection with `ToArray` before acquiring this set's lock. That avoids the ABBA lock-order deadlock that would happen if two threads called `A.IntersectWith(B)` and `B.IntersectWith(A)`. It builds an array-backed hash index over that snapshot using this set's hash and equality functions, then performs average O(n+m) membership filtering without calling the source collection while the destination lock is held.
 
 `AddRange`, `RemoveRange`, `ExceptWith`, `Overlaps`, and `SetEquals` also use `ToArray` snapshots of the other collection.
 
@@ -233,7 +239,7 @@ The set does not shrink automatically after removals.
 | `ToArray`, iteration | O(n) |
 | `AddRange(array)` | O(m) average, plus resize costs |
 | `RemoveRange(array)` | O(m) average |
-| `IntersectWith` | O(n * m) in the current snapshot scan implementation |
+| `IntersectWith` | O(n + m) average after source snapshot; O(n * m) worst case under full hash collision |
 | `UnionWith` | Delegates to `AddRange(Collection)` |
 | `ExceptWith` | O(m) average after source snapshot |
 | `Overlaps` | O(m) average after source snapshot |

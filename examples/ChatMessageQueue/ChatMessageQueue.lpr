@@ -12,6 +12,7 @@ program ChatMessageQueue;
 }
 
 uses
+  {$IFDEF UNIX}cthreads,{$ENDIF}
   Classes, SysUtils, DateUtils, ThreadSafeCollections.List, Math;
 
 type

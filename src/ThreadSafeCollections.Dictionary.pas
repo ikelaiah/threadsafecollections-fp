@@ -3,7 +3,7 @@
 {       Thread-safe Dictionary Implementation           }
 {                                                       }
 {       Copyright (C) 2024                              }
-{       Version: 0.8.4                                  }
+{       Version: 0.8.5                                  }
 {                                                       }
 {*******************************************************}
 
@@ -293,6 +293,8 @@ type
 
     // Internal unlocked helper — must only be called while FLock is already held.
     procedure InternalAdd(const Key: TKey; const Value: TValue);
+    procedure InternalInsertNew(const Key: TKey; const Value: TValue;
+      Hash: Cardinal; BucketIdx: Integer);
 
   public
     { Create
@@ -923,12 +925,22 @@ procedure TThreadSafeDictionary.InternalAdd(const Key: TKey; const Value: TValue
 var
   Hash: cardinal;
   BucketIdx: integer;
-  NewEntry: PEntry;
 begin
   Hash := GetHashValue(Key);
   BucketIdx := GetBucketIndex(Hash);
   if FindEntry(Key, Hash, BucketIdx) <> nil then
     raise Exception.Create(ERR_DUPLICATE_KEY);
+  InternalInsertNew(Key, Value, Hash, BucketIdx);
+end;
+
+// Internal: insert a key already known to be absent. Caller must hold FLock.
+// Accepting the precomputed hash/bucket avoids repeating both the hash and
+// bucket-chain lookup in AddOrSetValue, TryAdd, and AddRange.
+procedure TThreadSafeDictionary.InternalInsertNew(const Key: TKey;
+  const Value: TValue; Hash: Cardinal; BucketIdx: Integer);
+var
+  NewEntry: PEntry;
+begin
   NewEntry := FAllocator.Alloc;
   NewEntry^.Key := Key;
   NewEntry^.Value := Value;
@@ -1000,7 +1012,7 @@ begin
     if Entry <> nil then
       Entry^.Value := Value
     else
-      InternalAdd(Key, Value);  // Use internal helper — lock already held
+      InternalInsertNew(Key, Value, Hash, BucketIdx);
   finally
     FLock.Release;
   end;
@@ -1297,7 +1309,6 @@ function TThreadSafeDictionary.TryAdd(const Key: TKey; const Value: TValue): Boo
 var
   Hash: Cardinal;
   BucketIdx: Integer;
-  NewEntry: PEntry;
 begin
   Result := False;
   FLock.Acquire;
@@ -1308,15 +1319,7 @@ begin
     if FindEntry(Key, Hash, BucketIdx) <> nil then
       Exit;
 
-    NewEntry := FAllocator.Alloc;
-    NewEntry^.Key := Key;
-    NewEntry^.Value := Value;
-    NewEntry^.Hash := Hash;
-    NewEntry^.Next := FBuckets[BucketIdx];
-    FBuckets[BucketIdx] := NewEntry;
-    
-    Inc(FCount);
-    CheckLoadFactor;
+    InternalInsertNew(Key, Value, Hash, BucketIdx);
     Result := True;
   finally
     FLock.Release;
@@ -1365,7 +1368,8 @@ begin
       if Entry <> nil then
         Entry^.Value := AArray[I].Value
       else
-        InternalAdd(AArray[I].Key, AArray[I].Value);
+        InternalInsertNew(
+          AArray[I].Key, AArray[I].Value, Hash, BucketIdx);
     end;
   finally
     FLock.Release;

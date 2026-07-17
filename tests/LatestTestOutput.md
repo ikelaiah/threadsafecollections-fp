@@ -1,6 +1,6 @@
 # Latest Test Output
 
-## Output as of 2026-07-16
+## Output as of 2026-07-17
 
 Environment:
 
@@ -22,9 +22,15 @@ Test command:
 Summary:
 
 ```text
-Number of run tests: 117
+Number of run tests: 118
 Number of errors:    0
 Number of failures:  0
+```
+
+HeapTrc summary:
+
+```text
+0 unfreed memory blocks
 ```
 
 Suite summary:
@@ -34,7 +40,7 @@ Suite summary:
 | `TThreadSafeListTest` | 47 | 0 | 0 |
 | `TThreadSafeListStudentTest` | 2 | 0 | 0 |
 | `TThreadSafeDictionaryTest` | 38 | 0 | 0 |
-| `TThreadSafeHashSetTest` | 19 | 0 | 0 |
+| `TThreadSafeHashSetTest` | 20 | 0 | 0 |
 | `TThreadSafeDequeTests` | 11 | 0 | 0 |
 
 Notes:
@@ -44,4 +50,7 @@ Notes:
 - Dictionary coverage verifies semantic key/value equality for separately allocated strings and
   self-source `AddRange` behavior.
 - HashSet coverage verifies self-source `AddRange` and `RemoveRange` behavior.
-- The full suite includes long-running lock and collision stress tests.
+- `TThreadSafeHashSetTest.Test20_IntersectWithLargeSnapshot` covers a 10,000-item,
+  half-overlapping intersection plus legacy comparer, self-intersection, and empty-source behavior.
+- The full suite includes long-running lock and collision stress tests, including the
+  100,000-item aggressive-collision thread pool test.

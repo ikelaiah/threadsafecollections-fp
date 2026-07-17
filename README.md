@@ -1,17 +1,22 @@
-# 🔒 ThreadSafeCollections-FP
+<p align="center">
+  <img src="docs/assets/threadsafe-collections-fp-logo.svg" width="920" alt="ThreadSafeCollections-FP — concurrent collections for Free Pascal">
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-1E3A8A.svg)](https://opensource.org/licenses/MIT)
-[![Free Pascal](https://img.shields.io/badge/Free%20Pascal-3.2.2+-3B82F6.svg)](https://www.freepascal.org/)
-[![Lazarus](https://img.shields.io/badge/Lazarus-4.0+-60A5FA.svg)](https://www.lazarus-ide.org/)
-![Supports Windows](https://img.shields.io/badge/support-Windows-F59E0B?logo=Windows)
-![Supports Linux](https://img.shields.io/badge/support-Linux-F59E0B?logo=Linux)
-[![Version](https://img.shields.io/badge/version-0.8.4-8B5CF6.svg)](CHANGELOG.md)
-![No Dependencies](https://img.shields.io/badge/dependencies-none-10B981.svg)
-[![Documentation](https://img.shields.io/badge/Docs-Available-brightgreen.svg)](docs/)
-[![Status](https://img.shields.io/badge/Status-Stable-brightgreen.svg)]()
+<h1 align="center">ThreadSafeCollections-FP</h1>
 
+<p align="center">A thread-safe generic collections library for Free Pascal, designed for learning and experimentation.</p>
 
-A thread-safe generic collections library for Free Pascal, designed for learning and experimentation.
+<p align="center">
+  <a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-1E3A8A.svg"></a>
+  <a href="https://www.freepascal.org/"><img alt="Free Pascal 3.2.2+" src="https://img.shields.io/badge/Free%20Pascal-3.2.2+-3B82F6.svg"></a>
+  <a href="https://www.lazarus-ide.org/"><img alt="Lazarus 4.0+" src="https://img.shields.io/badge/Lazarus-4.0+-60A5FA.svg"></a>
+  <img alt="Supports Windows" src="https://img.shields.io/badge/support-Windows-F59E0B?logo=Windows">
+  <img alt="Supports Linux" src="https://img.shields.io/badge/support-Linux-F59E0B?logo=Linux">
+  <a href="CHANGELOG.md"><img alt="Version 0.8.4" src="https://img.shields.io/badge/version-0.8.4-8B5CF6.svg"></a>
+  <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-10B981.svg">
+  <a href="docs/"><img alt="Documentation available" src="https://img.shields.io/badge/Docs-Available-brightgreen.svg"></a>
+  <img alt="Status: Stable" src="https://img.shields.io/badge/Status-Stable-brightgreen.svg">
+</p>
 
 > [!NOTE]
 > 📚 **Library Maturity**: This is a learning-focused project with stable core functionality.
@@ -26,6 +31,13 @@ A thread-safe generic collections library for Free Pascal, designed for learning
 ## 🚧 Development Status
 
 **Latest Release: v0.8.4** - Correctness and POSIX Portability Release
+
+**In Development: v0.8.5** - Performance and Cross-Platform Build Tooling
+
+- HashSet `IntersectWith` improves from O(n*m) to O(n+m) average complexity.
+- Dictionary new-key insertion reuses precomputed hashes and bucket positions.
+- PowerShell and Bash scripts compile all examples into `example-bin/`.
+- GitHub Actions builds and publishes Linux and Windows example binaries.
 
 Current State:
 
@@ -711,11 +723,25 @@ end;
 - [ThreadSafeCollections.HashSet.md](docs/ThreadSafeCollections.HashSet.md)
 - [RAII-style locking through interface counting](docs/RAII-style-locking-through-interface-counting.md)
 - [Generated Cheat Sheet](docs/CHEATSHEET.md)
+- [Pull Request Summary v0.8.5](docs/PR_v0.8.5.md)
+- [Release Notes v0.8.5](docs/RELEASE-NOTES-v0.8.5.md)
 - [Release Notes v0.8.4](docs/RELEASE-NOTES-v0.8.4.md)
 - [Release Notes v0.8.3](docs/RELEASE-NOTES-v0.8.3.md)
 - [Latest Test Output](tests/LatestTestOutput.md)
 
 ## 📁 Examples
+
+Compile every example from the repository root. Both scripts discover only the
+actual projects at `examples/<project>/*.lpr` and place executables in
+`example-bin/` (with compiler units isolated below `example-bin/units/`).
+
+```powershell
+.\build-examples.ps1 -Configuration Release
+```
+
+```bash
+bash ./build-examples.sh Release
+```
 
 - [SimpleNumberList](examples/SimpleNumberList/SimpleNumberList.lpr) - Shows basic operations in `TThreadSafeList`; Add, Remove, Sort with the built-in integer comparer.
 - [SimpleShoppingCart](examples/SimpleShoppingCart/SimpleShoppingCart.lpr) - Shows how to use `TThreadSafeList` with a custom type and a custom comparer.
@@ -727,7 +753,7 @@ end;
 - [HashSetClientDemo](examples/HashSetClientDemo/HashSetClientDemo.lpr) - Demonstrates using `TThreadSafeHashSet` with a custom type, hash function, and equality function.
 - [SimpleDeque](examples/SimpleDeque/SimpleDeque.lpr) - Demonstrates using `TThreadSafeDeque` with basic push/pop operations.
 - [DequeWithCustomType](examples/DequeWithCustomType/DequeWithCustomType.lpr) - Demonstrates using `TThreadSafeDeque` with a custom type.
-- [Benchmark](examples/Benchmark/Benchmark.lpr) - Microsecond-precision benchmark suite covering all four collections at 1k, 10k, 100k and 1M items. Supports `--affinity` flag to pin the timing thread to CPU core 0 for stable measurements.
+- [Benchmark](examples/Benchmark/Benchmark.lpr) - Microsecond-precision benchmark suite covering all four collections at 1k, 10k, 100k and 1M items, including bulk insertion and HashSet intersection scenarios. Supports `--size=N` for a single-size run and Windows-only `--affinity` to pin the timing thread to CPU core 0 for stable measurements.
 
 ## 🤝 Contributing
 

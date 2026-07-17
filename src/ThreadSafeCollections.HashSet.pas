@@ -10,8 +10,13 @@ uses
   ThreadSafeCollections.Interfaces, ThreadSafeCollections.ErrorMessages;
 
 type
-  // Function type for comparing two values of type T for equality
+  // Legacy public comparer name retained for source compatibility.
   generic TEqualityComparer<T> = function(const A, B: T): Boolean;
+
+  // Internally use an unambiguous name: Generics.Defaults also exports a
+  // TEqualityComparer<T>, and FPC's late generic specialization can otherwise
+  // bind HashSet specializations to that class type in mixed-unit programs.
+  generic THashSetEqualityComparer<T> = function(const A, B: T): Boolean;
   
   // Function type for generating hash codes for values of type T
   generic THashFunction<T> = function(const Value: T): Cardinal;
@@ -84,6 +89,7 @@ type
         Using specialize TArray<T> for better compatibility with FPC's generic collections
       }
       _TArray = specialize TArray<T>;
+      _TEqualityComparer = specialize THashSetEqualityComparer<T>;
 
     const
       INITIAL_BUCKET_COUNT = 16;   // Default number of buckets in the hash table upon initialization.
@@ -116,7 +122,7 @@ type
       FBuckets: array of PEntry;   // Dynamic array holding pointers to the head of each bucket's entry chain.
       FCount: Integer;             // Current number of unique items stored in the hash set.
       FLock: TCriticalSection;     // Critical section to synchronize access and ensure thread safety.
-      FEqualityComparer: specialize TEqualityComparer<T>;  // Delegate for comparing two items for equality.
+      FEqualityComparer: _TEqualityComparer;  // Delegate for comparing two items for equality.
       FHashFunction: specialize THashFunction<T>;          // Delegate for computing the hash code of an item.
       FAllocator: TEntryAllocator; // Slab allocator for TEntry records
 
@@ -218,7 +224,7 @@ type
           - AHashFunction: A delegate function that computes the hash code for an item of type T.
           - AInitialCapacity: Optional parameter to specify the initial number of buckets. Defaults to INITIAL_BUCKET_COUNT.
     }
-    constructor Create(AEqualityComparer: specialize TEqualityComparer<T>;
+    constructor Create(AEqualityComparer: specialize THashSetEqualityComparer<T>;
                       AHashFunction: specialize THashFunction<T>;
                       AInitialCapacity: Integer = INITIAL_BUCKET_COUNT); 
 
@@ -664,7 +670,7 @@ begin
   Result := DefaultHash(IntValue);
 end;
 
-constructor TThreadSafeHashSet.Create(AEqualityComparer: specialize TEqualityComparer<T>;
+constructor TThreadSafeHashSet.Create(AEqualityComparer: specialize THashSetEqualityComparer<T>;
                                     AHashFunction: specialize THashFunction<T>;
                                     AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
 begin
@@ -725,17 +731,18 @@ begin
   Previous := nil;
   while Current <> nil do
   begin
-    if (Current^.Hash = Hash) and FEqualityComparer(Current^.Value, Item) then
-    begin
-      if Previous = nil then
-        FBuckets[BucketIdx] := Current^.Next
-      else
-        Previous^.Next := Current^.Next;
-      FAllocator.RecycleEntry(Current);
-      Dec(FCount);
-      Result := True;
-      Exit;
-    end;
+    if Current^.Hash = Hash then
+      if FEqualityComparer(Current^.Value, Item) then
+      begin
+        if Previous = nil then
+          FBuckets[BucketIdx] := Current^.Next
+        else
+          Previous^.Next := Current^.Next;
+        FAllocator.RecycleEntry(Current);
+        Dec(FCount);
+        Result := True;
+        Exit;
+      end;
     Previous := Current;
     Current := Current^.Next;
   end;
@@ -784,11 +791,12 @@ begin
   Current := FBuckets[BucketIdx];
   while Current <> nil do
   begin
-    if (Current^.Hash = Hash) and FEqualityComparer(Current^.Value, Item) then
-    begin
-      Result := Current;
-      Exit;
-    end;
+    if Current^.Hash = Hash then
+      if FEqualityComparer(Current^.Value, Item) then
+      begin
+        Result := Current;
+        Exit;
+      end;
     Current := Current^.Next;
   end;
 end;
@@ -889,7 +897,7 @@ end;
 // Specialized types with their own constructors
 constructor TThreadSafeHashSetInteger.Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
 var
-  EqualityComparer: specialize TEqualityComparer<Integer>;
+  EqualityComparer: specialize THashSetEqualityComparer<Integer>;
   HashFunc: specialize THashFunction<Integer>;
 begin
   EqualityComparer := @IntegerEquals;
@@ -899,7 +907,7 @@ end;
 
 constructor TThreadSafeHashSetString.Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
 var
-  EqualityComparer: specialize TEqualityComparer<string>;
+  EqualityComparer: specialize THashSetEqualityComparer<string>;
   HashFunc: specialize THashFunction<string>;
 begin
   EqualityComparer := @StringEquals;
@@ -910,7 +918,7 @@ end;
 constructor TThreadSafeHashSetString.Create(AHashFunction: specialize THashFunction<string>; 
                                           AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
 var
-  EqualityComparer: specialize TEqualityComparer<string>;
+  EqualityComparer: specialize THashSetEqualityComparer<string>;
 begin
   EqualityComparer := @StringEquals;
   inherited Create(EqualityComparer, AHashFunction, AInitialCapacity);
@@ -918,7 +926,7 @@ end;
 
 constructor TThreadSafeHashSetBoolean.Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
 var
-  EqualityComparer: specialize TEqualityComparer<Boolean>;
+  EqualityComparer: specialize THashSetEqualityComparer<Boolean>;
   HashFunc: specialize THashFunction<Boolean>;
 begin
   EqualityComparer := @BooleanEquals;
@@ -928,7 +936,7 @@ end;
 
 constructor TThreadSafeHashSetReal.Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
 var
-  EqualityComparer: specialize TEqualityComparer<Real>;
+  EqualityComparer: specialize THashSetEqualityComparer<Real>;
   HashFunc: specialize THashFunction<Real>;
 begin
   EqualityComparer := @RealEquals;
@@ -1103,7 +1111,11 @@ procedure TThreadSafeHashSet.IntersectWith(const Collection: specialize IThreadS
 var
   ToRemove: _TArray;
   CurrentArray: _TArray;
-  RemoveCount, I, J, BucketIdx: Integer;
+  LookupBuckets: array of Integer;
+  LookupNext: array of Integer;
+  LookupHashes: array of Cardinal;
+  RemoveCount, I, BucketIdx, LookupIndex, LookupSize: Integer;
+  Hash: Cardinal;
   Entry: PEntry;
   FoundInOther: Boolean;
 begin
@@ -1118,13 +1130,28 @@ begin
   // called A.IntersectWith(B) and B.IntersectWith(A).
   CurrentArray := Collection.ToArray;
 
+  // Index the snapshot with this set's hash/equality semantics. Bucket heads
+  // and next links store array indexes plus one, leaving zero as the nil value
+  // supplied by SetLength. The previous implementation linearly scanned the
+  // snapshot for every item in Self, making intersection O(n*m) despite the
+  // interface's O(n+m) average-case contract.
+  LookupSize := GetNextPowerOfTwo(
+    Trunc(Length(CurrentArray) / LOAD_FACTOR) + 1);
+  SetLength(LookupBuckets, LookupSize);
+  SetLength(LookupNext, Length(CurrentArray));
+  SetLength(LookupHashes, Length(CurrentArray));
+
+  for I := 0 to Length(CurrentArray) - 1 do
+  begin
+    Hash := FHashFunction(CurrentArray[I]);
+    BucketIdx := Hash and (LookupSize - 1);
+    LookupHashes[I] := Hash;
+    LookupNext[I] := LookupBuckets[BucketIdx];
+    LookupBuckets[BucketIdx] := I + 1;
+  end;
+
   FLock.Acquire;
   try
-    // Collect items from Self that are not present in Collection.
-    // We have a snapshot of Collection; check membership against it using our
-    // own hash/equality functions by scanning the snapshot linearly.
-    // Note: we cannot call Collection.Contains here while holding FLock because
-    // that would re-introduce the ABBA risk on the Collection's lock.
     SetLength(ToRemove, FCount);
     RemoveCount := 0;
 
@@ -1133,14 +1160,20 @@ begin
       Entry := FBuckets[BucketIdx];
       while Entry <> nil do
       begin
-        // Check if this entry's value exists in the snapshot
         FoundInOther := False;
-        for J := 0 to Length(CurrentArray) - 1 do
-          if FEqualityComparer(Entry^.Value, CurrentArray[J]) then
-          begin
-            FoundInOther := True;
-            Break;
-          end;
+        LookupIndex := LookupBuckets[
+          Entry^.Hash and (LookupSize - 1)] - 1;
+        while LookupIndex >= 0 do
+        begin
+          if LookupHashes[LookupIndex] = Entry^.Hash then
+            if FEqualityComparer(
+              Entry^.Value, CurrentArray[LookupIndex]) then
+            begin
+              FoundInOther := True;
+              Break;
+            end;
+          LookupIndex := LookupNext[LookupIndex] - 1;
+        end;
         if not FoundInOther then
         begin
           ToRemove[RemoveCount] := Entry^.Value;
