@@ -39,7 +39,7 @@ program Benchmark;
 uses
   {$IFDEF UNIX}cthreads,{$ENDIF}
   SysUtils, Classes, DateUtils, Math, SyncObjs,
-  {$IFDEF MSWINDOWS}Windows,{$ELSE}BaseUnix,{$ENDIF}
+  {$IFDEF MSWINDOWS}Windows,{$ELSE}BaseUnix, Unix,{$ENDIF}
   ThreadSafeCollections.List,
   ThreadSafeCollections.Dictionary,
   ThreadSafeCollections.HashSet,
