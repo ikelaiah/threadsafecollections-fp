@@ -121,6 +121,7 @@ The new [GitHub Actions workflow](../.github/workflows/ci.yml) adds:
 
 | Check | Result |
 |---|---|
+| Full FPCUnit suite | 118 tests passed; 0 errors, 0 failures, zero HeapTrc leaks |
 | HashSet large-intersection regression | Passed; zero HeapTrc leaks |
 | Dictionary test suite | 38 tests passed; zero HeapTrc leaks |
 | Targeted HashSet regression tests | Passed; zero HeapTrc leaks |
@@ -137,9 +138,11 @@ Indicative 50%-overlap HashSet intersection timings on the development machine, 
 | 10,000 | 371 us |
 | 100,000 | 7,995 us |
 
-The complete all-tests run was not finished in this work session because the aggressive collision
-stress test exceeded the 120-second local window. The focused suites covering the changed code
-passed. The GitHub-hosted Linux and Windows jobs will run after the branch is pushed.
+The complete FPCUnit suite passed on FPC 3.2.2 / Win64: 118 tests, 0 errors,
+0 failures, and zero unfreed HeapTrc blocks. This includes the 100,000-item aggressive
+collision stress test and the new large-snapshot intersection regression. All four
+GitHub-hosted example build checks passed for Linux/Bash and Windows/PowerShell on both
+`push` and `pull_request` events.
 
 ## Review Focus
 
@@ -147,14 +150,15 @@ passed. The GitHub-hosted Linux and Windows jobs will run after the branch is pu
 2. Dictionary reuse of precomputed hashes and bucket indices.
 3. Compatibility of the legacy HashSet comparer delegate.
 4. Platform path handling in both example-build scripts.
-5. First-run results from both GitHub Actions jobs.
+5. Hosted Linux and Windows example-build results and artifacts.
 
 ## Checklist
 
 - [x] Performance changes implemented
 - [x] Focused regression tests added and passing
+- [x] Full FPCUnit suite passed (118 tests; zero leaks)
 - [x] Package metadata updated to v0.8.5
 - [x] All 16 examples compile through both local scripts
 - [x] Changelog and API documentation updated
 - [x] PR and release notes added
-- [ ] GitHub-hosted Linux and Windows jobs confirmed after push
+- [x] GitHub-hosted Linux and Windows jobs confirmed after push

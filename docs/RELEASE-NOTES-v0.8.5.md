@@ -126,18 +126,20 @@ Local verification used Free Pascal 3.2.2 on Win64:
 
 | Check | Result |
 |---|---|
+| Full FPCUnit suite | 118 tests passed; 0 errors, 0 failures, zero HeapTrc leaks |
 | HashSet large-intersection test | Passed; zero HeapTrc leaks |
 | Dictionary suite | 38 tests passed; zero HeapTrc leaks |
 | Targeted HashSet tests | Passed; zero HeapTrc leaks |
 | Lazarus package | Compiled successfully as v0.8.5 |
 | PowerShell example build | 16/16 projects compiled |
 | Bash/Git Bash example build | 16/16 projects compiled |
+| GitHub Actions example builds | Linux/Bash and Windows/PowerShell passed for push and pull request |
 | Benchmark smoke test | Passed |
 | Static checks | PowerShell, Bash, YAML, SVG/XML, and diff checks passed |
 
-The aggressive collision stress test exceeded the 120-second local window, so a complete all-tests
-run was not recorded for this work session. The focused suites covering the changed code passed.
-GitHub-hosted Linux and Windows example builds run when the branch is pushed.
+The complete FPCUnit suite passed with 118 tests, 0 errors, 0 failures, and zero unfreed
+HeapTrc blocks. It includes the 100,000-item aggressive collision stress test and the new
+large-snapshot intersection regression. All four GitHub-hosted example build checks passed.
 
 ## Upgrading from v0.8.4
 
