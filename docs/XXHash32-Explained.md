@@ -1,7 +1,21 @@
 # XXHash32 Explained
 
-A plain-English guide to how XXHash32 works, why HashSet and Dictionary use it for string keys,
-and what the 4-lane improvement in v0.8.2 actually does.
+[Documentation home](README.md) · [Project README](../README.md) ·
+[Dictionary guide](ThreadSafeCollections.Dictionary.md) ·
+[Hash-set guide](ThreadSafeCollections.HashSet.md)
+
+**Audience:** developers who want an implementation-oriented introduction to
+the non-cryptographic string hash used by the dictionary and specialized string
+hash set.
+
+A plain-English guide to how XXHash32 works, where the dictionary and
+specialized string hash set use it, and what the 4-lane improvement in v0.8.2
+does.
+
+> [!IMPORTANT]
+> XXHash32 is a fast, non-cryptographic 32-bit hash. Do not use it for passwords,
+> signatures, authentication, encryption, or other security decisions. Different
+> inputs can produce the same 32-bit result.
 
 ---
 
@@ -35,16 +49,18 @@ ignores all the internal bytes.
 
 ---
 
-## XXHash32 is one-way
+## Hashing is not decoding
 
-You cannot go from the hash number back to the original string. That's the point.
+The hash contains too little information to identify one original string: many
+different inputs map to the same 32-bit value. It is not an encoded form that can
+be decoded, but likely inputs can still be guessed and hashed for comparison.
 
 ```
 "apple"  ──→  XXHash32  ──→  3847291045
 "apple"  ──→  XXHash32  ──→  3847291045   ← always the same
-"apples" ──→  XXHash32  ──→  0192847561   ← completely different
+"apples" ──→  XXHash32  ──→  0192847561   ← usually very different
 
-3847291045  ──→  ???  ──→  impossible to recover "apple"
+3847291045  ──→  does not identify one unique original string
 ```
 
 The HashSet never needs to go backwards. It only ever asks *"what shelf does this string
@@ -68,7 +84,7 @@ to a bucket. List and Deque are ordered collections and never hash anything.
 | Dictionary | other key types | custom hash if supplied, otherwise DefaultHash (FNV-1a on raw bytes) |
 | HashSet | `string` | XXHash32 |
 | HashSet | `integer` | MultiplicativeHash |
-| HashSet | `Boolean` | direct value hash |
+| HashSet | `Boolean` | MultiplicativeHash of the Boolean value |
 | HashSet | `Real` | fixed-point conversion hash |
 | HashSet | custom generic `T` | caller-supplied hash function |
 
@@ -76,8 +92,9 @@ to a bucket. List and Deque are ordered collections and never hash anything.
 
 ## How XXHash32 works — the three stages
 
-Think of it like mixing paint. You want to take any string and produce a single 32-bit number
-that looks completely random, but is always the same for the same input.
+Think of it like mixing paint. You want to take any string and produce a single
+32-bit number that is well distributed for hash-table use and is always the same
+for the same input bytes.
 
 The trick is **avalanche**: changing one character should scramble the entire output. You
 achieve this by repeatedly multiplying by large prime numbers and rotating bits — these two
@@ -95,14 +112,14 @@ After each chunk the accumulator looks completely different from what it was bef
 
 ### Stage 2 — Fold in the length
 
-Add the original string length into the accumulator. This ensures `"ab"` and `"abXX"` can
-never accidentally produce the same hash even if all other mixing happened to cancel out.
+Add the original string length into the accumulator. This helps distinguish
+inputs with related byte patterns, but it cannot make collisions impossible.
 
 ### Stage 3 — Finalisation (avalanche)
 
 Three rounds of XOR-shift and multiply. This is the last scramble that ensures even a
 single-bit difference anywhere in the input produces a wildly different output. After this
-step, every output bit depends on every input bit.
+step, changes in the input are intended to spread across the output bits.
 
 ---
 
@@ -204,7 +221,9 @@ Iteration 2:  V1 eats bytes 16-19   V2 eats bytes 20-23   V3 eats bytes 24-27  V
 
 Four people stirring four pots at the same time, then combining the results at the end.
 
-**Measured result: 19–23% faster on Dictionary key operations at 1M items.**
+**Historical v0.8.2 measurement:** Dictionary key operations at one million
+items were 19–23% faster on the development machine used for that release. This
+is not a guarantee for other CPUs, compilers, data, or workloads.
 
 For strings under 16 bytes there isn't enough data to fill four lanes, so it falls back to
 the single-lane path — which is fine because short strings are so cheap the difference
@@ -237,5 +256,5 @@ seed = PRIME32_5                    V2 ═══╬═ 4 lanes eat 16 bytes per 
 ```
 
 The only real difference is that the `>= 16` path runs four mixing chains in parallel before
-converging. The finalisation step is identical for both — that's the part that ensures even
-a single changed character produces a completely different output number.
+converging. The finalisation step is identical for both and is intended to
+produce a strong avalanche effect from small input changes.

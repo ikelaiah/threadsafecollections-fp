@@ -1,6 +1,12 @@
-# Latest Test Output
+# Test Snapshot — 2026-07-17
 
-## Output as of 2026-07-17
+[Documentation home](../docs/README.md) ·
+[Current test instructions](../docs/BUILDING.md#running-the-tests)
+
+> **Historical test snapshot.** These results describe one FPC 3.2.2 Win64 run
+> on 17 July 2026. Run the current checkout to establish its present status.
+
+## Recorded environment
 
 Environment:
 

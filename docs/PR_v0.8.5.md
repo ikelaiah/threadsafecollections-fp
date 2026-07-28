@@ -1,5 +1,13 @@
 # Pull Request: v0.8.5 Performance and Cross-Platform Build Tooling
 
+[Documentation home](README.md) · [Current changelog](../CHANGELOG.md)
+
+> **Historical development record.** This PR summary describes the v0.8.5
+> development state and is not current setup, support, or API guidance.
+
+**Audience:** maintainers researching earlier implementation and release
+decisions.
+
 ## Summary
 
 This PR prepares ThreadSafeCollections-FP v0.8.5 with focused performance work in

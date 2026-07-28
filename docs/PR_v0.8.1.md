@@ -1,5 +1,12 @@
 # Pull Request: Code Maintainability Improvements for v0.8.1
 
+[Documentation home](README.md) · [Current changelog](../CHANGELOG.md)
+
+> **Historical development record.** This PR summary describes the v0.8.1
+> development state and is not current setup, support, or API guidance.
+
+**Audience:** maintainers researching earlier implementation decisions.
+
 ## Summary
 
 This PR implements comprehensive maintainability improvements to the ThreadSafeCollections-FP codebase, focusing on code organization, documentation quality, and consistency while maintaining 100% backward compatibility.

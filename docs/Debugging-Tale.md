@@ -1,5 +1,14 @@
 # The Great Dictionary Resize Mystery - A Historical Debugging Note
 
+[Documentation home](README.md) ·
+[Current dictionary guide](ThreadSafeCollections.Dictionary.md)
+
+> **Historical investigation.** This narrative preserves an earlier debugging
+> episode. Use the current dictionary guide and tests for present behavior.
+
+**Audience:** contributors interested in debugging history and implementation
+lessons.
+
 This note documents an old debugging session. It is not a description of the current `TThreadSafeDictionary.CheckLoadFactor` implementation.
 
 ## Initial Problem

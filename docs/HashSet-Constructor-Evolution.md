@@ -1,5 +1,13 @@
 # Making Generic HashSet More User-Friendly in Free Pascal
 
+[Documentation home](README.md) ·
+[Current hash-set guide](ThreadSafeCollections.HashSet.md)
+
+> **Historical design record.** This document captures an earlier constructor
+> design discussion and may not match the current public API in every detail.
+
+**Audience:** contributors researching the evolution of the hash-set API.
+
 ## The Challenge
 
 We wanted to make a generic `TThreadSafeHashSet<T>` that would be easy to use with common types (Integer, String, Boolean, Real) while maintaining type safety and proper generic support.

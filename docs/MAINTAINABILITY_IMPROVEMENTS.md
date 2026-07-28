@@ -1,5 +1,13 @@
 # Maintainability Improvements - Complete Summary
 
+[Documentation home](README.md) · [Current changelog](../CHANGELOG.md)
+
+> **Historical development record.** This summary records work performed in
+> December 2025. Its status labels and conclusions apply to that snapshot, not
+> automatically to the current checkout.
+
+**Audience:** maintainers researching earlier refactoring decisions.
+
 **Branch:** `refactor/code-maintainability-improvements`
 **Date:** 2025-12-24
 **Status:** ✅ P0 Complete, ✅ P1.1 Complete, ✅ P1.2 Verified

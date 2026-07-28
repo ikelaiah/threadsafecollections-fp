@@ -1,9 +1,35 @@
 # Changelog
 
+[Project README](README.md) · [Documentation home](docs/README.md) ·
+[Roadmap](ROADMAP.md)
+
 All notable changes to ThreadSafeCollections-FP will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.8.6] - 2027-06-28
+
+### Documentation
+
+- Reworked the README around newcomer goals, with a verified five-minute build,
+  installation choices, Free Pascal conventions, an implementation-based
+  feature tour, thread-safety boundaries, and a smaller example learning path.
+- Added a documentation home and a build/verification guide covering platform
+  evidence, all-example builds, FPCUnit, the Lazarus package, benchmark options,
+  and API cheat-sheet generation.
+- Added navigation and audience guidance to current collection and advanced
+  references, and separated current guidance from historical release,
+  development, benchmark, and test records.
+- Corrected overbroad dependency and platform claims, documented CI's actual
+  example-build scope, and clarified the to-do example and benchmark command
+  behavior, including the FPCUnit runner's non-working advertised `-t` option.
+- Corrected non-cryptographic hash guidance, collision language, Boolean hashing,
+  and the scope of historical performance measurements.
+- Added the repository-level MIT license text already declared in the Lazarus
+  package metadata so the README's license link resolves.
 
 ## [0.8.5] - 2026-07-17
 

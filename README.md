@@ -4,601 +4,129 @@
 
 <h1 align="center">ThreadSafeCollections-FP</h1>
 
-<p align="center">A thread-safe generic collections library for Free Pascal, designed for learning and experimentation.</p>
-
 <p align="center">
-  <a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-1E3A8A.svg"></a>
-  <a href="https://www.freepascal.org/"><img alt="Free Pascal 3.2.2+" src="https://img.shields.io/badge/Free%20Pascal-3.2.2+-3B82F6.svg"></a>
-  <a href="https://www.lazarus-ide.org/"><img alt="Lazarus 4.0+" src="https://img.shields.io/badge/Lazarus-4.0+-60A5FA.svg"></a>
-  <img alt="Supports Windows" src="https://img.shields.io/badge/support-Windows-F59E0B?logo=Windows">
-  <img alt="Supports Linux" src="https://img.shields.io/badge/support-Linux-F59E0B?logo=Linux">
-  <a href="CHANGELOG.md"><img alt="Version 0.8.5" src="https://img.shields.io/badge/version-0.8.5-8B5CF6.svg"></a>
-  <img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-10B981.svg">
-  <a href="docs/"><img alt="Documentation available" src="https://img.shields.io/badge/Docs-Available-brightgreen.svg"></a>
-  <img alt="Status: Stable" src="https://img.shields.io/badge/Status-Stable-brightgreen.svg">
+  Thread-safe generic lists, deques, dictionaries, and hash sets for Free Pascal.
 </p>
 
-> [!NOTE]
-> 📚 **Library Maturity**: This is a learning-focused project with stable core functionality.
-> 
-> For production applications requiring battle-tested code, consider these more mature alternatives:
-> 
-> 1. [FPC Generics.Collections](https://gitlab.com/freepascal.org/fpc/source/-/blob/main/packages/rtl-generics/src/generics.collections.pas) - Official FPC generic collections
-> 2. [FCL-STL](https://gitlab.com/freepascal.org/fpc/source/-/tree/main/packages/fcl-stl) - FPC's template library
-> 3. [LGenerics](https://github.com/avk959/LGenerics) - Comprehensive generics library
+<p align="center">
+  <a href="https://github.com/ikelaiah/threadsafecollections-fp/actions/workflows/ci.yml"><img alt="CI example builds" src="https://github.com/ikelaiah/threadsafecollections-fp/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="CHANGELOG.md"><img alt="Version 0.8.6" src="https://img.shields.io/badge/version-0.8.6-8B5CF6.svg"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-1E3A8A.svg"></a>
+  <a href="#supported-and-verified-environments"><img alt="Free Pascal 3.2.2 verified" src="https://img.shields.io/badge/Free%20Pascal-3.2.2%20verified-3B82F6.svg"></a>
+  <a href="#supported-and-verified-environments"><img alt="Example builds: Windows and Linux" src="https://img.shields.io/badge/example%20builds-Windows%20%7C%20Linux-F59E0B.svg"></a>
+  <a href="docs/README.md"><img alt="Documentation" src="https://img.shields.io/badge/docs-current-10B981.svg"></a>
+</p>
 
+ThreadSafeCollections-FP provides familiar collection APIs with per-instance
+synchronization, bulk operations, and documented iteration behavior. It is a
+learning-focused project with a tested core, runnable examples, and no required
+packages beyond the Free Pascal standard distribution.
 
-## 📦 Release Status
+> [!IMPORTANT]
+> The library is intended for learning and experimentation. Evaluate its behavior,
+> performance, and test coverage against your application's requirements before
+> adopting it in production.
 
-**Latest Release: v0.8.5** - Performance and Cross-Platform Build Tooling
+## Start Here
 
-- HashSet `IntersectWith` improves from O(n*m) to O(n+m) average complexity.
-- Dictionary new-key insertion reuses precomputed hashes and bucket positions.
-- PowerShell and Bash scripts compile all examples into `example-bin/`.
-- GitHub Actions builds and publishes Linux and Windows example binaries.
+| Your goal | Best starting point |
+|---|---|
+| See it work in five minutes | [Five-minute first run](#five-minute-first-run) |
+| Add it to a Free Pascal or Lazarus project | [Installation](#installation) |
+| Learn the collection APIs | [Feature tour](#feature-tour) and [API cheat sheet](docs/CHEATSHEET.md) |
+| Understand locking and iteration | [Thread-safety model](#thread-safety-model) |
+| Build examples, tests, or generated docs | [Building and verification](docs/BUILDING.md) |
+| Browse all current and historical docs | [Documentation home](docs/README.md) |
+| See planned compatibility and API work | [Roadmap](ROADMAP.md) |
 
-Current State:
+## Five-minute first run
 
-- ✅ Basic operations working (Add, Remove, GetItem)
-- ✅ Thread safety verified through testing
-- ✅ Memory management stable
-- ✅ Thread-Safe Iterator Support
-   - List, HashSet, Deque: RAII-style locking — lock held for the full `for…in` loop
-   - Dictionary (v0.8.2): snapshot-based — lock released immediately after entry copy; concurrent modifications are safe but not visible to the iterator
-- ✅ Bulk operations support
-- ✅ **NEW in v0.8.5**: Performance and cross-platform build tooling
-  - HashSet `IntersectWith` now uses O(n+m) average-time hash-based lookups
-  - Dictionary insertion paths reuse precomputed hashes and bucket positions
-  - PowerShell and Bash scripts compile all 16 examples into `example-bin/`
-  - GitHub Actions validates Linux/Bash and Windows/PowerShell example builds
-  - Full FPCUnit suite: 118 tests, 0 errors, 0 failures, and zero HeapTrc leaks
-- ✅ **NEW in v0.8.4**: Correctness and POSIX portability fixes
-  - Direction-aware O(log n) `IndexOf`/`Contains` after both ascending and descending sort
-  - Dictionary and HashSet collection bulk operations now snapshot their source without nested locks
-  - Dictionary default key equality and `ContainsValue` now use Free Pascal's type-aware comparers
-  - Repaired broken links caused by moving release and maintenance documents into `docs/`
-  - Full FPCUnit suite: 117 tests, 0 errors, 0 failures
-- ✅ **NEW in v0.8.3**: Documentation and tooling refresh
-  - Lazarus package metadata updated to 0.8.3
-  - Generated API cheat sheet available at [docs/CHEATSHEET.md](docs/CHEATSHEET.md)
-  - PowerShell generator available at [tools/generate-cheatsheet.ps1](tools/generate-cheatsheet.ps1)
-  - Documentation refreshed against the current source code
-  - Fixed sorted-list `IndexOf` with duplicate values so it returns the first matching index
-- ✅ **v0.8.2**: Critical bug fixes and performance optimisations
-  - Fixed several re-entrant lock deadlocks in List, HashSet, and Dictionary on POSIX platforms
-  - Fixed managed-type memory safety (`string`/`interface`) in List and Deque
-  - Fixed ABBA cross-collection deadlock in `HashSet.IntersectWith`
-  - Fixed `IntersectWith` incorrect item removal
-  - Fixed `IntegerComparer` overflow
-  - Removed dead `DEBUG_LOGGING` code from Dictionary; unified locking API
-  - **Slab allocator** for Dictionary and HashSet `TEntry` records — 256-entry blocks with freelist recycling; 19–41% faster Dictionary ops, 15–19% faster HashSet Add at 1 M items
-  - **4-lane XXHash32** — strings ≥ 16 bytes processed across four independent accumulators; 19–23% faster for long string keys
-  - **Dictionary type dispatch caching** — `TKeyKind` enum cached at construction, eliminating per-call `TypeInfo` comparisons
-  - **Binary search for sorted lists** — `Contains`/`IndexOf` use O(log n) binary search after `Sort`; v0.8.4 added descending-order support
-  - **Dictionary iterator is now snapshot-based** — lock released immediately after copying; other threads may modify concurrently
-- ✅ **v0.8.1**: Code maintainability improvements
-  - Algorithm complexity annotations (Big-O) on all 80+ methods
-  - Centralized error messages (14 constants)
-  - Named constants replacing magic numbers
-  - Zero memory leaks (100% cleanup rate)
-- ✅ **v0.8.0**: Performance optimisations implemented
-  - Circular array-based Deque (5-10x faster)
-  - Pre-allocation strategies for List
-  - Optimised hash table resizing
+You need Free Pascal (`fpc`) on your `PATH`. The commands below compile the
+existing number-list example directly from source and keep all generated files
+under `build-temp/`.
 
-Planned Features:
+Clone the repository:
 
-- 🔄 Read-write lock support (concurrent reads)
-- 🔄 Lock-free operations for simple checks
-- 🔄 More specialized types
-
-## 🎯 Why Use This?
-
-- 💡 **Learning Tool**: Perfect for understanding thread-safe collections
-- 🔒 **Simple Thread Safety**: Just like regular collections, but thread-safe
-- 🚀 **Easy to Use**: Specialized types for common data (Integer, String, Boolean, Real)
-- ⚡ **Good for Prototypes**: Ideal for quick multi-threaded demos
-
-## 🎓 Getting Started
-
-If you are new to Object Pascal generics, start with a complete program like this:
-
-```pascal
-program HelloThreadSafeList;
-
-{$mode objfpc}{$H+}{$J-}
-
-uses
-  SysUtils,
-  ThreadSafeCollections.List;
-
-var
-  Numbers: specialize TThreadSafeList<Integer>;
-begin
-  Numbers := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
-  try
-    Numbers.Add(42);
-    Numbers.Add(17);
-    Numbers.Sort;
-
-    WriteLn('First number: ', Numbers[0]);
-    WriteLn('Count: ', Numbers.Count);
-  finally
-    Numbers.Free;
-  end;
-end.
+```text
+git clone https://github.com/ikelaiah/threadsafecollections-fp.git
+cd threadsafecollections-fp
 ```
 
-Two Object Pascal details matter in most examples:
+On Windows PowerShell:
 
-- `specialize TThreadSafeList<Integer>` creates a concrete list type from the generic list.
-- Lists need a comparer, such as `@IntegerComparer`, because sorting and searching depend on type-specific comparison.
-
-This library provides four main collection types:
-
-1. **ThreadSafeList**: Like an array that can grow
-```pascal
-uses 
-  ThreadSafeCollections.List;  // Built-in comparers included!
-
-var
-  List: specialize TThreadSafeList<Integer>;
-begin
-  // Basic creation using a built-in comparer
-  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);    // For integers
-  // List := specialize TThreadSafeList<string>.Create(@StringComparer);   // For strings
-  // List := specialize TThreadSafeList<Boolean>.Create(@BooleanComparer); // For booleans
-  // List := specialize TThreadSafeList<Real>.Create(@RealComparer);       // For reals
-  // List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer, 1000); // With initial capacity
-  
-  try
-    List.Add(42);  // Simple to use!
-    List.Sort;     // Automatic sorting with the comparer
-  finally
-    List.Free;
-  end;
-end;
+```powershell
+New-Item -ItemType Directory -Force build-temp\first-run\units, build-temp\first-run\bin | Out-Null
+fpc -B -Fusrc -FUbuild-temp\first-run\units -FEbuild-temp\first-run\bin examples\SimpleNumberList\SimpleNumberList.lpr
+.\build-temp\first-run\bin\SimpleNumberList.exe
 ```
 
-> [!TIP]
-> Built-in comparers in ThreadSafeCollections.List:
-> - `IntegerComparer`: For Integer types
-> - `StringComparer`: For string types
-> - `BooleanComparer`: For Boolean types
-> - `RealComparer`: For Real types
-> 
-> For custom types, implement your own comparer: `function MyComparer(const A, B: TMyType): Integer;`
+On Linux or macOS with Bash:
 
-2. **ThreadSafeDeque**: A double-ended queue (v0.8: Now circular array-based!)
-
-```pascal
-var
-  Deque: specialize TThreadSafeDeque<Integer>;
-begin
-  // Create with default capacity (16) or specify initial capacity
-  Deque := specialize TThreadSafeDeque<Integer>.Create;
-  // Deque := specialize TThreadSafeDeque<Integer>.Create(1000); // For better performance
-  try
-    Deque.PushBack(1);
-    Deque.PushFront(2);
-    WriteLn('Front item: ', Deque.PopFront);
-    WriteLn('Back item: ', Deque.PopBack);
-  finally
-    Deque.Free;
-  end;
-end;
+```bash
+mkdir -p build-temp/first-run/units build-temp/first-run/bin
+fpc -B -Fusrc -FUbuild-temp/first-run/units -FEbuild-temp/first-run/bin examples/SimpleNumberList/SimpleNumberList.lpr
+./build-temp/first-run/bin/SimpleNumberList
 ```
 
-3. **ThreadSafeDictionary**: Store key-value pairs
-```pascal
-uses 
-  ThreadSafeCollections.Dictionary;
+The program prints ten random integers, sorts them in both directions, and waits
+for Enter before exiting. The Windows commands and example were verified with
+FPC 3.2.2 on Win64. The same Bash build path is exercised for all examples by
+Linux CI; macOS is expected to use the same FPC command but is not tested in CI.
 
-var
-  Dict: specialize TThreadSafeDictionary<string, integer>;
-begin
-  Dict := specialize TThreadSafeDictionary<string, integer>.Create;
-  try
-    Dict.Add('one', 1);
-    Dict.Add('two', 2);
-    
-    if Dict.ContainsKey('one') then
-      WriteLn('Found: ', Dict['one']);
-  finally
-    Dict.Free;
-  end;
-end;
+## Installation
+
+### Requirements
+
+- Free Pascal Compiler. FPC 3.2.2 is the version used for the maintained local
+  test snapshot.
+- A Free Pascal installation containing `SyncObjs` (from `fcl-base`) and
+  `Generics.Collections` (from `rtl-generics`). Both are standard units included
+  in the tested FPC 3.2.2 distribution; they are not third-party dependencies.
+- The Lazarus package metadata separately declares the `FCL` package as a
+  requirement.
+- Lazarus is optional. The package build for this documentation revision was
+  verified locally with Lazarus 4.8.
+- Windows CI installs Lazarus 4.0.0 to obtain its bundled FPC, then compiles the
+  examples directly with `fpc`; it does not invoke `lazbuild` or build the
+  Lazarus package.
+- Git and PowerShell are needed only for the corresponding clone, build, or
+  documentation-generator workflows.
+
+There are no required third-party Pascal packages.
+
+### Use the source units directly
+
+Add this repository's `src` directory to your compiler's unit search path.
+From the repository root, `-Fusrc` does that for a command-line build:
+
+```text
+fpc -Fusrc path/to/YourProgram.lpr
 ```
 
-> [!TIP]
-> - For basic types (integer, string, etc.), use `Create` or `Create(capacity)`
-> - For custom types, use `Create(hashFunc, equalityFunc)` or `Create(capacity, hashFunc, equalityFunc)`
+In Lazarus, add `src` to **Project Options > Compiler Options > Paths > Other
+unit files**, or install/open
+`package/lazarus/ThreadSafeCollections.lpk` and add the package as a project
+requirement.
 
-4. **ThreadSafeHashSet**: Store unique values
-```pascal
-var
-  UniqueNames: TThreadSafeHashSetString;
-begin
-  UniqueNames := TThreadSafeHashSetString.Create;
-  try
-    UniqueNames.Add('unique');  // Duplicates handled automatically
-  finally
-    UniqueNames.Free;
-  end;
-end;
-```
-
-> [!TIP]
-> Always use try-finally blocks to ensure proper cleanup:
-> ```pascal
-> try
->   // Your code here
-> finally
->   Collection.Free;
-> end;
-> ```
-
-## 🚀 Quick Start
-
-### 📋 Requirements
-
-- Free Pascal 3.2.2 or later
-- No external dependencies
-
-### Using ThreadSafeList
-
-```pascal
-uses ThreadSafeCollections.List;
-
-// Create a thread-safe list of integers
-var
-  Numbers: specialize TThreadSafeList<Integer>;
-begin
-  Numbers := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
-  try
-    // Multiple threads can safely add/remove items
-    Numbers.Add(42);
-    Numbers.Add(17);
-    Numbers.Sort;  // Thread-safe sorting
-    
-    WriteLn(Numbers[0]); // Thread-safe access
-  finally
-    Numbers.Free;
-  end;
-end;
-```
-
-### ThreadSafeList with Custom Types
-
-```pascal
-uses ThreadSafeCollections.List;
-
-type
-  TStudent = record
-      Name: string;
-      StudentId: Integer;
-end;
-
-// Custom comparer for sorting
-function StudentNameComparer(const A, B: TStudent): Integer;
-begin
-  Result := CompareStr(A.Name, B.Name);
-end;
-
-var
-  Students: specialize TThreadSafeList<TStudent>;
-begin
-  Students := specialize TThreadSafeList<TStudent>.Create(@StudentNameComparer);
-  try 
-      // ... use the list
-  finally
-      Students.Free;
-  end;
-end;
-```
-
-### Using ThreadSafeDeque
-
-```pascal
-uses
-  ThreadSafeCollections.Deque;
-
-var
-  Deque: specialize TThreadSafeDeque<string>;
-  Name: string;
-begin
-  Deque := specialize TThreadSafeDeque<string>.Create;
-  try
-    // Add items to the front and back
-    Deque.PushFront('Obed');
-    Deque.PushFront('Jesse');
-    Deque.PushBack('David');
-
-    // Remove items from the front and back
-    if Deque.TryPopFront(Name) then
-      WriteLn('Popped from front: ', Name);
-
-    if Deque.TryPopBack(Name) then
-      WriteLn('Popped from back: ', Name);
-  finally
-    Deque.Free;
-  end;
-
-// Other code
-
-end.
-```
-
-
-### Using ThreadSafeDeque with Custom Types
-
-```pascal
-{$mode objfpc}{$H+}{$J-}
-{$modeswitch advancedrecords}
-
-uses
-  ThreadSafeCollections.Deque;
-
-type
-  TPerson = record
-    Name: string;
-    Age: Integer;
-    public
-    constructor Create(NewName: string; NewAge: Integer);
-  end;
-
-constructor TPerson.Create(NewName: string; NewAge: Integer);
-begin
-  Name := NewName;
-  Age := NewAge;
-end;
-
-var
-  Deque: specialize TThreadSafeDeque<TPerson>;
-  Person: TPerson;
-begin
-  Deque := specialize TThreadSafeDeque<TPerson>.Create;
-  try
-    // Add items to the front and back
-    Deque.PushFront(TPerson.Create('Alice', 30));
-    Deque.PushBack(TPerson.Create('Bob', 25));
-
-    // Remove items from the front and back
-    if Deque.TryPopFront(Person) then
-      WriteLn('Popped from front: ', Person.Name);
-
-    if Deque.TryPopBack(Person) then
-      WriteLn('Popped from back: ', Person.Name);
-  finally
-    Deque.Free;
-  end;
-end;
-```
-
-### Using ThreadSafeHashSet
-
-#### 1. Basic String Set (Using Built-in Type)
-```pascal
-uses 
-  ThreadSafeCollections.HashSet;
-
-var
-  UniqueNames: TThreadSafeHashSetString;
-begin
-  UniqueNames := TThreadSafeHashSetString.Create;
-  try
-    // Add items (duplicates are ignored)
-    UniqueNames.Add('Alice');    // Returns True (added)
-    UniqueNames.Add('Bob');      // Returns True (added)
-    UniqueNames.Add('Alice');    // Returns False (already exists)
-    
-    // Check existence
-    if UniqueNames.Contains('Alice') then
-      WriteLn('Alice is in the set');
-      
-    // Remove items
-    UniqueNames.Remove('Bob');   // Returns True (was removed)
-    
-    WriteLn('Count: ', UniqueNames.Count); // Outputs: 1
-  finally
-    UniqueNames.Free;
-  end;
-end;
-```
-
-#### 2. Custom Type Set (Advanced Usage)
-```pascal
-uses 
-  ThreadSafeCollections.HashSet;
-
-type
-  TPoint = record
-    X, Y: Integer;
-  end;
-
-// Compare two points for equality
-function PointEquals(const A, B: TPoint): Boolean;
-begin
-  Result := (A.X = B.X) and (A.Y = B.Y);
-end;
-
-// Generate hash code for a point
-function PointHash(const Value: TPoint): Cardinal;
-begin
-  Result := Cardinal(Value.X xor Value.Y);
-end;
-
-var
-  UniquePoints: specialize TThreadSafeHashSet<TPoint>;
-  Point: TPoint;
-begin
-  UniquePoints := specialize TThreadSafeHashSet<TPoint>.Create(@PointEquals, @PointHash);
-  try
-    // Add unique points
-    Point.X := 1;
-    Point.Y := 1;
-    UniquePoints.Add(Point);
-
-    Point.X := 2;
-    Point.Y := 2;
-    UniquePoints.Add(Point);
-    
-    // Check for existence
-    Point.X := 1;
-    Point.Y := 1;
-    if UniquePoints.Contains(Point) then
-      WriteLn('Point (1,1) exists');
-  finally
-    UniquePoints.Free;
-  end;
-end;
-```
-
-### Using ThreadSafeHashSet with Set Operations
-
-```pascal
-var
-  SetA, SetB: TThreadSafeHashSetInteger;
-  Numbers: array of Integer;
-begin
-  SetA := TThreadSafeHashSetInteger.Create;
-  SetB := TThreadSafeHashSetInteger.Create;
-  try
-    // Setup sets
-    SetA.Add(1);
-    SetA.Add(2);
-    SetA.Add(3);
-    
-    SetB.Add(2);
-    SetB.Add(3);
-    SetB.Add(4);
-    
-    // Intersection: Keep only items in both sets
-    SetA.IntersectWith(SetB);  // SetA now contains {2, 3}
-    
-    // Union: Add all unique items from both sets
-    SetA.UnionWith(SetB);      // SetA now contains {1, 2, 3, 4}
-    
-    // Difference: Remove items that exist in SetB
-    SetA.ExceptWith(SetB);     // SetA now contains {1}
-    
-    // Bulk operations
-    SetLength(Numbers, 3);
-    Numbers[0] := 5;
-    Numbers[1] := 6;
-    Numbers[2] := 7;
-    
-    SetA.AddRange(Numbers);    // Add multiple items at once
-    SetA.AddRange(SetB);       // Add all items from another set
-  finally
-    SetA.Free;
-    SetB.Free;
-  end;
-end;
-```
-
-### Performance Characteristics
-
-Benchmarks on **Dell Inspiron 15 7510** (Intel i7-11800H @ 2.30 GHz, 8 cores, 16 GB RAM, Windows 11).
-
-> [!NOTE]
-> v0.8.2 introduced three performance improvements that affect these figures:
-> slab allocator (19–41% faster Dictionary ops, 15–19% faster HashSet Add at 1 M items),
-> 4-lane XXHash32 (19–23% faster for long string keys), and
-> binary search for sorted lists (`Contains`/`IndexOf` become O(log n) after `Sort(True)` or `Sort(False)`).
-
-**List Operations:**
-
-| Operation            | Time (ms) | Items   | Notes                                  |
-|----------------------|-----------|---------|----------------------------------------|
-| Sort Integers        | 47        | 100,000 | QuickSort                              |
-| Sort Strings         | 235       | 100,000 | QuickSort                              |
-| Sort Students (Name) | 312       | 100,000 | Custom comparer                        |
-| Sort Students (ID)   | 234       | 100,000 | Custom comparer                        |
-| Contains (unsorted)  | O(n)      | —       | Linear scan                            |
-| Contains (sorted)  | O(log n)  | —       | Direction-aware binary search after `Sort` |
-
-**Dictionary Operations:**
-
-| Operation | Time (ms) | Items   | Notes                         |
-|-----------|-----------|---------|-------------------------------|
-| Add       | 672       | 100,000 | Bulk insert (v0.8.2 allocator)|
-| Find      | 63        | 100,000 | Sequential lookups            |
-
-**HashSet Operations:**
-
-| Operation       | Time (ms) | Items   | Notes             |
-|-----------------|-----------|---------|-------------------|
-| Add             | 31        | 100,000 | Bulk insert       |
-| Find            | 47        | 100,000 | Contains checks   |
-| Stress Test     | 172       | 100,000 | Mixed operations  |
-| Hash Collisions | 3,468     | 10,000  | Forced collisions |
-
-> [!TIP]
-> Use bulk operations (AddRange, RemoveRange) for better performance when working with multiple items.
-
-## 📥 Installation
-
-### Method 1: Lazarus package
-
-1. Clone or download this repository.
-2. In Lazarus, open `package/lazarus/ThreadSafeCollections.lpk`.
-3. Click **Compile**.
-4. Open your project, then use **Project → Project Inspector → Add → New Requirement** and select `ThreadSafeCollections`.
-
-You can then add the units you need in a `uses` clause, for example:
+The library units use dotted names:
 
 ```pascal
 uses
   ThreadSafeCollections.List,
-  ThreadSafeCollections.Dictionary;
+  ThreadSafeCollections.Deque,
+  ThreadSafeCollections.Dictionary,
+  ThreadSafeCollections.HashSet;
 ```
 
-### Method 2: Using Git and FPC
+Import only the units your program needs.
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/ikelaiah/ThreadSafeCollections-FP.git
-   ```
+## Your first collection
 
-2. Add to Your Project:
-   - In Lazarus IDE:
-     1. Project → Project Inspector
-     2. Add Unit → Browse to `src` directory
-     3. Select needed units (e.g., ThreadSafeCollections.List.pas)
+This complete program creates an integer list, adds values, sorts them, and
+prints the result:
 
-   - In FPC Project:
-     ```pascal
-     {$UNITPATH your/path/to/ThreadSafeCollections-FP/src}
-     ```
-
-   Or compile with `fpc` by adding the source path:
-   ```bash
-   fpc -Fu/path/to/ThreadSafeCollections-FP/src yourprogram.pas
-   ```
-
-### Method 3: Manual Installation
-
-1. Download ZIP from GitHub
-2. Extract to your preferred location
-3. Add `src` directory to your project's search path:
-   ```pascal
-   program YourProject;
-   
-   {$mode objfpc}{$H+}{$J-}
-   {$UNITPATH path/to/ThreadSafeCollections-FP/src}
-   
-   uses
-     ThreadSafeCollections.List,  // For List
-     ThreadSafeCollections.Deque, // For Deque
-     // ... other units as needed
-   ```
-
-### Verify Installation
-
-Create a simple test program:
 ```pascal
-program TestInstall;
+program FirstThreadSafeList;
 
 {$mode objfpc}{$H+}{$J-}
 
@@ -606,175 +134,187 @@ uses
   ThreadSafeCollections.List;
 
 var
-  List: specialize TThreadSafeList<Integer>;
+  Numbers: specialize TThreadSafeList<Integer>;
+  Number: Integer;
 begin
-  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
+  Numbers := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
   try
-    List.Add(42);
-    WriteLn('Installation successful!');
+    Numbers.AddRange([30, 10, 20]);
+    Numbers.Sort;
+
+    for Number in Numbers do
+      WriteLn(Number);
   finally
-    List.Free;
+    Numbers.Free;
   end;
 end.
 ```
 
-### Troubleshooting
+Save it as `build-temp/first-list/FirstThreadSafeList.lpr`, then compile it with
+the same `-Fusrc`, `-FU`, and `-FE` pattern used in the
+[first-build commands](docs/BUILDING.md#first-build).
 
-1. **Compilation Errors**:
-   - Ensure FPC 3.2.2 or later
-   - Check unit path is correct
-   - Verify all required files are present
+### Free Pascal orientation
 
-2. **Runtime Errors**:
-   - Check memory management (use try-finally)
-   - Verify comparers are provided where needed
+If Free Pascal generics are new to you, these are the conventions used above:
 
-## 🧪 Thread Safety Examples
+- `{$mode objfpc}` selects the language mode used throughout this repository.
+- `uses` imports units. Unit filenames and paths must keep their exact casing on
+  case-sensitive filesystems.
+- `specialize` turns a generic type such as `TThreadSafeList<T>` into a concrete
+  type such as `TThreadSafeList<Integer>`.
+- `@IntegerComparer` passes the comparison function needed for list searching
+  and sorting. Custom element types need a comparer with the same signature.
+- Classes are explicitly freed. `try..finally` ensures `Free` runs if an
+  operation raises an exception.
+- Interface-backed collections use reference counting instead; see
+  `examples/InterfaceTest`.
+- A threaded Unix program should place `cthreads` first in its program `uses`
+  clause before it creates threads. The chat and benchmark examples demonstrate
+  this pattern.
 
-### Safe Iteration
-```pascal
-var
-  List: specialize TThreadSafeList<Integer>;
-  Item: Integer;
-begin
-  List := specialize TThreadSafeList<Integer>.Create(@IntegerComparer);
-  try
-    // Iterator automatically acquires lock through RAII
-    for Item in List do
-    begin
-      // Other threads wait until iteration completes
-      WriteLn(Item);
-    end; // Lock automatically released here
-  finally
-    List.Free;
-  end;
-end;
-```
+## Feature tour
 
-### Concurrent Access
-```pascal
-// Thread 1
-procedure Thread1;
-begin
-  ThreadSafeList.Add(42);  // Automatically locked
-end;
+### List
 
-// Thread 2
-procedure Thread2;
-begin
-  if ThreadSafeList.Contains(42) then  // Automatically locked
-    WriteLn('Found it!');
-end;
-```
+`TThreadSafeList<T>` is a resizable array with indexed access, add/insert/delete
+operations, ranges, sorting, searching, reversing, moving, array conversion, and
+capacity management. It requires a comparer at construction.
 
-### Safe Resource Management
-```pascal
-var
-  Dict: specialize TThreadSafeDictionary<string, integer>;
-begin
-  Dict := specialize TThreadSafeDictionary<string, integer>.Create;
-  try
-    // Multiple threads can safely access
-    Dict.Add('one', 1);    // Thread 1
-    Dict.Add('two', 2);    // Thread 2
-    Dict.Remove('one');    // Thread 3
-    
-    // Snapshot-based iteration (v0.8.2): lock released immediately after copy;
-    // other threads may modify the dictionary during the loop
-    for Pair in Dict do
-      WriteLn(Pair.Key, ': ', Pair.Value);
-  finally
-    Dict.Free;
-  end;
-end;
-```
+[List guide](docs/ThreadSafeCollections.List.md) ·
+[Simple example](examples/SimpleNumberList/SimpleNumberList.lpr)
 
-## ✨ Features
+### Deque
 
-- 🛡️ Thread-safe List, Deque, Dictionary and HashSet implementations
-- 🚀 Generic type support (Integer, String, Real, Boolean, Records)
-- 📦 Built-in comparers and hash functions
-- 🔐 Automatic locking mechanism with `TCriticalSection`
-- 🎯 Exception-safe resource management
-- 🧪 Comprehensive test suite with collision testing
-- ⚡ Optimized performance for common operations
-- 📊 Load factor based automatic resizing
+`TThreadSafeDeque<T>` is a circular-buffer double-ended queue. It supports
+push, pop, peek, and `Try*` operations at both ends, plus range and array
+operations.
 
-## 🔄 Feature Comparison
+[Deque guide](docs/ThreadSafeCollections.Deque.md) ·
+[Simple example](examples/SimpleDeque/SimpleDeque.lpr)
 
-| Feature                   | List | Deque | Dictionary       | HashSet |
-|---------------------------|------|-------|------------------|---------|
-| Thread-Safe Operations    |  ✅  |  ✅   |       ✅         |   ✅    |
-| Iterator Locking          |  ✅  |  ✅   | Snapshot (v0.8.2)|   ✅    |
-| Automatic Resizing        |  ✅  |  ✅   |       ✅         |   ✅    |
-| Collision Resolution      |  N/A |  N/A  |       ✅         |   ✅    |
-| Specialized Types         |  ✅  |  ❌   |       ❌         |   ✅    |
-| Custom Comparers          |  ✅  |  ❌   |       ✅         |   ✅    |
-| Bulk Operations           |  ✅  |  ✅   |       ✅         |   ✅    |
-| Set Operations            |  N/A |  N/A  |      N/A         |   ✅    |
+### Dictionary
 
-## 🧪 Testing
+`TThreadSafeDictionary<TKey, TValue>` stores key/value pairs in chained hash
+buckets. It supports add, update, lookup, removal, bulk operations, key/value
+snapshots, and custom hash and equality functions.
 
-1. Go to `tests/` directory
-2. Open `TestRunner.lpi` in Lazarus IDE and compile
-3. Run `./TestRunner.exe -a -p --format=plain` to see the test results.
+[Dictionary guide](docs/ThreadSafeCollections.Dictionary.md) ·
+[Iterator example](examples/DictionaryIterator/DictionaryIterator.lpr)
 
-## 📚 Documentation
+### Hash set
 
-- [ThreadSafeCollections.List.md](docs/ThreadSafeCollections.List.md)
-- [ThreadSafeCollections.Deque.md](docs/ThreadSafeCollections.Deque.md)
-- [ThreadSafeCollections.Dictionary.md](docs/ThreadSafeCollections.Dictionary.md)
-- [ThreadSafeCollections.HashSet.md](docs/ThreadSafeCollections.HashSet.md)
-- [RAII-style locking through interface counting](docs/RAII-style-locking-through-interface-counting.md)
-- [Generated Cheat Sheet](docs/CHEATSHEET.md)
-- [Pull Request Summary v0.8.5](docs/PR_v0.8.5.md)
-- [Release Notes v0.8.5](docs/RELEASE-NOTES-v0.8.5.md)
-- [Release Notes v0.8.4](docs/RELEASE-NOTES-v0.8.4.md)
-- [Release Notes v0.8.3](docs/RELEASE-NOTES-v0.8.3.md)
-- [Latest Test Output](tests/LatestTestOutput.md)
+`TThreadSafeHashSet<T>` stores unique values and supports single-item and bulk
+updates, lookup, removal, intersection, union, difference, overlap checks, and
+set equality. Specialized integer, string, Boolean, and real set classes provide
+built-in hash/equality choices.
 
-## 📁 Examples
+[Hash-set guide](docs/ThreadSafeCollections.HashSet.md) ·
+[Client example](examples/HashSetClientDemo/HashSetClientDemo.lpr)
 
-Compile every example from the repository root. Both scripts discover only the
-actual projects at `examples/<project>/*.lpr` and place executables in
-`example-bin/` (with compiler units isolated below `example-bin/units/`).
+### Interfaces and lock tokens
+
+Each collection has an interface form, and `Lock` returns an interface token
+that releases the collection lock when the token leaves scope. The implementation
+uses these tokens for lock-holding enumerators and dictionary snapshot creation.
+Because public methods acquire the same lock themselves, do not hold a manual
+token and then call public methods on that collection; this can deadlock on
+non-reentrant implementations.
+
+[RAII-style locking guide](docs/RAII-style-locking-through-interface-counting.md) ·
+[Interface example](examples/InterfaceTest/InterfaceTest.lpr)
+
+## Thread-safety model
+
+Each collection instance owns one `TCriticalSection`. Public collection
+operations synchronize access to that instance.
+
+That boundary matters:
+
+- One method call is synchronized; a check followed by a separate update is not
+  automatically one atomic operation. Prefer a combined operation such as
+  `TryAdd`, `AddOrSetValue`, or `TryPop*` where applicable, or coordinate the
+  sequence with external synchronization you control.
+- List, deque, and hash-set `for..in` enumerators retain the collection lock for
+  the enumerator's lifetime. Keep loop bodies short and do not hand an
+  enumerator to another thread.
+- Dictionary iteration snapshots the pairs first, then releases the dictionary
+  lock. The snapshot does not reflect later updates.
+- Synchronization protects collection structure, not mutable objects referenced
+  by stored pointers, classes, or interfaces.
+- Class instances stored as elements are not automatically freed by the
+  collection.
+- A collection must outlive every thread, enumerator, and lock token using it.
+
+The implementation uses mutual exclusion; it is not a lock-free or
+reader/writer-lock design.
+
+## Supported and verified environments
+
+| Environment | What is verified |
+|---|---|
+| Windows x86-64, FPC 3.2.2 | Current 118-test FPCUnit run, documented examples, and both all-example scripts |
+| Windows x86-64, Lazarus 4.8 | Command-line build of the Lazarus package |
+| Windows CI (`windows-latest`), FPC bundled with Lazarus 4.0.0 | All tracked examples compile through the PowerShell script; the Lazarus package is not built |
+| Linux CI (`ubuntu-latest`) | All tracked examples compile with the distribution FPC package through the Bash build script |
+| macOS and other FPC targets | Not currently tested by this repository |
+
+The source is written for FPC's `objfpc` mode. A platform being supported by
+FPC does not by itself mean this repository has tested that platform.
+
+## Build, test, benchmark, and generated docs
+
+The repository includes scripts to compile every example:
 
 ```powershell
 .\build-examples.ps1 -Configuration Release
 ```
 
 ```bash
-bash ./build-examples.sh Release
+./build-examples.sh Release
 ```
 
-- [SimpleNumberList](examples/SimpleNumberList/SimpleNumberList.lpr) - Shows basic operations in `TThreadSafeList`; Add, Remove, Sort with the built-in integer comparer.
-- [SimpleShoppingCart](examples/SimpleShoppingCart/SimpleShoppingCart.lpr) - Shows how to use `TThreadSafeList` with a custom type and a custom comparer.
-- [SimpleToDoList](examples/SimpleToDoList/SimpleToDoList.lpr) - Shows how to use `TThreadSafeList` with the built-in string comparer.   
-- [ChatMessageQueue](examples/ChatMessageQueue/ChatMessageQueue.lpr) - Demonstrates using `TThreadSafeList` for a multi-threaded chat system.
-- [DictionaryIterator](examples/DictionaryIterator/DictionaryIterator.lpr) - Demonstrates using `TThreadSafeDictionary` with an iterator.
-- [DictionaryWithCustomType](examples/DictionaryWithCustomType/DictionaryWithCustomType.lpr) - Demonstrates using `TThreadSafeDictionary` with a custom key type, hash function, and equality function.
-- [SimpleHashSet](examples/SimpleHashSet/SimpleHashSet.lpr) - Demonstrates using `TThreadSafeHashSet` with the built-in integer comparer.
-- [HashSetClientDemo](examples/HashSetClientDemo/HashSetClientDemo.lpr) - Demonstrates using `TThreadSafeHashSet` with a custom type, hash function, and equality function.
-- [SimpleDeque](examples/SimpleDeque/SimpleDeque.lpr) - Demonstrates using `TThreadSafeDeque` with basic push/pop operations.
-- [DequeWithCustomType](examples/DequeWithCustomType/DequeWithCustomType.lpr) - Demonstrates using `TThreadSafeDeque` with a custom type.
-- [Benchmark](examples/Benchmark/Benchmark.lpr) - Microsecond-precision benchmark suite covering all four collections at 1k, 10k, 100k and 1M items, including bulk insertion and HashSet intersection scenarios. Supports `--size=N` for a single-size run and Windows-only `--affinity` to pin the timing thread to CPU core 0 for stable measurements.
+Valid configurations are `Debug` and `Release`; omitting the value selects
+`Release`. The scripts place programs in `example-bin/`.
 
-## 🤝 Contributing
+The FPCUnit suite, benchmark options, Lazarus package build, and cheat-sheet
+generator have separate commands and prerequisites. Follow
+[Building and verification](docs/BUILDING.md) for their exact scope.
 
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+## Example learning path
 
-## 📄 License
+1. [SimpleNumberList](examples/SimpleNumberList/SimpleNumberList.lpr) — generic
+   specialization, a comparer, indexed access, and sorting.
+2. [SimpleDeque](examples/SimpleDeque/SimpleDeque.lpr) — front/back queue
+   operations and `TryPop`.
+3. [SimpleHashSet](examples/SimpleHashSet/SimpleHashSet.lpr) — uniqueness,
+   membership, removal, and specialized set types.
+4. [DictionaryIterator](examples/DictionaryIterator/DictionaryIterator.lpr) —
+   snapshot iteration with `Generics.Collections.TPair`.
+5. [SimpleShoppingCart](examples/SimpleShoppingCart/SimpleShoppingCart.lpr) —
+   records and a custom comparer.
+6. [ChatMessageQueue](examples/ChatMessageQueue/ChatMessageQueue.lpr) —
+   a multi-threaded queue demonstration; stop it with Ctrl+C.
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+All 16 tracked examples and their build status are listed in the
+[building guide](docs/BUILDING.md#building-all-examples).
 
-## 👏 Acknowledgments
+## Documentation
 
-- 🎯 Free Pascal and Lazarus community
-- 🧪 FPCUnit testing framework
+- [Documentation home](docs/README.md) — current guides, learning paths, and
+  historical records
+- [API cheat sheet](docs/CHEATSHEET.md) — generated public API summary
+- [Building and verification](docs/BUILDING.md) — examples, tests, package,
+  benchmark, and generator
+- [Roadmap to 2.0](ROADMAP.md) — planned compatibility, quality, and release work
+- [Changelog](CHANGELOG.md) — released and unreleased changes
 
+## Contributing
 
+Bug reports, focused changes, tests, examples, and documentation improvements
+are welcome. Before proposing a change, build the affected examples and run the
+relevant tests described in [Building and verification](docs/BUILDING.md).
 
+## License
+
+ThreadSafeCollections-FP is available under the [MIT License](LICENSE).

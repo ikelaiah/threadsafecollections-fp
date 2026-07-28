@@ -1,5 +1,13 @@
 # ThreadSafeCollections-FP v0.8.2 Release Notes
 
+[Documentation home](README.md) · [Current changelog](../CHANGELOG.md)
+
+> **Historical release snapshot.** This document records v0.8.2 and may contain
+> older APIs, measurements, toolchains, or support statements. Use the
+> [current documentation](README.md) for the present checkout.
+
+**Audience:** users researching the v0.8.2 release and project maintainers.
+
 **Release Date**: 2026-04-14
 
 ## Overview

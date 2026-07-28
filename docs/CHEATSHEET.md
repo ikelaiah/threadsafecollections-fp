@@ -1,8 +1,12 @@
 ﻿# ThreadSafeCollections-FP Cheat Sheet
 
+[Documentation home](README.md) · [Project README](../README.md) · [Build and verify](BUILDING.md)
+
+**Audience:** developers who need a generated, compact reference to the current public API and source complexity annotations.
+
 > Generated file. Do not edit manually.
 >
-> Regenerate with: `pwsh tools/generate-cheatsheet.ps1`
+> Regenerate from the repository root with: `pwsh -File ./tools/generate-cheatsheet.ps1`
 
 Package version: `0.8.5`
 
