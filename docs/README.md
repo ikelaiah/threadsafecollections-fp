@@ -74,11 +74,13 @@ guidance.
 - [v0.8.3](RELEASE-NOTES-v0.8.3.md)
 - [v0.8.4](RELEASE-NOTES-v0.8.4.md)
 - [v0.8.5](RELEASE-NOTES-v0.8.5.md)
+- [v0.8.6](RELEASE-NOTES-v0.8.6.md)
 
 ### Development and design records
 
 - [v0.8.1 pull-request summary](PR_v0.8.1.md)
 - [v0.8.5 pull-request summary](PR_v0.8.5.md)
+- [v0.8.6 pull-request summary](PR_v0.8.6.md)
 - [Maintainability improvements](MAINTAINABILITY_IMPROVEMENTS.md)
 - [Debugging tale](Debugging-Tale.md)
 - [Hash-set constructor evolution](HashSet-Constructor-Evolution.md)
