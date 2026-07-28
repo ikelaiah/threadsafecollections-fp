@@ -1,12 +1,28 @@
 # ThreadSafeCollections.HashSet Documentation
 
+[Documentation home](README.md) · [Project README](../README.md) ·
+[API cheat sheet](CHEATSHEET.md)
+
+**Audience:** application developers and contributors who need the hash-set API,
+behavior, complexity notes, hashing rules, and implementation boundaries.
+
 `TThreadSafeHashSet<T>` is a generic hash set protected by one `TCriticalSection` per set instance.
 
 The current implementation lives in `src/ThreadSafeCollections.HashSet.pas`.
 
+## Start with a working example
+
+Build [all examples](BUILDING.md#building-all-examples), then run
+`SimpleHashSet` from `example-bin/`. Its
+[source](../examples/SimpleHashSet/SimpleHashSet.lpr) demonstrates built-in
+integer and string set types, membership, removal, and uniqueness. Continue with
+[HashSetClientDemo](../examples/HashSetClientDemo/HashSetClientDemo.lpr) for a
+custom value type and bulk/set operations.
+
 ## Dependencies
 
-- Free Pascal 3.2.2 or later
+- Free Pascal 3.2.2 is verified; newer compatible releases are expected but are
+  not tested by this repository
 - `SyncObjs`
 - `HashFunctions`
 - `TypInfo`
@@ -208,7 +224,7 @@ Specialized hash functions:
 
 - `Integer`: multiplicative hash
 - `string`: `XXHash32`
-- `Boolean`: direct value hash
+- `Boolean`: multiplicative hash of the Boolean value
 - `Real`: fixed-point conversion hash
 
 The generic `TThreadSafeHashSet<T>` does not auto-select a hash function for arbitrary `T`; callers provide one.
@@ -290,5 +306,6 @@ end;
 - Iteration blocks other public operations until the enumerator is destroyed.
 - Ordering is bucket/chaining order and is not stable API.
 - Heavy collisions degrade lookup operations to linear chain scans.
+- The set does not own or automatically free class instances stored as values.
 - There is no built-in serialization support.
 - There is no `DEBUG_LOGGING` constant or runtime debug logging switch in this unit.

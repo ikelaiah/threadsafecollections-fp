@@ -1,5 +1,11 @@
 # RAII-Style Locking Through Interface Counting
 
+[Documentation home](README.md) · [Project README](../README.md) ·
+[Thread-safety model](../README.md#thread-safety-model)
+
+**Audience:** advanced users considering the public `Lock` method and
+contributors reviewing lock-token and iterator lifetime behavior.
+
 This project uses `ILockToken` and `TLockToken` to tie a `TCriticalSection` lock to an interface reference lifetime.
 
 `TLockToken.Create` acquires the critical section. `TLockToken.Destroy` releases it if it is still held. `Release` can also release it explicitly before the interface reference is destroyed.

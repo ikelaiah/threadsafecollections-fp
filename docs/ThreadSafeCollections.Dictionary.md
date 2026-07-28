@@ -1,12 +1,28 @@
 # ThreadSafeCollections.Dictionary Documentation
 
+[Documentation home](README.md) · [Project README](../README.md) ·
+[API cheat sheet](CHEATSHEET.md)
+
+**Audience:** application developers and contributors who need the dictionary
+API, behavior, complexity notes, hashing rules, and implementation boundaries.
+
 `TThreadSafeDictionary<TKey, TValue>` is a generic hash table protected by one `TCriticalSection` per dictionary instance.
 
 The current implementation lives in `src/ThreadSafeCollections.Dictionary.pas`.
 
+## Start with a working example
+
+Build [all examples](BUILDING.md#building-all-examples), then run
+`DictionaryIterator` from `example-bin/`. Its
+[source](../examples/DictionaryIterator/DictionaryIterator.lpr) shows basic
+insertion and snapshot iteration. Continue with
+[DictionaryWithCustomType](../examples/DictionaryWithCustomType/DictionaryWithCustomType.lpr)
+when you need custom hash and equality functions.
+
 ## Dependencies
 
-- Free Pascal 3.2.2 or later
+- Free Pascal 3.2.2 is verified; newer compatible releases are expected but are
+  not tested by this repository
 - `Generics.Collections` for `TPair`
 - `SyncObjs`
 - `HashFunctions`
@@ -140,6 +156,10 @@ TKeyKind = (kkString, kkInteger, kkOther);
 - other key types: custom hash if provided, otherwise `DefaultHash`
 
 `XXHash32` uses a 4-lane path for strings of at least 16 bytes and a single-lane path for shorter strings.
+
+`DefaultHash` hashes the raw in-memory bytes of `TKey`. For records with padding,
+managed fields, pointers, or a logical equality rule, provide explicit hash and
+equality functions that agree with one another.
 
 ## Thread Safety
 
@@ -280,4 +300,6 @@ end;
 - Entry order is implementation-dependent and follows bucket/chaining layout.
 - `First` and `Last` are not insertion-order operations.
 - `ContainsValue` is a full scan using the RTL's type-aware default equality comparer.
+- The dictionary does not own or automatically free class instances stored in
+  keys or values.
 - There is no `DEBUG_LOGGING` constant or runtime debug logging switch in this unit.

@@ -1,12 +1,25 @@
 # ThreadSafeCollections.Deque Documentation
 
+[Documentation home](README.md) · [Project README](../README.md) ·
+[API cheat sheet](CHEATSHEET.md)
+
+**Audience:** application developers and contributors who need the deque API,
+behavior, complexity notes, and implementation boundaries.
+
 `TThreadSafeDeque<T>` is a generic double-ended queue protected by one `TCriticalSection` per deque instance.
 
 The current implementation lives in `src/ThreadSafeCollections.Deque.pas`.
 
+## Start with a working example
+
+Build [all examples](BUILDING.md#building-all-examples), then run
+`SimpleDeque` from `example-bin/`. Its source demonstrates `PushFront`,
+`PushBack`, `TryPopFront`, and `TryPopBack` before the reference material below.
+
 ## Dependencies
 
-- Free Pascal 3.2.2 or later
+- Free Pascal 3.2.2 is verified; newer compatible releases are expected but are
+  not tested by this repository
 - `SyncObjs`
 - `ThreadSafeCollections.Interfaces`
 - `ThreadSafeCollections.ErrorMessages`
@@ -172,4 +185,5 @@ This is intentional. It releases references for managed types such as `string`, 
 - The deque does not shrink automatically after `Clear`.
 - There is no random access by index.
 - There are no search, `Contains`, or bulk remove operations.
+- The deque does not own or automatically free class instances stored as values.
 - There is no `DEBUG_LOGGING` constant or runtime debug logging switch in this unit.
