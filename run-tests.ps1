@@ -28,10 +28,15 @@ if ($LASTEXITCODE -ne 0) {
 
 $Runner = Join-Path $BinOut 'TestRunner.exe'
 $OutputFile = Join-Path $BinOut 'test-output.txt'
+$HeaptrcLog = Join-Path $BinOut 'heaptrc.log'
+Remove-Item -LiteralPath $HeaptrcLog -ErrorAction SilentlyContinue
 
 Write-Host "Running the FPCUnit suite (collision and stress cases can take several minutes)..."
+$PreviousHeaptrc = $env:HEAPTRC
+$env:HEAPTRC = "log=$HeaptrcLog"
 & $Runner --all --format=plain *> $OutputFile
 $RunnerExitCode = $LASTEXITCODE
+$env:HEAPTRC = $PreviousHeaptrc
 
 $Text = Get-Content -LiteralPath $OutputFile -Raw
 
@@ -47,7 +52,14 @@ function Get-MatchValue {
 $RunTests = Get-MatchValue $Text 'Number of run tests:\s+(\d+)'
 $Errors = Get-MatchValue $Text 'Number of errors:\s+(\d+)'
 $Failures = Get-MatchValue $Text 'Number of failures:\s+(\d+)'
-$Unfreed = Get-MatchValue $Text '(\d+) unfreed memory blocks'
+$Unfreed = $null
+if (Test-Path -LiteralPath $HeaptrcLog) {
+    $HeaptrcText = Get-Content -LiteralPath $HeaptrcLog -Raw
+    $Unfreed = Get-MatchValue $HeaptrcText '(\d+) unfreed memory blocks'
+}
+if ($null -eq $Unfreed) {
+    $Unfreed = Get-MatchValue $Text '(\d+) unfreed memory blocks'
+}
 
 Write-Host ''
 Write-Host 'FPCUnit summary:'

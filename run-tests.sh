@@ -45,10 +45,12 @@ fpc -B -MObjFPC -Sh -gl -gh -Cr -Co \
 
 runner="$bin_out/TestRunner"
 output_file="$bin_out/test-output.txt"
+heaptrc_log="$bin_out/heaptrc.log"
+rm -f -- "$heaptrc_log"
 
 echo "Running the FPCUnit suite (collision and stress cases can take several minutes)..."
 set +e
-"$runner" --all --format=plain >"$output_file" 2>&1
+HEAPTRC="log=$heaptrc_log" "$runner" --all --format=plain >"$output_file" 2>&1
 runner_exit_code=$?
 set -e
 
@@ -59,7 +61,10 @@ extract() {
 run_tests="$(extract 'Number of run tests')"
 errors="$(extract 'Number of errors')"
 failures="$(extract 'Number of failures')"
-unfreed="$(sed -n 's/.*\([0-9][0-9]*\) unfreed memory blocks.*/\1/p' "$output_file" | tail -n 1)"
+unfreed="$(sed -n 's/.*\([0-9][0-9]*\) unfreed memory blocks.*/\1/p' "$heaptrc_log" | tail -n 1)"
+if [[ -z "$unfreed" ]]; then
+  unfreed="$(sed -n 's/.*\([0-9][0-9]*\) unfreed memory blocks.*/\1/p' "$output_file" | tail -n 1)"
+fi
 
 echo ""
 echo "FPCUnit summary:"

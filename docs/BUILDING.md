@@ -185,9 +185,13 @@ On Linux, macOS, or Git Bash:
 ./run-tests.sh
 ```
 
-Both save the raw test output to `build-temp/tests/test-output.txt`. To run
-the suite without failing on HeapTrc results, pass `-SkipLeakCheck`
-(PowerShell) or `--skip-leak-check` (Bash); this is not recommended for CI.
+Both save the raw test output to `build-temp/tests/test-output.txt` and the
+HeapTrc report to `build-temp/tests/bin/heaptrc.log` through the `HEAPTRC`
+environment variable. Using heaptrc's own log file avoids a Linux-specific
+truncation that occurs when the pthreads thread manager terminates the process
+before the buffered stderr text file is flushed. To run the suite without
+failing on HeapTrc results, pass `-SkipLeakCheck` (PowerShell) or
+`--skip-leak-check` (Bash); this is not recommended for CI.
 
 Manual compiler and runner commands keep the executable and newly compiled
 units in `build-temp/tests/`:

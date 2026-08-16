@@ -39,6 +39,9 @@ does not change the Pascal API or runtime implementation.
 
 - FPC 3.2.2 on Win64: 118 tests, 0 errors, 0 failures, and 0 HeapTrc leaks
   through both `run-tests.ps1` and `run-tests.sh`.
+- Linux CI: the same 118-test suite passes, and the HeapTrc report is read
+  from heaptrc's own log file so the leak gate is not affected by the
+  Linux-specific truncation of the buffered stderr dump.
 - The Lazarus package compiled as `ThreadSafeCollections 0.8.7` with lazbuild,
   and the package smoke consumer passed on Windows with Lazarus 4.8.
 - `tools/check-docs.ps1` and `tools/check-release-metadata.ps1` pass on the

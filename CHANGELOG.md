@@ -46,6 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Lazarus package metadata now reports 0.8.7; it had remained at 0.8.5
   through the v0.8.6 documentation release, and the generated cheat sheet is
   regenerated to match.
+- The run scripts now capture the HeapTrc report through heaptrc's own log
+  file (`HEAPTRC=log=...`) instead of parsing merged stderr. On Linux the
+  buffered stderr dump was truncated when the pthreads thread manager
+  terminated the process before the standard text files were flushed, which
+  broke the leak gate for an otherwise clean 118-test run.
 
 ### Testing
 
