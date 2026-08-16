@@ -1,4 +1,4 @@
-﻿# ThreadSafeCollections-FP Cheat Sheet
+# ThreadSafeCollections-FP Cheat Sheet
 
 [Documentation home](README.md) · [Project README](../README.md) · [Build and verify](BUILDING.md)
 
@@ -8,7 +8,7 @@
 >
 > Regenerate from the repository root with: `pwsh -File ./tools/generate-cheatsheet.ps1`
 
-Package version: `0.8.5`
+Package version: `0.8.7`
 
 ## Source Inputs
 

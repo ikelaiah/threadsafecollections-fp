@@ -6,7 +6,7 @@
 
 **Status:** Released
 
-**Release date:** 2027-06-28
+**Release date:** 2026-07-28
 
 ## Overview
 

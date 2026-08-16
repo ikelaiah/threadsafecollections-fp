@@ -27,12 +27,23 @@ Optional tools:
 - Bash for `build-examples.sh`
 
 The current documentation revision was verified with FPC 3.2.2 and Lazarus 4.8
-on Win64, including the full 118-test suite and the Lazarus package build.
-Current CI compiles all examples on `ubuntu-latest` with the distribution `fpc`
-package. On `windows-latest`, CI installs Lazarus 4.0.0 to obtain its bundled
-FPC, then invokes `build-examples.ps1`; it does not invoke `lazbuild`. Neither CI
-job currently builds the Lazarus package or runs the FPCUnit suite. macOS and
-other targets are not tested by the repository.
+on Win64, including the full 118-test suite, the Lazarus package build, and
+the package smoke consumer. Current CI runs these jobs:
+
+| Job | Platform | Command |
+|---|---|---|
+| Examples | Linux | `./build-examples.sh Release` with the distribution `fpc` package |
+| Examples | Windows | `.\build-examples.ps1 -Configuration Release` with the FPC bundled in Lazarus 4.0.0 |
+| Tests | Linux | `./run-tests.sh` with the distribution `fpc` package |
+| Tests | Windows | `.\run-tests.ps1` with the FPC bundled in Lazarus 4.0.0 |
+| Package smoke | Linux | `./smoke-package.sh 0.8.7` with Lazarus and `lazbuild` from `apt` |
+| Documentation checks | Linux | `pwsh -File ./tools/check-docs.ps1` and `pwsh -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.7` |
+
+On `windows-latest`, CI installs Lazarus 4.0.0 only to obtain its bundled FPC;
+it does not invoke `lazbuild` or build the Lazarus package. The Lazarus package
+and its smoke consumer are verified locally with Lazarus 4.8 on Win64 and in
+the Linux CI package-smoke job. Benchmarks are run locally, not in CI. macOS
+and other targets are not tested by the repository.
 
 `Generics.Collections` is not a newly introduced external package requirement.
 The current implementation imports it in
@@ -134,12 +145,52 @@ lazbuild --build-all package/lazarus/ThreadSafeCollections.lpk
 
 The package points Lazarus at `src`, writes compiled units below
 `package/lazarus/lib/<target-cpu>-<target-os>/`, and declares the standard FCL
-package as a requirement. The package version in the current checkout is 0.8.5.
+package as a requirement. The package version in the current checkout is 0.8.7.
+
+### Package smoke build
+
+The smoke scripts verify everything CI needs from the package in one command:
+the version, that every unit in `src/` is listed in the package file, that
+`lazbuild --build-all` succeeds, that every listed unit was compiled, and that
+a tiny consumer program compiles against the built package and runs.
+
+```powershell
+.\smoke-package.ps1 -ExpectedVersion 0.8.7
+```
+
+```bash
+./smoke-package.sh 0.8.7
+```
+
+The consumer program is `tools/package-smoke-consumer.lpr`; its artifacts stay
+under `build-temp/package-smoke/`. Both scripts fail with a non-zero exit code
+on any verification problem, so they can be used as CI gates.
 
 ## Running the tests
 
-The test runner is an FPCUnit console application. These Windows PowerShell
-commands keep the executable and newly compiled units in `build-temp/tests/`:
+The test runner is an FPCUnit console application. The `run-tests.*` scripts
+compile it with debug checks and HeapTrc, run the full suite, and fail the
+command if any test errors, any test fails, or HeapTrc reports unfreed memory
+blocks.
+
+On Windows PowerShell:
+
+```powershell
+.\run-tests.ps1
+```
+
+On Linux, macOS, or Git Bash:
+
+```bash
+./run-tests.sh
+```
+
+Both save the raw test output to `build-temp/tests/test-output.txt`. To run
+the suite without failing on HeapTrc results, pass `-SkipLeakCheck`
+(PowerShell) or `--skip-leak-check` (Bash); this is not recommended for CI.
+
+Manual compiler and runner commands keep the executable and newly compiled
+units in `build-temp/tests/`:
 
 ```powershell
 New-Item -ItemType Directory -Force build-temp\tests\units, build-temp\tests\bin | Out-Null
@@ -155,8 +206,12 @@ fpc -B -MObjFPC -Sh -gl -gh -Cr -Co -Fusrc -Futests -FUbuild-temp/tests/units -F
 ./build-temp/tests/bin/TestRunner --all --format=plain
 ```
 
-The Bash form is provided for portability but is not exercised by current CI.
-Threaded test execution on Unix has not been claimed as verified.
+`TestRunner.lpr` links `cthreads` on Unix so the threaded collision and stress
+tests can run on Linux; the Linux CI test job runs the full suite. HeapTrc
+output appears at normal program exit on both platforms; the run scripts
+report the unfreed-block count and treat any unfreed block as a failure.
+HeapTrc is a debug-build leak detector, not a replacement for memory-tooling
+or long-running soak tests.
 
 The FPCUnit console runner accepts:
 
@@ -224,15 +279,40 @@ pwsh -File ./tools/generate-cheatsheet.ps1 -OutputPath build-temp/cheatsheet-che
 A relative `-OutputPath` is resolved from the repository root, not from the
 caller's current directory. The script creates a missing output directory.
 
+## Running the documentation checks
+
+Two inexpensive checks run in CI and can be run locally with PowerShell 7:
+
+```powershell
+pwsh -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.7
+pwsh -File ./tools/check-docs.ps1
+```
+
+`check-release-metadata.ps1` verifies that the README version badge, the
+Lazarus package version, the documentation home, the changelog, the release
+notes, the pull-request summary, and the generated cheat sheet all agree on
+`-ExpectedVersion`. Bump the expected version on every release.
+
+`check-docs.ps1` verifies that local Markdown links resolve and heading
+fragments match, that code fences are balanced, that every example in
+`examples/` is listed in the `docs/BUILDING.md` inventory (and vice versa),
+and that `docs/CHEATSHEET.md` matches a fresh generator run. Compilability of
+the examples themselves is covered by the example-build CI jobs.
+
+Both scripts exit non-zero and list each problem; CI reports their failures as
+a separate `Documentation / Checks` job.
+
 ## Before submitting a documentation change
 
 At minimum:
 
 1. Compile every command or complete example added to current documentation.
-2. Run the relevant FPCUnit suites.
+2. Run the relevant FPCUnit suites with `.\run-tests.ps1` (or
+   `./run-tests.sh`).
 3. Regenerate `docs/CHEATSHEET.md` if source declarations or its generator
    changed.
-4. Check local Markdown links, heading fragments, and balanced fences.
+4. Run `pwsh -File ./tools/check-docs.ps1` and
+   `pwsh -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.7`.
 5. Run `git diff --check`.
 
 Historical results are evidence for that recorded checkout only; they do not

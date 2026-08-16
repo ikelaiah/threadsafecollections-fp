@@ -3,8 +3,8 @@
 [Project README](../README.md) · [Build and verify](BUILDING.md) ·
 [API cheat sheet](CHEATSHEET.md) · [Roadmap](../ROADMAP.md)
 
-This is the documentation home for ThreadSafeCollections-FP 0.8.6, released on
-2027-06-28.
+This is the documentation home for ThreadSafeCollections-FP 0.8.7, released on
+2026-08-16.
 
 ## Choose a path
 
@@ -75,20 +75,22 @@ guidance.
 - [v0.8.4](RELEASE-NOTES-v0.8.4.md)
 - [v0.8.5](RELEASE-NOTES-v0.8.5.md)
 - [v0.8.6](RELEASE-NOTES-v0.8.6.md)
+- [v0.8.7](RELEASE-NOTES-v0.8.7.md)
 
 ### Development and design records
 
 - [v0.8.1 pull-request summary](PR_v0.8.1.md)
 - [v0.8.5 pull-request summary](PR_v0.8.5.md)
 - [v0.8.6 pull-request summary](PR_v0.8.6.md)
+- [v0.8.7 pull-request summary](PR_v0.8.7.md)
 - [Maintainability improvements](MAINTAINABILITY_IMPROVEMENTS.md)
 - [Debugging tale](Debugging-Tale.md)
 - [Hash-set constructor evolution](HashSet-Constructor-Evolution.md)
 
 ### Test snapshots
 
-- [17 July 2026 test snapshot](../tests/LatestTestOutput.md) — recorded on
-  FPC 3.2.2 Win64
+- [16 August 2026 test snapshot](../tests/LatestTestOutput.md) — recorded on
+  FPC 3.2.2 Win64 with `run-tests.ps1`
 - [December 2025 raw test output](../tests/251220-test-output.txt)
 
 To assess the current checkout, run the tests yourself using

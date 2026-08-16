@@ -1,10 +1,10 @@
-# Test Snapshot — 2026-07-17
+# Test Snapshot — 2026-08-16
 
 [Documentation home](../docs/README.md) ·
 [Current test instructions](../docs/BUILDING.md#running-the-tests)
 
 > **Historical test snapshot.** These results describe one FPC 3.2.2 Win64 run
-> on 17 July 2026. Run the current checkout to establish its present status.
+> on 16 August 2026. Run the current checkout to establish its present status.
 
 ## Recorded environment
 
@@ -13,16 +13,16 @@ Environment:
 - Free Pascal Compiler 3.2.2 for x86_64
 - Target OS: Win64 for x64
 
-Build command:
+Build command (from `run-tests.ps1`):
 
 ```powershell
-fpc -B -Fusrc -FUbuild-temp\audit-units -FEbuild-temp\audit-bin tests\TestRunner.lpr
+fpc -B -MObjFPC -Sh -gl -gh -Cr -Co -Fusrc -Futests -FUbuild-temp\tests\units -FEbuild-temp\tests\bin tests\TestRunner.lpr
 ```
 
 Test command:
 
 ```powershell
-.\build-temp\audit-bin\TestRunner.exe --all --progress --format=plain
+.\build-temp\tests\bin\TestRunner.exe --all --format=plain
 ```
 
 Summary:
@@ -36,7 +36,9 @@ Number of failures:  0
 HeapTrc summary:
 
 ```text
-0 unfreed memory blocks
+3804328 memory blocks allocated : 324433038/347801344
+3804328 memory blocks freed     : 324433038/347801344
+0 unfreed memory blocks : 0
 ```
 
 Suite summary:
@@ -60,3 +62,6 @@ Notes:
   half-overlapping intersection plus legacy comparer, self-intersection, and empty-source behavior.
 - The full suite includes long-running lock and collision stress tests, including the
   100,000-item aggressive-collision thread pool test.
+- The same suite now runs automatically on Windows and Linux CI through
+  `run-tests.ps1` and `run-tests.sh`, which also fail the job if HeapTrc
+  reports any unfreed memory block.

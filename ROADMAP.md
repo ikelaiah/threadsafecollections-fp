@@ -107,28 +107,60 @@ tokens, inconsistent iterator behavior, non-uniform default construction and
 comparer integration, incomplete compatibility coverage, incomplete CI gates,
 and point-in-time rather than regression-controlled benchmarks.
 
-## Current baseline — 0.8.6
+## Historical baseline — 0.8.6
 
-The project already contains generic, per-instance-synchronized List, Deque,
+The 0.8.6 release reworked onboarding and accuracy: a shorter README with a
+verified five-minute first run, a documentation home and building guide, a
+roadmap to 2.0, current guides separated from historical snapshots, and
+corrected dependency, platform, locking, benchmark, and hash guidance. It was
+documentation-only and did not change the Pascal API or runtime behavior.
+
+The remaining weaknesses at 0.8.6 were primarily verification and contract
+maturity:
+
+- CI did not run the complete FPCUnit suite on any environment;
+- concurrency, leak, portability, and benchmark results were not continuous
+  release gates;
+- iterator behavior differed between collection families;
+- `Lock()` had important re-entry limitations;
+- comparer, hashing, and construction defaults were not fully uniform; and
+- package metadata (still 0.8.5) and documentation versions could drift.
+
+## Current baseline — 0.8.7
+
+The project contains generic, per-instance-synchronized List, Deque,
 Dictionary, and HashSet implementations; array, circular-buffer, and
 chained-hash-table storage; managed-type-aware operations; optimized hashing;
 bulk-operation lock-order protections; lock-holding enumeration for List,
 Deque, and HashSet; and snapshot enumeration for Dictionary.
 
-It also has interface-backed collection forms, scoped lock tokens, 118 FPCUnit
-tests in the maintained local snapshot, a recorded clean Win64 HeapTrc run, 16
-tracked examples, Windows and Linux example builds, benchmarks, Lazarus package
-metadata, generated cheat sheets, and task-oriented documentation.
+0.8.7 delivered the CI and verification milestone:
 
-The remaining weaknesses are primarily verification and contract maturity:
+- the full practical FPCUnit suite, with HeapTrc leak verification, runs
+  automatically on Windows CI and on Linux CI through `run-tests.ps1` and
+  `run-tests.sh`, and the test runner links `cthreads` on Unix;
+- a package smoke build verifies version, source inclusion, `lazbuild`
+  compilation, and a tiny consumer, automated on Linux CI and reproducibly
+  documented on Windows;
+- documentation checks verify local links, heading fragments, code fences,
+  example paths, and stale cheat sheets, and release-metadata checks keep
+  README badges, package metadata, changelog, release notes, documentation
+  home, and generated cheat sheet on one version;
+- CI jobs are separated by concern so reports identify examples, tests,
+  packaging, or documentation failures; and
+- package metadata was brought to 0.8.7 and the misdated v0.8.6 release
+  record was corrected.
 
-- CI does not yet run the complete FPCUnit suite on each primary environment;
-- concurrency, leak, portability, and benchmark results are not yet complete
-  continuous release gates;
-- iterator behavior differs between collection families;
-- `Lock()` has important re-entry limitations;
+Remaining weaknesses, addressed by later milestones:
+
+- Windows package smoke verification is documented locally (Lazarus 4.8) but
+  not automated in Windows CI;
+- benchmarks remain local-only and point-in-time rather than
+  regression-controlled;
+- iterator behavior still differs between collection families, and `Lock()`
+  re-entry limitations remain;
 - comparer, hashing, and construction defaults are not fully uniform; and
-- package and documentation versions can drift.
+- macOS and other targets are not tested by the repository.
 
 ## Milestones at a glance
 
@@ -145,6 +177,10 @@ The remaining weaknesses are primarily verification and contract maturity:
 | 2.0.0 | Conditional compatibility guarantee | Release-gated replacement surface for accepted profiles |
 
 ## 0.8.7 — CI and verification
+
+> **Delivered in v0.8.7 (2026-08-16).** See the
+> [current baseline](#current-baseline--087) and the
+> [v0.8.7 release notes](docs/RELEASE-NOTES-v0.8.7.md) for what was automated.
 
 - Run the practical FPCUnit suite in CI, separating fast unit, long stress,
   leak, benchmark, and example jobs where appropriate.
