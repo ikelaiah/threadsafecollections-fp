@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/ikelaiah/threadsafecollections-fp/actions/workflows/ci.yml"><img alt="CI example builds" src="https://github.com/ikelaiah/threadsafecollections-fp/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="CHANGELOG.md"><img alt="Version 0.8.6" src="https://img.shields.io/badge/version-0.8.6-8B5CF6.svg"></a>
+  <a href="CHANGELOG.md"><img alt="Version 0.8.7" src="https://img.shields.io/badge/version-0.8.7-8B5CF6.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-1E3A8A.svg"></a>
   <a href="#supported-and-verified-environments"><img alt="Free Pascal 3.2.2 verified" src="https://img.shields.io/badge/Free%20Pascal-3.2.2%20verified-3B82F6.svg"></a>
   <a href="#supported-and-verified-environments"><img alt="Example builds: Windows and Linux" src="https://img.shields.io/badge/example%20builds-Windows%20%7C%20Linux-F59E0B.svg"></a>
@@ -253,10 +253,10 @@ reader/writer-lock design.
 
 | Environment | What is verified |
 |---|---|
-| Windows x86-64, FPC 3.2.2 | Current 118-test FPCUnit run, documented examples, and both all-example scripts |
-| Windows x86-64, Lazarus 4.8 | Command-line build of the Lazarus package |
-| Windows CI (`windows-latest`), FPC bundled with Lazarus 4.0.0 | All tracked examples compile through the PowerShell script; the Lazarus package is not built |
-| Linux CI (`ubuntu-latest`) | All tracked examples compile with the distribution FPC package through the Bash build script |
+| Windows x86-64, FPC 3.2.2 | Current 118-test FPCUnit run with HeapTrc, documented examples, and both all-example scripts |
+| Windows x86-64, Lazarus 4.8 | Command-line build of the Lazarus package and the package smoke consumer |
+| Windows CI (`windows-latest`), FPC bundled with Lazarus 4.0.0 | All tracked examples compile and the full FPCUnit suite runs through the PowerShell test script |
+| Linux CI (`ubuntu-latest`) | All tracked examples compile with the distribution FPC package, the full FPCUnit suite runs, the Lazarus package builds with `lazbuild`, and the documentation checks pass |
 | macOS and other FPC targets | Not currently tested by this repository |
 
 The source is written for FPC's `objfpc` mode. A platform being supported by
@@ -279,7 +279,10 @@ Valid configurations are `Debug` and `Release`; omitting the value selects
 
 The FPCUnit suite, benchmark options, Lazarus package build, and cheat-sheet
 generator have separate commands and prerequisites. Follow
-[Building and verification](docs/BUILDING.md) for their exact scope.
+[Building and verification](docs/BUILDING.md) for their exact scope. The same
+test, package-smoke, and documentation-check commands that CI runs are
+available locally through `run-tests.*`, `smoke-package.*`, and
+`tools/check-*.ps1`.
 
 ## Example learning path
 

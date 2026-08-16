@@ -3,6 +3,7 @@ program TestRunner;
 {$mode objfpc}{$H+}{$J-}
 
 uses
+  {$IFDEF UNIX} cthreads, {$ENDIF}
   Classes
   , consoletestrunner, testutils, testregistry, DateUtils, SysUtils
   , ThreadSafeListTests

@@ -31,6 +31,9 @@ tests/lib/
 example-bin/*
 !example-bin/.gitkeep
 
+# Local build and check scratch area
+build-temp/
+
 # Debug files
 *.dbg
 *.dcu

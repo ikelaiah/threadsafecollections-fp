@@ -10,7 +10,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.6] - 2027-06-28
+## [0.8.7] - 2026-08-16
+
+### Added
+
+- Added `run-tests.ps1` and `run-tests.sh`, which compile the FPCUnit runner
+  with debug checks and HeapTrc, run the full suite, fail on any error,
+  failure, or unfreed memory block, and save the raw output under
+  `build-temp/tests/`.
+- Added `smoke-package.ps1` and `smoke-package.sh`, which verify the Lazarus
+  package version, confirm every `src` unit is listed in the package file,
+  build the package with `lazbuild`, check that every unit was compiled, and
+  compile and run a tiny consumer program against the built package.
+- Added `tools/check-docs.ps1`, which verifies local Markdown links and heading
+  fragments, balanced code fences, the example inventory against
+  `docs/BUILDING.md`, and that `docs/CHEATSHEET.md` is not stale.
+- Added `tools/check-release-metadata.ps1`, which verifies that the README
+  badge, package metadata, documentation home, changelog, release notes, and
+  generated cheat sheet agree on one version.
+- Expanded the CI workflow with FPCUnit test jobs on Windows and Linux, a
+  Linux `lazbuild` package-smoke job, and a documentation-checks job, in
+  addition to the existing Windows and Linux example-build jobs.
+
+### Changed
+
+- `tests/TestRunner.lpr` now links `cthreads` on Unix so the threaded
+  collision and stress tests can run on Linux.
+- The Linux CI package-smoke job installs Lazarus so `lazbuild` builds the
+  package exactly as a Linux user would.
+- Corrected the recorded v0.8.6 release date from 2027-06-28 to the actual
+  2026-07-28 merge date so release records match git history.
+
+### Fixed
+
+- The Lazarus package metadata now reports 0.8.7; it had remained at 0.8.5
+  through the v0.8.6 documentation release, and the generated cheat sheet is
+  regenerated to match.
+- The run scripts now capture the HeapTrc report through heaptrc's own log
+  file (`HEAPTRC=log=...`) instead of parsing merged stderr. On Linux the
+  buffered stderr dump was truncated when the pthreads thread manager
+  terminated the process before the standard text files were flushed, which
+  broke the leak gate for an otherwise clean 118-test run.
+
+### Testing
+
+- Full FPCUnit suite: 118 tests passed with 0 errors, 0 failures, and zero
+  unfreed HeapTrc blocks on FPC 3.2.2 / Win64, both through
+  `run-tests.ps1` and `run-tests.sh`.
+- The Lazarus package compiled as `ThreadSafeCollections 0.8.7` with lazbuild,
+  and the package smoke consumer passed on Windows (Lazarus 4.8).
+- `tools/check-docs.ps1` and `tools/check-release-metadata.ps1` pass on the
+  current tree.
+- All 16 examples continue to compile through the PowerShell and Bash build
+  scripts.
+
+## [0.8.6] - 2026-07-28
 
 ### Documentation
 

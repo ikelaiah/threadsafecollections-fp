@@ -76,3 +76,103 @@ jobs:
             !example-bin/units/
           if-no-files-found: error
           retention-days: 7
+
+  tests-linux:
+    name: Tests / Linux / FPCUnit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Free Pascal
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes fpc
+
+      - name: Compile and run the FPCUnit suite with HeapTrc
+        run: bash ./run-tests.sh
+
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-output-linux
+          path: |
+            build-temp/tests/bin/test-output.txt
+            build-temp/tests/bin/heaptrc.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  tests-windows:
+    name: Tests / Windows / FPCUnit
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Lazarus and Free Pascal
+        shell: pwsh
+        run: choco install lazarus --version 4.0.0 --yes --no-progress
+
+      - name: Add Free Pascal to PATH
+        shell: pwsh
+        run: |
+          $Compiler = Get-ChildItem -LiteralPath 'C:\lazarus\fpc' -Recurse -File -Filter 'fpc.exe' |
+            Select-Object -First 1
+          if (-not $Compiler) {
+            throw 'Could not find fpc.exe after installing Lazarus.'
+          }
+          $Compiler.Directory.FullName | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Compile and run the FPCUnit suite with HeapTrc
+        shell: pwsh
+        run: .\run-tests.ps1
+
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-output-windows
+          path: |
+            build-temp/tests/bin/test-output.txt
+            build-temp/tests/bin/heaptrc.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  package-smoke-linux:
+    name: Package / Linux / lazbuild
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Lazarus and Free Pascal
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes lazarus fpc
+
+      - name: Build the Lazarus package and run the tiny consumer
+        run: bash ./smoke-package.sh 0.8.7
+
+  docs-checks:
+    name: Documentation / Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Check release metadata consistency
+        shell: pwsh
+        run: pwsh -NoProfile -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.7
+
+      - name: Check links, fences, example paths, and stale cheat sheet
+        shell: pwsh
+        run: pwsh -NoProfile -File ./tools/check-docs.ps1
