@@ -1,476 +1,374 @@
-# Roadmap: 0.8.5 to 2.0.0
+# Roadmap: 0.8.6 to 2.0.0 and Beyond
 
-[Documentation home](docs/README.md) · [Project README](README.md) ·
-[Changelog](CHANGELOG.md)
+[Documentation home](docs/README.md) · [Project README](README.md) · [Changelog](CHANGELOG.md)
 
-**Audience:** users and contributors tracking planned compatibility,
-performance, quality, and release work. Items below are goals, not current API
-guarantees.
+**Audience:** users and contributors tracking correctness, concurrency, API
+stability, compatibility, performance, and release work. Items are goals, not
+current API guarantees.
 
-ThreadSafeCollections-FP aims to become a production-ready, high-performance
-collection library for modern Object Pascal. It should feel familiar on first
-use, remain safe under concurrency, and make migration from widely used generic
-collection APIs predictable.
+ThreadSafeCollections-FP will first make its existing thread-safe generic
+collections trustworthy and stable. It may then grow into a source-compatible
+collection suite where there is demonstrated demand and a reviewed
+compatibility manifest. This is a capability roadmap, not a calendar: evidence
+from testing, portability, and benchmarks can move milestone contents.
 
-This is a capability roadmap, not a calendar. Version contents may move when
-correctness, compiler support, or benchmark evidence requires it. A milestone
-is complete only when its exit criteria pass.
+## Product direction and sequencing
 
-## Product direction
+The committed native core is:
 
-The project will offer two complementary surfaces:
+- `TThreadSafeList<T>`;
+- `TThreadSafeDeque<T>`;
+- `TThreadSafeDictionary<TKey, TValue>`; and
+- `TThreadSafeHashSet<T>`.
 
-- **Native API** — the existing `TThreadSafe*` types, plus modern operations
-  designed specifically for concurrent programs.
-- **Compatibility API** — familiar collection names and signatures backed by
-  the same tested implementation, intended for migration with minimal source
-  changes.
+The immediate path to 1.0 is deliberately depth-first: automated verification,
+concurrency hardening, API consistency, documented iterator/locking semantics,
+packaging, and reproducible benchmarks. New collection families are not a 1.0
+requirement.
 
-The native API will not be discarded to make room for compatibility. Existing
-0.8.5 users should have a documented upgrade path, and public APIs will follow
-Semantic Versioning from 1.0 onward.
+The long-term direction has two complementary surfaces:
 
-### What “drop-in” means
+- **Native API** — the `TThreadSafe*` types and modern operations designed for
+  concurrent programs.
+- **Compatibility API** — familiar names and signatures, backed by the same
+  tested storage engines, to make accepted migrations predictable.
 
-By 2.0, accepted compatibility-profile programs should:
+The compatibility program is a **post-1.0 decision gate**, not a release gate
+for 1.0. It starts only after a concrete migration use case or demonstrated user
+demand is accepted and a machine-readable manifest defines the intended surface.
+This preserves the 2.0 direction without making speculative breadth compete
+with the quality of the native core.
 
-1. compile after selecting the compatibility package or changing the relevant
-   `uses` entry, without renaming collection types or rewriting algorithms;
-2. observe compatible method signatures, return values, exceptions, ownership
-   rules, notifications, capacity behavior, and enumeration behavior;
-3. gain a documented concurrency contract without needing to add external
-   locking around individual operations; and
-4. have every intentional difference listed in a generated compatibility
-   report.
+### What “drop-in” means if the compatibility gate is accepted
 
-Compatibility will be tested, not inferred from similar method names.
-It means source-level compatibility on supported Free Pascal compilers, not
-binary compatibility with precompiled units or private memory layouts.
+Accepted compatibility-profile programs should be able to compile by selecting
+the façade package or adjusting the relevant `uses` entry, without renaming
+collection types or rewriting algorithms. Compatibility must cover documented
+signatures, results, exceptions, ownership, notifications, capacity, and
+enumeration behavior. Each intentional difference must appear in a generated
+report.
+
+This is source-level compatibility on supported Free Pascal compilers; it does
+not promise binary compatibility with precompiled units or private layouts.
 
 ### Compatibility profiles
 
-The exact surface will be frozen in the 0.9 compatibility manifest. It will be
-split into:
+The accepted manifest will classify each public item as Core, Extended, an
+intentional difference, or out of scope.
 
-- **Core profile** — array algorithms, enumerable and enumerator foundations,
-  pair types, lists, queues, stacks, dictionaries, hash sets, object-owning
-  variants, thread-safe lists, and bounded threaded queues.
-- **Extended profile** — sorted and ordered collections, tree maps and sets,
-  indexed trees, additional hash-map strategies, collection views, pointer or
-  borrowed views where these can be made safe, and other accepted public types.
+- **Core:** array algorithms; enumerable/enumerator and pair foundations;
+  lists, queues, stacks, dictionaries, hash sets; object-owning variants;
+  thread-safe lists; and bounded threaded queues.
+- **Extended:** sorted and ordered families, tree maps and sets, indexed trees,
+  additional hash-map strategies, and safe collection views.
 
-Internal, private, deprecated, or experimental implementation helpers are out
-of scope unless the compatibility manifest explicitly includes them. There
-will be no unlisted compatibility gaps.
+Private, deprecated, and experimental helpers are excluded unless the manifest
+explicitly includes them.
 
 ## Guiding principles
 
 - **Correctness before cleverness.** Managed types, ownership, exceptions, and
   concurrency edge cases must be correct before an optimization is retained.
-- **Thread safety has precise semantics.** Each operation will document its
-  atomicity, linearization point, blocking behavior, and iterator guarantees.
-- **Performance claims are reproducible.** Claims require versioned benchmarks,
-  recorded environments, representative workloads, and regression budgets.
-- **Easy defaults, full control.** Common scalar, string, record, interface, and
-  object types should work without boilerplate; custom comparers, hashers,
-  allocators, ownership, and lock policies remain available.
-- **Documentation is part of the API.** A public symbol is incomplete until its
-  behavior, complexity, concurrency, exceptions, and ownership are documented.
-- **Compatibility without copied implementation.** Behavior will be established
-  through independently written contracts and fixtures.
+- **Tests are part of the product.** Important claims run in CI, rather than
+  existing only as historical local results.
+- **Thread safety has precise boundaries.** Individual operations, atomic
+  compound operations, and multi-operation workflows are documented separately.
+- **Deadlocks are correctness bugs.** Lock ordering, iteration, callbacks,
+  bulk operations, and destruction require deliberate regression coverage.
+- **Performance claims are reproducible.** Measurements include the workload,
+  environment, configuration, and regression budget.
+- **Documentation is part of the API.** Public behavior includes complexity,
+  concurrency, iterators, ownership, and exceptions.
+- **Depth before breadth.** Existing collections become excellent before new
+  families are committed.
+- **Compatibility is tested, not inferred.** A similar method name is not a
+  compatibility guarantee.
 
-## Current baseline — 0.8.5
+## Current baseline — 0.8.6
 
-The project already has a solid correctness and performance base:
+The project already contains generic, per-instance-synchronized List, Deque,
+Dictionary, and HashSet implementations; array, circular-buffer, and
+chained-hash-table storage; managed-type-aware operations; optimized hashing;
+bulk-operation lock-order protections; lock-holding enumeration for List,
+Deque, and HashSet; and snapshot enumeration for Dictionary.
 
-- `TThreadSafeList<T>`, `TThreadSafeDeque<T>`,
-  `TThreadSafeDictionary<TKey, TValue>`, and `TThreadSafeHashSet<T>`;
-- array, circular-buffer, and chained-hash-table storage;
-- managed-type-safe list and deque operations;
-- slab allocation for dictionary and hash-set entries;
-- optimized hashing and average O(n+m) hash-set intersection;
-- bulk operations designed to avoid cross-collection lock-order deadlocks;
-- lock-holding iteration for List, Deque, and HashSet, and snapshot iteration
-  for Dictionary;
-- 118 FPCUnit tests with no reported HeapTrc leaks on the recorded Win64 run;
-- Windows and Linux example builds; and
-- generated API cheat sheets, collection guides, examples, and benchmarks.
+It also has interface-backed collection forms, scoped lock tokens, 118 FPCUnit
+tests in the maintained local snapshot, a recorded clean Win64 HeapTrc run, 16
+tracked examples, Windows and Linux example builds, benchmarks, Lazarus package
+metadata, generated cheat sheets, and task-oriented documentation.
 
-The main limitations to address are:
+The remaining weaknesses are primarily verification and contract maturity:
 
-- one exclusive `TCriticalSection` per collection prevents concurrent reads;
-- manual `Lock()` tokens cannot safely call the same collection's public
-  methods on platforms with non-reentrant critical sections;
-- iterator behavior is inconsistent across collection families;
-- default construction and comparer integration are not yet uniform;
-- the collection family and API surface are not yet compatibility-complete;
-- CI builds examples but does not yet run the complete test, leak, portability,
-  and benchmark gates; and
-- benchmarks record useful point results but do not yet enforce a repeatable
-  regression policy.
+- CI does not yet run the complete FPCUnit suite on each primary environment;
+- concurrency, leak, portability, and benchmark results are not yet complete
+  continuous release gates;
+- iterator behavior differs between collection families;
+- `Lock()` has important re-entry limitations;
+- comparer, hashing, and construction defaults are not fully uniform; and
+- package and documentation versions can drift.
 
 ## Milestones at a glance
 
 | Version | Theme | Primary outcome |
 |---|---|---|
-| 0.9.0 | Contract and foundations | Compatibility and concurrency become executable specifications |
-| 1.0.0 | Stable core | Production-ready Core profile with a stable public API |
-| 1.1.0 | Atomic concurrent workflows | Modern compound operations without check-then-act races |
+| 0.8.7 | CI and verification | Existing correctness claims become automated checks |
+| 0.8.8 | Concurrency hardening | Races, deadlocks, iteration, resize, and lifetime behavior are exercised |
+| 0.8.9 | API consistency and 1.0 preparation | Pre-1.0 inconsistencies resolved and core frozen |
+| 1.0.0 | Stable native core | Four well-tested collection families with documented contracts |
+| 1.1.0 | Atomic concurrent workflows | Compound operations eliminate common check-then-act races |
 | 1.2.0 | Read scalability | Measured parallel-read and contention improvements |
-| 1.3.0 | Ordered and sorted families | High-level Extended-profile collection breadth |
-| 1.4.0 | Advanced collections and portability | Remaining Extended profile, broader targets, mature packaging |
-| 1.5.0 | 2.0 compatibility preview | Feature-complete façade, migration tooling, and ecosystem validation |
-| 2.0.0 | Compatibility and performance guarantee | Stable, documented, release-gated replacement surface |
+| 1.3–1.4 | Conditional compatibility breadth | Ordered/advanced families only after the compatibility gate |
+| 1.5.0 | Conditional 2.0 preview | Feature-complete façade, migration tooling, and validation |
+| 2.0.0 | Conditional compatibility guarantee | Release-gated replacement surface for accepted profiles |
 
-## 0.9.0 — Contract and foundations
+## 0.8.7 — CI and verification
 
-### Compatibility
-
-- Create a machine-readable compatibility manifest of public types, methods,
-  overloads, properties, events, exceptions, and generic constraints.
-- Classify each item as Core, Extended, implementation detail, or intentional
-  difference.
-- Add compile-only fixtures in both `objfpc` and `delphi` modes.
-- Add behavioral fixtures for duplicate handling, missing keys, empty
-  collections, range checks, capacity changes, managed values, enumeration,
-  notification ordering, and object ownership.
-- Decide and document façade unit names, namespace behavior, and package search
-  order without disrupting native API users.
-- Adopt a deprecation policy and an API-diff check for every release.
-
-### Architecture and semantics
-
-- Define common pair, enumerable, enumerator, comparer, equality, notification,
-  exception, and collection-view contracts.
-- Separate storage engines from public façades so native and compatibility APIs
-  share the same implementation.
-- Standardize integer/index types and overflow behavior across supported
-  architectures.
-- Publish a concurrency contract for every existing method.
-- Choose one default iterator policy for 1.0. Snapshot iteration is preferred
-  unless measurement demonstrates an unacceptable cost; explicit locked or
-  borrowed iteration may be offered separately.
-- Design a safe replacement for multi-operation manual locking, such as scoped
-  read/write views that do not re-enter public locking methods.
-
-### Engineering system
-
-- Run the complete test suite in CI on Windows and Linux, not only example
-  compilation.
-- Test the oldest supported stable compiler and a current development compiler.
-- Add separate fast unit, long stress, leak, and benchmark jobs.
-- Store benchmark results with compiler, target, CPU, commit, configuration,
-  sample count, and workload metadata.
-- Establish compiler-warning and documentation-link checks.
+- Run the practical FPCUnit suite in CI, separating fast unit, long stress,
+  leak, benchmark, and example jobs where appropriate.
+- Establish Windows and Linux runtime coverage and clearly document any scope
+  that cannot yet run on a platform.
+- Preserve HeapTrc verification where applicable and document its limits.
+- Add a Lazarus/package smoke build that verifies paths, dependencies, unit
+  compilation, version, source inclusion, and, where practical, a tiny consumer.
+- Check release metadata across README badges, `CHANGELOG.md`, package metadata,
+  generated documentation, and release notes.
+- Automate inexpensive documentation checks: local links, referenced files,
+  example paths, stale generated cheat sheets, and compilable examples.
 
 ### Exit criteria
 
-- The compatibility manifest is reviewed, versioned, and diffable.
-- Every 0.8.5 public method has a concurrency and ownership contract.
-- Core-profile compile fixtures run in both supported language modes.
-- Full Windows and Linux test jobs pass with no known leaks.
-- A reproducible 0.8.5 performance and memory baseline is checked in.
-- No new public API is accepted without tests and documentation.
+- Full practical FPCUnit coverage runs automatically on the primary Windows
+  environment, with Linux scope established and documented.
+- Examples compile on Windows and Linux; package smoke verification is automated
+  or reproducibly documented.
+- Leak-verification scope and actual CI coverage are accurately documented.
+- CI reports identify whether examples, tests, packaging, or documentation failed.
 
-## 1.0.0 — Stable core
+## 0.8.8 — Concurrency hardening
 
-### Core collection surface
-
-- Complete array search and sorting helpers.
-- Provide shared enumerable, enumerator, pair, comparer, equality, and
-  notification foundations.
-- Complete List behavior, including default and custom comparers, remove and
-  extract variants, binary search, ranges, capacity, sorting, notifications,
-  and collection constructors.
-- Expose Queue and Stack APIs over the proven circular-buffer engine, including
-  peek, extract, array conversion, capacity, and trimming behavior.
-- Complete Dictionary behavior, including comparer-aware constructors,
-  capacity, key and value views, extraction, notifications, collection
-  constructors, and all duplicate-key paths.
-- Complete HashSet algebra and relationship operations, including symmetric
-  difference and subset/superset predicates required by the manifest.
-- Add object-owning List, Queue, Stack, Dictionary, and HashSet variants with
-  explicit, tested transfer and destruction rules.
-- Add familiar thread-safe list and bounded blocking queue APIs, including
-  timeout, shutdown, and wake-up behavior.
-
-### Safety and usability
-
-- Make useful default construction work for supported built-in and managed
-  types.
-- Keep custom comparer and hash-function construction available.
-- Use a consistent snapshot iterator by default, with an explicit advanced API
-  for lock-held access where justified.
-- Ensure callbacks and notifications cannot cause undocumented self-deadlocks.
-- Preserve the current `TThreadSafe*` API or provide compile-time deprecations
-  and a migration guide for each changed member.
-- Document exception guarantees for failed adds, allocation failures, comparer
-  exceptions, and partial bulk operations.
-
-### Documentation and distribution
-
-- Publish a task-oriented getting-started guide for each Core collection.
-- Generate an API reference from source and verify all examples in CI.
-- Add guides for concurrency, iterators, comparers and hashing, ownership,
-  exceptions, performance, and migration from 0.8.5.
-- Provide tested Lazarus and command-line installation packages.
+- Add deterministic, barrier/event-coordinated tests for List, Deque,
+  Dictionary, and HashSet under concurrent add, remove, lookup, resize,
+  enumeration, collision, and bulk-operation workloads.
+- Maintain bounded-completion deadlock regressions for opposite lock order,
+  cross-collection input, lock-holding enumeration, manual lock tokens,
+  callbacks, and lifetime/destruction boundaries.
+- Decide whether the current lock-holding versus snapshot iterator difference
+  remains intentional or converges toward a common policy; measure safety,
+  compatibility, memory, and performance before changing it.
+- Exercise valid and invalid boundaries for worker threads, enumerators,
+  snapshots, interfaces, and lock tokens that refer to a collection.
+- Add randomized stress tests for add, remove, contains, clear, resize,
+  enumeration, ranges, and poor hashes. Record seed, iterations, thread count,
+  collection type, and operation mix for reproduction.
 
 ### Exit criteria
 
-- The Core compatibility manifest is 100% implemented or has an explicit,
-  reviewed exception for each missing item.
-- Compile and behavioral fixtures pass in all supported compiler modes.
-- No open critical or high-severity correctness, deadlock, or memory issue.
-- All Core public symbols have API documentation and at least one tested usage
-  path.
-- Benchmark regressions beyond the release budget are fixed or explained in
-  the release notes.
-- Public Core APIs are declared stable under Semantic Versioning.
+- Every core collection has intentional multi-thread stress coverage.
+- Lock-order, collision, resize, iterator, and lifetime regressions have direct tests.
+- Randomized failures report reproducible seeds.
+- No known high-severity race, deadlock, corruption, or managed-memory defect remains open.
+
+## 0.8.9 — API consistency and 1.0 preparation
+
+- Normalize or deliberately document default construction, custom comparers,
+  equality/hash functions, built-in specializations, and invalid callback behavior.
+- Review related List, Deque, Dictionary, and HashSet names and contracts without
+  renaming merely for visual symmetry.
+- Specify and test duplicate keys, missing keys, indexes, empty deque operations,
+  capacities, callback exceptions, partial bulk failures, and allocation failures
+  where practical.
+- Finalize the safe use, redesign, or deprecation of `Lock()` so it cannot be
+  mistaken for a safe re-entrant multi-operation API.
+- Document purpose, complexity, atomicity, blocking, iterator implications,
+  ownership, and exceptions for public core methods.
+- Review the candidate 1.0 public surface, final pre-1.0 deprecations, direct
+  `-Fu` use, Lazarus installation, clean-checkout builds, and version consistency.
+
+### Exit criteria
+
+- Construction, comparer, and hash behavior are consistent or intentionally documented.
+- Iterator and manual-lock policies are finalized for 1.0.
+- Core APIs have concurrency and ownership documentation, and known breaking
+  inconsistencies are resolved.
+- The candidate 1.0 surface, package metadata, and release metadata are reviewed.
+
+## 1.0.0 — Stable native core
+
+1.0 marks stable, tested contracts for the four native core families. It does
+not claim that every possible concurrent collection exists, nor does it depend
+on the compatibility program.
+
+### Guarantees
+
+- Stable public core APIs under Semantic Versioning.
+- Documented synchronization, iterator, ownership, exception, and lifetime rules.
+- Automated unit, multi-platform, stress, leak, package, and example verification.
+- Reproducible benchmark tooling and useful complexity expectations.
+- A published support matrix naming the Free Pascal, Windows, Linux, Lazarus,
+  and other targets actually exercised.
+
+Thread-safe individual operations do not automatically make a sequence such as
+`if Contains(X) then Remove(X);` atomic. Users need a documented compound API,
+an explicitly supported scoped-access mechanism, or external synchronization.
+
+### Release gates
+
+- Normal CI and supported-environment FPCUnit tests pass.
+- Concurrency stress and package smoke verification pass.
+- No known critical/high correctness, deadlock, corruption, or leak defect remains.
+- All core families have tested examples, reviewed stable APIs, and documentation
+  that matches actual behavior.
 
 ## 1.1.0 — Atomic concurrent workflows
 
-- Add atomic Dictionary operations such as get-or-add, add-or-update,
-  try-update, and remove-with-value.
-- Add mutation callbacks or factories with documented retry, exception, and
-  lock behavior.
-- Add atomic set insert/remove/query variants where they remove common
-  check-then-act races.
-- Add immutable snapshots for all collection families.
-- Add safe scoped read and write access for multi-operation transactions.
+- Add Dictionary get-or-add, add-or-update, try-update, and remove-with-value
+  operations where their contracts can be made precise.
+- Add atomic set operations that eliminate common check-then-act races.
+- Provide immutable snapshots and safe scoped read/write access for supported
+  multi-operation workflows.
 - Complete bounded-queue cancellation, timeout, shutdown, drain, and metrics
-  behavior.
-- Define whether notifications run before or after lock release and guarantee
-  ordering consistently.
+  behavior if the queue façade is accepted.
+- Define callback/factory retry, exception, ordering, lock, and re-entry behavior.
 
 ### Exit criteria
 
-- Atomic APIs pass deterministic race fixtures and randomized history checks.
-- Re-entrant callbacks, exceptions, cancellation, shutdown, and destruction
-  have regression coverage.
-- No public workflow requires the unsafe 0.8.5 manual-lock pattern.
-- The atomicity table and examples cover every new operation.
+- Deterministic race fixtures and randomized history checks pass.
+- Re-entrant callbacks, exceptions, cancellation, shutdown, and destruction are covered.
+- The atomicity table and examples document every new operation.
 
 ## 1.2.0 — Read scalability
 
-- Introduce an internal lock abstraction and a reader/writer implementation.
-- Allow concurrent reads for List, Dictionary, HashSet, and Deque when safe.
-- Evaluate lock striping or sharding for Dictionary and HashSet.
-- Make `Count` and `IsEmpty` low-contention where supported by the target.
-- Reduce time spent under write locks by preparing resize and bulk-operation
-  data outside the critical section when correctness permits.
-- Evaluate specialized lock-free queues or fast paths only through a design
-  review, correctness proof or model, stress testing, and benchmarks. Retain
-  the lock-based implementation when those gates are not met.
-- Record throughput, p50/p95/p99 latency, allocation count, and peak memory for
+- Introduce an internal lock abstraction and evaluate reader/writer locking.
+- Allow concurrent reads where safe; evaluate sharding/striping for Dictionary
+  and HashSet and low-contention `Count`/`IsEmpty` paths.
+- Reduce write-lock duration by preparing resize/bulk-operation data outside a
+  lock when correctness permits.
+- Evaluate lock-free paths only with a design review, safety argument, stress
+  tests, and benchmarks; retain the simpler implementation when gates are unmet.
+- Record throughput, p50/p95/p99 latency, allocations, and peak memory for
   single-threaded and contended workloads.
 
 ### Exit criteria
 
-- Read-heavy workloads demonstrate a material, reproducible improvement over
-  the 1.0 exclusive-lock baseline.
+- Read-heavy workloads show a material, reproducible gain over the 1.0 baseline.
 - Write-heavy and mixed workloads have no unexplained material regression.
-- Race, starvation, resize, destruction, and cross-collection stress suites
-  pass on every supported operating system.
+- Race, starvation, resize, destruction, and cross-collection stress suites pass.
 - The selected lock policy and fairness guarantees are public documentation.
 
-## 1.3.0 — Ordered and sorted families
+## Compatibility decision gate
 
-- Add sorted List behavior and automatic-sort options required by the manifest.
-- Add ordered Dictionary variants with key- and index-based access.
-- Add sorted Set and sorted HashSet variants.
-- Add balanced tree Map and Set types, including indexed variants where
-  required.
-- Complete comparer propagation, ordering, duplicate policy, range queries,
-  enumeration direction, and capacity semantics.
-- Add object-owning variants and notifications for the new families.
-- Provide native concurrent range and ordered-snapshot operations where they
-  can be implemented without weakening compatibility.
+Before committing the 1.3–2.0 compatibility track, the project must have a
+concrete migration use case or demonstrated demand, maintainers willing to own
+the long-term contract, and an approved manifest. The discovery work then:
 
-### Exit criteria
+- defines pair, enumerable, enumerator, comparer, equality, notification,
+  exception, and collection-view contracts;
+- separates storage engines from native and compatibility façades;
+- adds compile fixtures in `objfpc` and `delphi` modes and behavioral fixtures
+  for duplicates, missing keys, ranges, capacity, managed values, enumeration,
+  notification ordering, and ownership; and
+- chooses façade unit names, namespace behavior, package search order,
+  deprecation policy, API-diff automation, and the iterator/locking contract.
 
-- High-level ordered, sorted, and tree types in the Extended profile pass their
-  compile and behavior fixtures.
-- Ordering and iterator guarantees are deterministic and documented.
-- Randomized differential tests cover insert, remove, search, rank, range, and
-  enumeration behavior.
-- Complexity claims are verified against benchmark scaling curves.
+No compatibility type is promised until it appears in the reviewed manifest.
 
-## 1.4.0 — Advanced collections and portability
+## 1.3.0–1.4.0 — Conditional compatibility breadth
 
-- Complete accepted advanced hash-map strategies and public collection views.
-- Support pointer or borrowed views only through lifetimes that cannot silently
-  outlive a mutation; document any deliberate incompatibility needed for
-  memory safety.
-- Complete the Extended compatibility manifest.
-- Test Windows, Linux, and macOS on x86-64 and ARM64 where CI infrastructure is
-  available; document other targets as experimental or community-supported.
-- Add 32-bit overflow and capacity tests even when 32-bit runners are not part
-  of every CI run.
-- Test stable and development compiler channels and publish the supported
-  matrix.
-- Provide versioned release archives, checksums, package metadata, and clean
-  installation/uninstallation tests.
-- Make documentation generation reproducible on all primary platforms.
+If the gate is accepted:
+
+- Add sorted List behavior, ordered Dictionary variants, sorted sets, balanced
+  tree maps/sets, indexed variants, range queries, ordering policies, and
+  object-owning/notification behavior required by the Extended manifest.
+- Complete accepted advanced hash-map strategies and collection views. Borrowed
+  or pointer views must not silently outlive mutation; safety exceptions are
+  documented as intentional incompatibilities.
+- Complete the Extended manifest; test Windows, Linux, and macOS on x86-64 and
+  ARM64 where infrastructure permits; add 32-bit overflow/capacity tests.
+- Ship versioned archives, checksums, package metadata, clean install/uninstall
+  checks, and reproducible documentation generation.
 
 ### Exit criteria
 
-- Every Extended-profile item is implemented or has a documented, reviewed
-  safety exception.
-- Primary platform/compiler combinations pass unit, stress, leak, example, and
-  packaging jobs.
-- No supported feature depends on undocumented structure layout.
-- Installation and a minimal compile work in clean CI environments.
+- Every accepted item is implemented or has a reviewed, documented safety exception.
+- Ordered/tree differential tests verify insert, remove, search, rank, range,
+  and enumeration; complexity claims match scaling benchmarks.
+- Primary platform/compiler combinations pass unit, stress, leak, example,
+  packaging, and compatibility fixtures.
 
-## 1.5.0 — 2.0 compatibility preview
+## 1.5.0 — Conditional 2.0 compatibility preview
 
-- Mark the full compatibility façade feature-complete.
-- Freeze the proposed 2.0 public surface and publish generated API-diff and
-  compatibility reports.
-- Deprecate superseded native APIs with precise replacements and automated
-  migration notes.
-- Publish complete migration guides for native 0.8.x/1.x users and
-  compatibility-profile users.
-- Validate representative real applications, including managed records,
-  interfaces, object ownership, custom comparers, plugins/packages, and
-  multi-threaded producer/consumer workloads.
-- Complete performance tuning using the frozen behavior contract.
-- Publish release-candidate packages and require a full compatibility cycle
-  before 2.0.
+- Mark the accepted façade feature-complete and freeze the proposed 2.0 surface.
+- Publish API-diff and compatibility reports, precise native-API deprecations,
+  migration guidance, release candidates, and benchmark results.
+- Validate representative applications using managed records, interfaces,
+  ownership, custom comparers, packages, and multi-threaded producer/consumer
+  workloads.
 
 ### Exit criteria
 
-- Both compatibility profiles report no accidental gaps.
-- Representative applications compile without collection-level source
-  rewrites beyond selecting the façade.
-- No unresolved API-design issue is deferred to the 2.0 patch line.
-- All critical and high-severity preview findings are closed with regression
-  tests.
-- Documentation, packages, and benchmark reports are release-candidate ready.
+- Core and Extended profiles have no accidental gaps.
+- Representative applications compile without collection-level rewrites beyond
+  selecting the façade.
+- Critical/high preview findings are closed with regression tests, and release
+  packages, documentation, and benchmarks are ready.
 
-## 2.0.0 — Compatibility and performance guarantee
+## 2.0.0 — Conditional compatibility and performance guarantee
 
-2.0 is the point at which the project may describe itself as a stable,
-production-ready, drop-in collection suite for the accepted profiles.
+2.0 is released only when the accepted profiles have a 100% pass rate for their
+compile and behavioral fixtures, with no unlisted differences in signatures,
+exceptions, ownership, notifications, views, or enumeration.
 
-The release requires all of the following:
+The release also requires no known critical/high correctness, deadlock, race,
+use-after-free, double-free, or leak defect; passing unit, differential, stress,
+cancellation, collision, allocation-failure, and cross-collection suites; and
+complete atomicity, blocking, fairness, iterator, callback, and destruction
+documentation.
 
-### Compatibility
+Benchmark reports must cover scalar, string, record, interface, and object
+payloads; normal/adversarial hashes; bulk operations; and contention mixes. CI
+flags median regressions above 5% and blocks unexplained regressions above 10%
+against the frozen 1.5 baseline on controlled runners.
 
-- 100% pass rate for Core and Extended compile fixtures.
-- 100% pass rate for accepted behavioral contracts.
-- No unlisted differences in signatures, exceptions, ownership,
-  notifications, collection views, or enumeration behavior.
-- A final API-diff report and complete 1.x-to-2.0 migration guide.
+## Cross-cutting test, documentation, and release discipline
 
-### Correctness and concurrency
+All milestones build on compile contracts, behavior contracts, model/differential
+tests, deterministic and randomized concurrency histories, managed-memory and
+leak tests, performance tests with recorded metadata, and clean package tests.
+Fast checks run on pull requests; expensive stress, platform, memory-tooling,
+and benchmark jobs may run nightly or before releases.
 
-- No known critical or high-severity correctness, deadlock, race, use-after-free,
-  double-free, or leak defect.
-- Unit, property-based, differential, long-running stress, cancellation,
-  collision, allocation-failure, and cross-collection tests pass.
-- Atomicity, blocking, fairness, iterator, callback, and destruction semantics
-  are documented for every public concurrent operation.
-- HeapTrc and platform-appropriate external memory/race tooling are clean for
-  the supported test corpus.
+Maintain a five-minute quick start; installation/build guide; collection guides;
+generated reference and cheat sheet; concurrency/atomicity, iterator,
+comparer/hashing, ownership/lifetime, benchmark, and migration guides. Examples
+claimed as supported should compile in CI.
 
-### Performance
-
-- Reproducible benchmark reports cover scalar, string, record, interface, and
-  object payloads; normal and adversarial hashes; bulk operations; and
-  read/write contention mixes.
-- CI flags a median regression above 5% and blocks unexplained regressions above
-  10% against the frozen 1.5 baseline on controlled runners.
-- Every public complexity claim matches measured scaling behavior.
-- Memory overhead and allocation rates are published alongside throughput and
-  latency.
-
-### Documentation and release engineering
-
-- 100% of public symbols have generated reference documentation.
-- Every collection family has a runnable quick start and a tested recipe.
-- Compatibility, concurrency, ownership, migration, performance, and support
-  guides are complete.
-- All primary packages install, compile a smoke project, and uninstall cleanly.
-- The support matrix, security policy, deprecation policy, and release process
-  are published.
-
-## Cross-cutting test strategy
-
-All milestones build on the same test layers:
-
-1. **Compile contracts** — names, overloads, constraints, visibility, modes,
-   and unit/package selection.
-2. **Behavior contracts** — results, exceptions, ownership, notifications,
-   capacity, ordering, and iterators.
-3. **Model and differential tests** — randomized operation sequences checked
-   against simple reference models.
-4. **Concurrency histories** — deterministic barriers plus randomized schedules
-   checked against documented atomic behavior.
-5. **Memory tests** — managed types, objects, interfaces, allocation failures,
-   HeapTrc, and external tooling.
-6. **Performance tests** — versioned workloads with statistical summaries and
-   stored metadata.
-7. **Packaging tests** — clean install, build, run, and uninstall.
-
-Fast tests should run on every pull request. Long stress, extended platform,
-memory-tooling, and benchmark jobs may run nightly and before releases.
-
-## Documentation plan
-
-The documentation set will grow into:
-
-- a five-minute quick start;
-- one task-oriented guide per collection family;
-- a generated API reference and compact cheat sheet;
-- a concurrency and atomicity guide;
-- an iterator and snapshot guide;
-- comparer, equality, hashing, and ordering guides;
-- an object ownership and notification guide;
-- a performance methodology and results dashboard;
-- native and compatibility migration guides;
-- a generated compatibility-status report; and
-- fully tested examples ranging from single-threaded use to contended services.
-
-Examples and declarations in documentation must compile in CI. Complexity and
-thread-safety notes should be generated from the same metadata used by the API
-reference wherever practical.
-
-## Release discipline
-
-Every release from 0.9 onward must:
-
-- update the changelog, package version, compatibility manifest, and API diff;
-- run unit, behavior, stress, leak, example, and package smoke tests appropriate
-  to the milestone;
-- publish or link its benchmark comparison;
-- document all intentional compatibility changes;
-- include migration notes for deprecations or breaking pre-1.0 changes; and
-- avoid performance claims that cannot be reproduced from repository tooling.
-
-Patch releases fix defects and documentation without expanding the stable
-surface. Minor 1.x releases add backward-compatible functionality. Breaking
-changes after 1.0 require deprecation where feasible and are reserved for 2.0.
+Every release updates the changelog, package/version metadata, generated docs,
+and relevant migration notes; runs the checks appropriate to its milestone; and
+publishes reproducible performance evidence for material changes. From 1.0,
+patch releases are compatible fixes, minor releases add compatible capability,
+and breaking public changes require strong justification and an appropriate
+major version.
 
 ## Explicit non-goals
 
-- Preserving private field layout or undocumented implementation accidents.
-- Promising a particular iteration order where the public contract does not.
-- Exposing pointers that can become invalid after an unlocked mutation.
-- Calling an operation lock-free without a demonstrated safety and performance
-  case.
-- Trading managed-type safety, ownership correctness, or deadlock freedom for a
-  microbenchmark win.
-- Claiming compatibility for types not present in the accepted manifest.
+- Preserving private layout or undocumented implementation accidents.
+- Promising undocumented iteration order or invalid-after-mutation pointer views.
+- Calling a feature lock-free without demonstrated safety and performance value.
+- Sacrificing managed-type safety, ownership correctness, or deadlock freedom
+  for a microbenchmark result.
+- Claiming support for platforms, profiles, or types that are not tested and
+  accepted by the published contract.
+- Making multiple independent method calls automatically atomic.
 
 ## How to read progress
 
-Release notes will link to the generated compatibility report and summarize:
+Progress is measured by automated verification, prevented regressions, verified
+platform coverage, documentation that matches implementation, reproducible
+performance results, and fewer ambiguous API behaviors—not by the number of
+type names. Release notes should link to the relevant test, API-diff, benchmark,
+and compatibility reports.
 
-- Core and Extended profile completion;
-- correctness and concurrency findings;
-- supported compiler/platform coverage;
-- performance changes against the frozen baseline; and
-- documentation coverage.
-
-The roadmap is complete when 2.0 satisfies its release gates, not merely when
-all planned type names exist.
+The immediate success criterion is a modest, evidence-backed 1.0 claim: these
+are the collections provided, these are their concurrency guarantees, and these
+are the environments continuously verified. The 2.0 claim becomes available
+only after the compatibility decision gate and its release criteria are met.
