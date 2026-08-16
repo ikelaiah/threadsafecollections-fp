@@ -1,4 +1,4 @@
-# Roadmap: 0.8.6 to 2.0.0 and Beyond
+# Roadmap: 0.8.5 to 2.0.0 and Beyond
 
 [Documentation home](docs/README.md) · [Project README](README.md) · [Changelog](CHANGELOG.md)
 
@@ -83,6 +83,29 @@ explicitly includes them.
   families are committed.
 - **Compatibility is tested, not inferred.** A similar method name is not a
   compatibility guarantee.
+
+## Historical baseline — 0.8.5
+
+The 0.8.5 roadmap recorded a solid correctness and performance foundation:
+
+- `TThreadSafeList<T>`, `TThreadSafeDeque<T>`,
+  `TThreadSafeDictionary<TKey, TValue>`, and `TThreadSafeHashSet<T>`;
+- array, circular-buffer, and chained-hash-table storage;
+- managed-type-safe List and Deque operations;
+- slab allocation for Dictionary and HashSet entries;
+- optimized hashing and average O(n+m) HashSet intersection;
+- bulk operations designed to avoid cross-collection lock-order deadlocks;
+- lock-holding iteration for List, Deque, and HashSet, and snapshot iteration
+  for Dictionary;
+- 118 FPCUnit tests with no reported HeapTrc leaks on the recorded Win64 run;
+- Windows and Linux example builds; and
+- generated API cheat sheets, collection guides, examples, and benchmarks.
+
+The principal limitations identified at 0.8.5 were one exclusive
+`TCriticalSection` per collection, unsafe re-entry through manual `Lock()`
+tokens, inconsistent iterator behavior, non-uniform default construction and
+comparer integration, incomplete compatibility coverage, incomplete CI gates,
+and point-in-time rather than regression-controlled benchmarks.
 
 ## Current baseline — 0.8.6
 
