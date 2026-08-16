@@ -99,7 +99,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-output-linux
-          path: build-temp/tests/test-output.txt
+          path: build-temp/tests/bin/test-output.txt
           if-no-files-found: ignore
           retention-days: 7
 
@@ -135,7 +135,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-output-windows
-          path: build-temp/tests/test-output.txt
+          path: build-temp/tests/bin/test-output.txt
           if-no-files-found: ignore
           retention-days: 7
 

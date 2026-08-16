@@ -92,6 +92,8 @@ if (( skip_leak_check == 0 )); then
   if [[ -z "$unfreed" ]]; then
     echo "FAIL: no HeapTrc summary was found. The runner must be built with -gh"
     echo "and exit normally for leak verification."
+    echo "Last 40 lines of the test output:"
+    tail -n 40 "$output_file"
     failed=1
   elif (( unfreed > 0 )); then
     echo "FAIL: HeapTrc reports $unfreed unfreed memory blocks."
