@@ -3,8 +3,8 @@
 [Project README](../README.md) · [Build and verify](BUILDING.md) ·
 [API cheat sheet](CHEATSHEET.md) · [Roadmap](../ROADMAP.md)
 
-This is the documentation home for ThreadSafeCollections-FP 0.8.7, released on
-2026-08-16.
+This is the documentation home for ThreadSafeCollections-FP 0.8.8, released on
+2026-08-17.
 
 ## Choose a path
 
@@ -37,6 +37,9 @@ This is the documentation home for ThreadSafeCollections-FP 0.8.7, released on
   examples, tests, Lazarus package, benchmark, and documentation generator
 - [API cheat sheet](CHEATSHEET.md) — generated declarations and complexity
   annotations from the source
+- [Thread-safety, iteration, and lock policy](Thread-Safety-and-Iteration.md)
+  — the synchronization model, the decided iterator policy, manual-lock
+  limits, and where each guarantee is tested
 - [RAII-style locking through interface counting](RAII-style-locking-through-interface-counting.md)
   — lock-token lifetimes, iteration, and manual-lock limitations
 - [XXHash32 explained](XXHash32-Explained.md) — an implementation-oriented
@@ -76,6 +79,7 @@ guidance.
 - [v0.8.5](RELEASE-NOTES-v0.8.5.md)
 - [v0.8.6](RELEASE-NOTES-v0.8.6.md)
 - [v0.8.7](RELEASE-NOTES-v0.8.7.md)
+- [v0.8.8](RELEASE-NOTES-v0.8.8.md)
 
 ### Development and design records
 
@@ -83,14 +87,16 @@ guidance.
 - [v0.8.5 pull-request summary](PR_v0.8.5.md)
 - [v0.8.6 pull-request summary](PR_v0.8.6.md)
 - [v0.8.7 pull-request summary](PR_v0.8.7.md)
+- [v0.8.8 pull-request summary](PR_v0.8.8.md)
 - [Maintainability improvements](MAINTAINABILITY_IMPROVEMENTS.md)
 - [Debugging tale](Debugging-Tale.md)
 - [Hash-set constructor evolution](HashSet-Constructor-Evolution.md)
 
 ### Test snapshots
 
-- [16 August 2026 test snapshot](../tests/LatestTestOutput.md) — recorded on
-  FPC 3.2.2 Win64 with `run-tests.ps1`
+- [17 August 2026 test snapshot](../tests/LatestTestOutput.md) — recorded on
+  FPC 3.2.2 Win64 with `run-tests.ps1`, including the concurrency hardening
+  suites
 - [December 2025 raw test output](../tests/251220-test-output.txt)
 
 To assess the current checkout, run the tests yourself using

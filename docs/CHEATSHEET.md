@@ -8,7 +8,7 @@
 >
 > Regenerate from the repository root with: `pwsh -File ./tools/generate-cheatsheet.ps1`
 
-Package version: `0.8.7`
+Package version: `0.8.8`
 
 ## Source Inputs
 

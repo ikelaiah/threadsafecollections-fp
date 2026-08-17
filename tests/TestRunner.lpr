@@ -10,7 +10,10 @@ uses
   , ThreadSafeListStudentTests
   , ThreadSafeDictionaryTests
   , ThreadSafeHashSetTests
-  , ThreadSafeDequeTests;
+  , ThreadSafeDequeTests
+  , ThreadSafeCollections.ConcurrencyTests
+  , ThreadSafeCollections.DeadlockTests
+  , ThreadSafeCollections.StressTests;
 
 type
 
