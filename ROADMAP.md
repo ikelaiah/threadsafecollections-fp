@@ -126,7 +126,7 @@ maturity:
 - comparer, hashing, and construction defaults were not fully uniform; and
 - package metadata (still 0.8.5) and documentation versions could drift.
 
-## Current baseline — 0.8.7
+## Historical baseline — 0.8.7
 
 The project contains generic, per-instance-synchronized List, Deque,
 Dictionary, and HashSet implementations; array, circular-buffer, and
@@ -151,14 +151,36 @@ Deque, and HashSet; and snapshot enumeration for Dictionary.
 - package metadata was brought to 0.8.7 and the misdated v0.8.6 release
   record was corrected.
 
+## Current baseline — 0.8.8
+
+0.8.8 delivered the concurrency hardening milestone. The FPCUnit suite grew
+from 118 to 146 tests:
+
+- deterministic, event-coordinated concurrency tests cover concurrent add,
+  remove, lookup, resize, bulk, collision, enumeration, interface, and
+  callback workloads for all four collection families, with exact final-state
+  verification;
+- bounded-completion deadlock regressions cover opposite lock order,
+  self-source bulk operations, lock-holding enumeration with concurrent
+  mutation, manual lock token serialization, the Windows-only `Lock()`
+  re-entry behavior, and lifetime/destruction boundaries; a regression that
+  does not complete within its bound fails the runner instead of hanging it;
+- seeded randomized stress tests cover add, remove, contains, clear, resize,
+  enumeration, ranges, and poor hashes, recording seed, thread count,
+  iterations, collection, and operation mix for reproduction; and
+- the lock-holding versus snapshot iterator difference was decided to be
+  intentional and is documented with its trade-offs in
+  [Thread-safety, iteration, and lock policy](docs/Thread-Safety-and-Iteration.md);
+  the tests now enforce both behaviors.
+
 Remaining weaknesses, addressed by later milestones:
 
 - Windows package smoke verification is documented locally (Lazarus 4.8) but
   not automated in Windows CI;
 - benchmarks remain local-only and point-in-time rather than
   regression-controlled;
-- iterator behavior still differs between collection families, and `Lock()`
-  re-entry limitations remain;
+- `Lock()` re-entry limitations remain and its final safe-use design is
+  deferred to 0.8.9;
 - comparer, hashing, and construction defaults are not fully uniform; and
 - macOS and other targets are not tested by the repository.
 
@@ -179,7 +201,6 @@ Remaining weaknesses, addressed by later milestones:
 ## 0.8.7 — CI and verification
 
 > **Delivered in v0.8.7 (2026-08-16).** See the
-> [current baseline](#current-baseline--087) and the
 > [v0.8.7 release notes](docs/RELEASE-NOTES-v0.8.7.md) for what was automated.
 
 - Run the practical FPCUnit suite in CI, separating fast unit, long stress,
@@ -204,6 +225,10 @@ Remaining weaknesses, addressed by later milestones:
 - CI reports identify whether examples, tests, packaging, or documentation failed.
 
 ## 0.8.8 — Concurrency hardening
+
+> **Delivered in v0.8.8 (2026-08-17).** See the
+> [current baseline](#current-baseline--088) and the
+> [v0.8.8 release notes](docs/RELEASE-NOTES-v0.8.8.md) for what was hardened.
 
 - Add deterministic, barrier/event-coordinated tests for List, Deque,
   Dictionary, and HashSet under concurrent add, remove, lookup, resize,

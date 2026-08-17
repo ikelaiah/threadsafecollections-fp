@@ -27,7 +27,7 @@ Optional tools:
 - Bash for `build-examples.sh`
 
 The current documentation revision was verified with FPC 3.2.2 and Lazarus 4.8
-on Win64, including the full 118-test suite, the Lazarus package build, and
+on Win64, including the full 146-test suite, the Lazarus package build, and
 the package smoke consumer. Current CI runs these jobs:
 
 | Job | Platform | Command |
@@ -36,8 +36,8 @@ the package smoke consumer. Current CI runs these jobs:
 | Examples | Windows | `.\build-examples.ps1 -Configuration Release` with the FPC bundled in Lazarus 4.0.0 |
 | Tests | Linux | `./run-tests.sh` with the distribution `fpc` package |
 | Tests | Windows | `.\run-tests.ps1` with the FPC bundled in Lazarus 4.0.0 |
-| Package smoke | Linux | `./smoke-package.sh 0.8.7` with Lazarus and `lazbuild` from `apt` |
-| Documentation checks | Linux | `pwsh -File ./tools/check-docs.ps1` and `pwsh -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.7` |
+| Package smoke | Linux | `./smoke-package.sh 0.8.8` with Lazarus and `lazbuild` from `apt` |
+| Documentation checks | Linux | `pwsh -File ./tools/check-docs.ps1` and `pwsh -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.8` |
 
 On `windows-latest`, CI installs Lazarus 4.0.0 only to obtain its bundled FPC;
 it does not invoke `lazbuild` or build the Lazarus package. The Lazarus package
@@ -145,7 +145,7 @@ lazbuild --build-all package/lazarus/ThreadSafeCollections.lpk
 
 The package points Lazarus at `src`, writes compiled units below
 `package/lazarus/lib/<target-cpu>-<target-os>/`, and declares the standard FCL
-package as a requirement. The package version in the current checkout is 0.8.7.
+package as a requirement. The package version in the current checkout is 0.8.8.
 
 ### Package smoke build
 
@@ -155,11 +155,11 @@ the version, that every unit in `src/` is listed in the package file, that
 a tiny consumer program compiles against the built package and runs.
 
 ```powershell
-.\smoke-package.ps1 -ExpectedVersion 0.8.7
+.\smoke-package.ps1 -ExpectedVersion 0.8.8
 ```
 
 ```bash
-./smoke-package.sh 0.8.7
+./smoke-package.sh 0.8.8
 ```
 
 The consumer program is `tools/package-smoke-consumer.lpr`; its artifacts stay
@@ -229,7 +229,24 @@ The program's custom help footer also advertises `-t TestName`, but FPCUnit
 3.2.2 rejects that option; use `--suite=SuiteName`. The suite is not quick:
 collision and high-volume concurrency cases can take several minutes. The
 latest preserved result is a
-[historical 118-test Win64 snapshot](../tests/LatestTestOutput.md).
+[historical 146-test Win64 snapshot](../tests/LatestTestOutput.md).
+
+### The concurrency hardening suites
+
+Three suites, added in v0.8.8, exercise the synchronization contracts described
+in [Thread-safety, iteration, and lock policy](Thread-Safety-and-Iteration.md):
+
+| Suite | Contents |
+|---|---|
+| **TThreadSafeConcurrencyTests** | Deterministic, event-coordinated concurrent add, remove, lookup, resize, bulk, collision, enumeration, interface, and callback tests for all four collection families |
+| **TThreadSafeDeadlockTests** | Bounded-completion regressions for opposite lock order, self-source bulk operations, lock-holding enumeration, manual lock tokens, and lifetime/destruction boundaries. A test that does not complete within its bound fails the process instead of hanging the runner. |
+| **TThreadSafeRandomizedStressTests** | Seeded randomized stress with fixed defaults. Every run logs the seed, thread count, iterations, collection, and operation mix; set `STRESS_SEED` to override the seed. Final states are verified deterministically. |
+
+Run one suite with:
+
+```powershell
+.\build-temp\tests\bin\TestRunner.exe --suite=TThreadSafeDeadlockTests --format=plain
+```
 
 ## Running the benchmark
 
@@ -288,7 +305,7 @@ caller's current directory. The script creates a missing output directory.
 Two inexpensive checks run in CI and can be run locally with PowerShell 7:
 
 ```powershell
-pwsh -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.7
+pwsh -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.8
 pwsh -File ./tools/check-docs.ps1
 ```
 
@@ -316,7 +333,7 @@ At minimum:
 3. Regenerate `docs/CHEATSHEET.md` if source declarations or its generator
    changed.
 4. Run `pwsh -File ./tools/check-docs.ps1` and
-   `pwsh -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.7`.
+   `pwsh -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.8`.
 5. Run `git diff --check`.
 
 Historical results are evidence for that recorded checkout only; they do not

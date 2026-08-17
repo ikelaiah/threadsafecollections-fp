@@ -10,6 +10,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.8] - 2026-08-17
+
+### Added
+
+- Added `ThreadSafeCollections.ConcurrencyTests.pas`, a deterministic,
+  event-coordinated suite that exercises concurrent add, remove, lookup,
+  resize, bulk, collision, enumeration, interface, and callback workloads for
+  List, Deque, Dictionary, and HashSet. Final states are verified exactly,
+  including sorted snapshots of every concurrently added value.
+- Added `ThreadSafeCollections.DeadlockTests.pas`, bounded-completion
+  regressions for opposite lock order (`AddRange`, `IntersectWith`),
+  self-source bulk operations, lock-holding enumeration with concurrent
+  mutation, manual lock token serialization, Windows-only `Lock` re-entry,
+  and destruction after concurrent work. A regression that fails to complete
+  within its bound fails the runner instead of hanging it.
+- Added `ThreadSafeCollections.StressTests.pas`, seeded randomized stress for
+  all four collection families plus poor-hash dictionaries and a mixed
+  four-collection workload. Each run logs its seed, thread count, iterations,
+  collection, and operation mix; `STRESS_SEED` overrides the seed. Final
+  states are verified deterministically after each randomized phase.
+- Added `docs/Thread-Safety-and-Iteration.md`, which records the iterator
+  policy decision: lock-holding enumeration for List, Deque, and HashSet and
+  snapshot enumeration for Dictionary remain intentionally different, with
+  the trade-offs documented. Manual `Lock()` re-entry remains documented as
+  unsafe on POSIX; its final redesign is deferred to v0.8.9.
+
+### Changed
+
+- The FPCUnit suite now contains 146 tests across eight suites. The new
+  concurrency, deadlock, and stress suites run automatically in CI on Windows
+  and Linux through the existing `run-tests.ps1` and `run-tests.sh` scripts.
+
+### Testing
+
+- Full FPCUnit suite: 146 tests passed with 0 errors, 0 failures, and zero
+  unfreed HeapTrc blocks on FPC 3.2.2 / Win64.
+- The three new suites were each run repeatedly and completed with no
+  failures; deterministic assertions and bounded waits are used throughout so
+  failures report their recorded seed instead of hanging.
+
 ## [0.8.7] - 2026-08-16
 
 ### Added
