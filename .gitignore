@@ -34,10 +34,18 @@ example-bin/*
 # Local build and check scratch area
 build-temp/
 
+# Generated documentation site
+build/docs-site/
+build/site/
+build/artifacts/
+
 # Debug files
 *.dbg
 *.dcu
 *.~*
+
+# Python tooling
+__pycache__/
 
 # IDE specific
 .vscode/

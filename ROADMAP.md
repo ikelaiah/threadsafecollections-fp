@@ -1,6 +1,6 @@
 # Roadmap: 0.8.5 to 2.0.0 and Beyond
 
-[Documentation home](docs/README.md) · [Project README](README.md) · [Changelog](CHANGELOG.md)
+[Documentation home](docs/start/index.md) · [Project README](README.md) · [Changelog](CHANGELOG.md)
 
 **Audience:** users and contributors tracking correctness, concurrency, API
 stability, compatibility, performance, and release work. Items are goals, not
@@ -170,7 +170,7 @@ from 118 to 146 tests:
   iterations, collection, and operation mix for reproduction; and
 - the lock-holding versus snapshot iterator difference was decided to be
   intentional and is documented with its trade-offs in
-  [Thread-safety, iteration, and lock policy](docs/Thread-Safety-and-Iteration.md);
+  [Thread-safety, iteration, and lock policy](docs/guides/thread-safety-and-iteration.md);
   the tests now enforce both behaviors.
 
 Remaining weaknesses, addressed by later milestones:
@@ -182,7 +182,8 @@ Remaining weaknesses, addressed by later milestones:
 - `Lock()` re-entry limitations remain and its final safe-use design is
   deferred to 0.8.9;
 - comparer, hashing, and construction defaults are not fully uniform; and
-- macOS and other targets are not tested by the repository.
+- macOS and other targets are out of scope for now; the maintained focus is
+  Windows x86-64 and Linux.
 
 ## Milestones at a glance
 
@@ -201,7 +202,7 @@ Remaining weaknesses, addressed by later milestones:
 ## 0.8.7 — CI and verification
 
 > **Delivered in v0.8.7 (2026-08-16).** See the
-> [v0.8.7 release notes](docs/RELEASE-NOTES-v0.8.7.md) for what was automated.
+> [v0.8.7 release notes](docs/history/RELEASE-NOTES-v0.8.7.md) for what was automated.
 
 - Run the practical FPCUnit suite in CI, separating fast unit, long stress,
   leak, benchmark, and example jobs where appropriate.
@@ -228,7 +229,7 @@ Remaining weaknesses, addressed by later milestones:
 
 > **Delivered in v0.8.8 (2026-08-17).** See the
 > [current baseline](#current-baseline--088) and the
-> [v0.8.8 release notes](docs/RELEASE-NOTES-v0.8.8.md) for what was hardened.
+> [v0.8.8 release notes](docs/history/RELEASE-NOTES-v0.8.8.md) for what was hardened.
 
 - Add deterministic, barrier/event-coordinated tests for List, Deque,
   Dictionary, and HashSet under concurrent add, remove, lookup, resize,
@@ -366,8 +367,9 @@ If the gate is accepted:
 - Complete accepted advanced hash-map strategies and collection views. Borrowed
   or pointer views must not silently outlive mutation; safety exceptions are
   documented as intentional incompatibilities.
-- Complete the Extended manifest; test Windows, Linux, and macOS on x86-64 and
-  ARM64 where infrastructure permits; add 32-bit overflow/capacity tests.
+- Complete the Extended manifest; test Windows x86-64 and Linux on x86-64 and
+  ARM64 where infrastructure permits; keep macOS out of scope for now; add
+  32-bit overflow/capacity tests.
 - Ship versioned archives, checksums, package metadata, clean install/uninstall
   checks, and reproducible documentation generation.
 

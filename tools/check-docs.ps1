@@ -87,7 +87,7 @@ function Test-LinkTarget {
 
 $MarkdownFiles = @(
     @(Get-ChildItem -LiteralPath $RepoRoot -File -Filter '*.md') +
-    @(Get-ChildItem -LiteralPath $DocsRoot -File -Filter '*.md')
+    @(Get-ChildItem -LiteralPath $DocsRoot -Recurse -File -Filter '*.md')
 )
 
 foreach ($File in $MarkdownFiles) {
@@ -125,10 +125,10 @@ $ExampleLprFiles = @(
     Get-ChildItem -LiteralPath (Join-Path $RepoRoot 'examples') -Recurse -File -Filter '*.lpr' |
         Where-Object { $_.FullName -split '[\\/]' -notcontains 'backup' }
 )
-$BuildingText = Get-Content -LiteralPath (Join-Path $DocsRoot 'BUILDING.md') -Raw
+$BuildingText = Get-Content -LiteralPath (Join-Path $DocsRoot 'project/building.md') -Raw
 foreach ($Example in $ExampleLprFiles) {
     if ($BuildingText -notmatch [regex]::Escape($Example.BaseName)) {
-        Add-Issue "examples/$($Example.BaseName) is not documented in docs/BUILDING.md"
+        Add-Issue "examples/$($Example.BaseName) is not documented in docs/project/building.md"
     }
 }
 $BuildingLines = $BuildingText -split "`n"
@@ -139,7 +139,7 @@ foreach ($Line in $BuildingLines) {
         $Name = $Matches[1]
         $Found = $ExampleLprFiles | Where-Object { $_.BaseName -eq $Name }
         if ($null -eq $Found) {
-            Add-Issue "docs/BUILDING.md line $LineNumber : no example named '$Name' exists"
+            Add-Issue "docs/project/building.md line $LineNumber : no example named '$Name' exists"
         }
     }
 }
@@ -151,10 +151,10 @@ if ($LASTEXITCODE -ne 0) {
     Add-Issue 'tools/generate-cheatsheet.ps1 failed to run'
 }
 elseif (Test-Path -LiteralPath $CheckSheetPath) {
-    $Current = Get-Content -LiteralPath (Join-Path $DocsRoot 'CHEATSHEET.md') -Raw
+    $Current = Get-Content -LiteralPath (Join-Path $DocsRoot 'start/cheat-sheet.md') -Raw
     $Generated = Get-Content -LiteralPath $CheckSheetPath -Raw
     if ($Current -ne $Generated) {
-        Add-Issue 'docs/CHEATSHEET.md is stale; regenerate with pwsh -File ./tools/generate-cheatsheet.ps1'
+        Add-Issue 'docs/start/cheat-sheet.md is stale; regenerate with pwsh -File ./tools/generate-cheatsheet.ps1'
     }
 }
 else {
@@ -171,5 +171,5 @@ if ($Issues.Count -gt 0) {
 
 Write-Host 'Documentation checks passed:'
 Write-Host "  - $($MarkdownFiles.Count) Markdown files checked for links and fences"
-Write-Host "  - $($ExampleLprFiles.Count) examples cross-checked against docs/BUILDING.md"
-Write-Host '  - generated cheat sheet matches docs/CHEATSHEET.md'
+Write-Host "  - $($ExampleLprFiles.Count) examples cross-checked against docs/project/building.md"
+Write-Host '  - generated cheat sheet matches docs/start/cheat-sheet.md'

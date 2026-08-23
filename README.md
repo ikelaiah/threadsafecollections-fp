@@ -14,13 +14,24 @@
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-1E3A8A.svg"></a>
   <a href="#supported-and-verified-environments"><img alt="Free Pascal 3.2.2 verified" src="https://img.shields.io/badge/Free%20Pascal-3.2.2%20verified-3B82F6.svg"></a>
   <a href="#supported-and-verified-environments"><img alt="Example builds: Windows and Linux" src="https://img.shields.io/badge/example%20builds-Windows%20%7C%20Linux-F59E0B.svg"></a>
-  <a href="docs/README.md"><img alt="Documentation" src="https://img.shields.io/badge/docs-current-10B981.svg"></a>
+  <a href="https://ikelaiah.github.io/threadsafecollections-fp/"><img alt="Docs site" src="https://img.shields.io/badge/docs-site-10B981.svg"></a>
 </p>
 
 ThreadSafeCollections-FP provides familiar collection APIs with per-instance
 synchronization, bulk operations, and documented iteration behavior. It is a
 learning-focused project with a tested core, runnable examples, and no required
 packages beyond the Free Pascal standard distribution.
+
+## Documentation
+
+The **online documentation site** — including installation, guides for every
+collection, recipes, an API cheat sheet, full-text search, and versioned
+releases — is published at:
+
+**<https://ikelaiah.github.io/threadsafecollections-fp/>**
+
+Repository-local documentation lives under `docs/`; start at
+[`docs/start/index.md`](docs/start/index.md).
 
 > [!IMPORTANT]
 > The library is intended for learning and experimentation. Evaluate its behavior,
@@ -33,10 +44,10 @@ packages beyond the Free Pascal standard distribution.
 |---|---|
 | See it work in five minutes | [Five-minute first run](#five-minute-first-run) |
 | Add it to a Free Pascal or Lazarus project | [Installation](#installation) |
-| Learn the collection APIs | [Feature tour](#feature-tour) and [API cheat sheet](docs/CHEATSHEET.md) |
+| Learn the collection APIs | [Feature tour](#feature-tour) and [API cheat sheet](docs/start/cheat-sheet.md) |
 | Understand locking and iteration | [Thread-safety model](#thread-safety-model) |
-| Build examples, tests, or generated docs | [Building and verification](docs/BUILDING.md) |
-| Browse all current and historical docs | [Documentation home](docs/README.md) |
+| Build examples, tests, or generated docs | [Building and verification](docs/project/building.md) |
+| Browse guides, recipes, and the API reference | [Online documentation](https://ikelaiah.github.io/threadsafecollections-fp/) |
 | See planned compatibility and API work | [Roadmap](ROADMAP.md) |
 
 ## Five-minute first run
@@ -60,7 +71,7 @@ fpc -B -Fusrc -FUbuild-temp\first-run\units -FEbuild-temp\first-run\bin examples
 .\build-temp\first-run\bin\SimpleNumberList.exe
 ```
 
-On Linux or macOS with Bash:
+On Linux with Bash:
 
 ```bash
 mkdir -p build-temp/first-run/units build-temp/first-run/bin
@@ -71,7 +82,8 @@ fpc -B -Fusrc -FUbuild-temp/first-run/units -FEbuild-temp/first-run/bin examples
 The program prints ten random integers, sorts them in both directions, and waits
 for Enter before exiting. The Windows commands and example were verified with
 FPC 3.2.2 on Win64. The same Bash build path is exercised for all examples by
-Linux CI; macOS is expected to use the same FPC command but is not tested in CI.
+Linux CI. The maintained target platforms are **Windows x86-64** and **Linux**;
+macOS is not currently targeted or tested.
 
 ## Installation
 
@@ -152,7 +164,7 @@ end.
 
 Save it as `build-temp/first-list/FirstThreadSafeList.lpr`, then compile it with
 the same `-Fusrc`, `-FU`, and `-FE` pattern used in the
-[first-build commands](docs/BUILDING.md#first-build).
+[first-build commands](docs/project/building.md#first-build).
 
 ### Free Pascal orientation
 
@@ -181,7 +193,7 @@ If Free Pascal generics are new to you, these are the conventions used above:
 operations, ranges, sorting, searching, reversing, moving, array conversion, and
 capacity management. It requires a comparer at construction.
 
-[List guide](docs/ThreadSafeCollections.List.md) ·
+[List guide](docs/guides/list.md) ·
 [Simple example](examples/SimpleNumberList/SimpleNumberList.lpr)
 
 ### Deque
@@ -190,7 +202,7 @@ capacity management. It requires a comparer at construction.
 push, pop, peek, and `Try*` operations at both ends, plus range and array
 operations.
 
-[Deque guide](docs/ThreadSafeCollections.Deque.md) ·
+[Deque guide](docs/guides/deque.md) ·
 [Simple example](examples/SimpleDeque/SimpleDeque.lpr)
 
 ### Dictionary
@@ -199,7 +211,7 @@ operations.
 buckets. It supports add, update, lookup, removal, bulk operations, key/value
 snapshots, and custom hash and equality functions.
 
-[Dictionary guide](docs/ThreadSafeCollections.Dictionary.md) ·
+[Dictionary guide](docs/guides/dictionary.md) ·
 [Iterator example](examples/DictionaryIterator/DictionaryIterator.lpr)
 
 ### Hash set
@@ -209,7 +221,7 @@ updates, lookup, removal, intersection, union, difference, overlap checks, and
 set equality. Specialized integer, string, Boolean, and real set classes provide
 built-in hash/equality choices.
 
-[Hash-set guide](docs/ThreadSafeCollections.HashSet.md) ·
+[Hash-set guide](docs/guides/hash-set.md) ·
 [Client example](examples/HashSetClientDemo/HashSetClientDemo.lpr)
 
 ### Interfaces and lock tokens
@@ -221,7 +233,7 @@ Because public methods acquire the same lock themselves, do not hold a manual
 token and then call public methods on that collection; this can deadlock on
 non-reentrant implementations.
 
-[RAII-style locking guide](docs/RAII-style-locking-through-interface-counting.md) ·
+[RAII-style locking guide](docs/guides/lock-tokens.md) ·
 [Interface example](examples/InterfaceTest/InterfaceTest.lpr)
 
 ## Thread-safety model
@@ -250,7 +262,7 @@ The implementation uses mutual exclusion; it is not a lock-free or
 reader/writer-lock design. The iterator difference between lock-holding
 (List, Deque, HashSet) and snapshot (Dictionary) enumeration is an intentional,
 tested policy documented in
-[Thread-safety, iteration, and lock policy](docs/Thread-Safety-and-Iteration.md).
+[Thread-safety, iteration, and lock policy](docs/guides/thread-safety-and-iteration.md).
 
 ## Supported and verified environments
 
@@ -260,7 +272,7 @@ tested policy documented in
 | Windows x86-64, Lazarus 4.8 | Command-line build of the Lazarus package and the package smoke consumer |
 | Windows CI (`windows-latest`), FPC bundled with Lazarus 4.0.0 | All tracked examples compile and the full FPCUnit suite, including the concurrency, deadlock, and stress suites, runs through the PowerShell test script |
 | Linux CI (`ubuntu-latest`) | All tracked examples compile with the distribution FPC package, the full FPCUnit suite runs, the Lazarus package builds with `lazbuild`, and the documentation checks pass |
-| macOS and other FPC targets | Not currently tested by this repository |
+| macOS and other FPC targets | Out of scope for now; the maintained focus is Windows x86-64 and Linux |
 
 The source is written for FPC's `objfpc` mode. A platform being supported by
 FPC does not by itself mean this repository has tested that platform.
@@ -282,7 +294,7 @@ Valid configurations are `Debug` and `Release`; omitting the value selects
 
 The FPCUnit suite, benchmark options, Lazarus package build, and cheat-sheet
 generator have separate commands and prerequisites. Follow
-[Building and verification](docs/BUILDING.md) for their exact scope. The same
+[Building and verification](docs/project/building.md) for their exact scope. The same
 test, package-smoke, and documentation-check commands that CI runs are
 available locally through `run-tests.*`, `smoke-package.*`, and
 `tools/check-*.ps1`.
@@ -303,23 +315,13 @@ available locally through `run-tests.*`, `smoke-package.*`, and
    a multi-threaded queue demonstration; stop it with Ctrl+C.
 
 All 16 tracked examples and their build status are listed in the
-[building guide](docs/BUILDING.md#building-all-examples).
-
-## Documentation
-
-- [Documentation home](docs/README.md) — current guides, learning paths, and
-  historical records
-- [API cheat sheet](docs/CHEATSHEET.md) — generated public API summary
-- [Building and verification](docs/BUILDING.md) — examples, tests, package,
-  benchmark, and generator
-- [Roadmap to 2.0](ROADMAP.md) — planned compatibility, quality, and release work
-- [Changelog](CHANGELOG.md) — released and unreleased changes
+[building guide](docs/project/building.md#building-all-examples).
 
 ## Contributing
 
 Bug reports, focused changes, tests, examples, and documentation improvements
 are welcome. Before proposing a change, build the affected examples and run the
-relevant tests described in [Building and verification](docs/BUILDING.md).
+relevant tests described in [Building and verification](docs/project/building.md).
 
 ## License
 

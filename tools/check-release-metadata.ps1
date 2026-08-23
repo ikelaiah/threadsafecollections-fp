@@ -48,7 +48,7 @@ if ($PackageVersion -ne $ExpectedVersion) {
     Add-Issue "$PackageFile : package version '$PackageVersion' does not match '$ExpectedVersion'"
 }
 
-$DocsHome = Join-Path $DocsRoot 'README.md'
+$DocsHome = Join-Path $DocsRoot 'start/index.md'
 Test-Match $DocsHome "documentation home does not mention version $ExpectedVersion" `
     ('ThreadSafeCollections-FP ' + [regex]::Escape($ExpectedVersion))
 Test-Match $DocsHome "documentation home does not link RELEASE-NOTES-v$ExpectedVersion.md" `
@@ -60,7 +60,7 @@ $Changelog = Join-Path $RepoRoot 'CHANGELOG.md'
 Test-Match $Changelog "CHANGELOG.md has no '$ExpectedVersion' entry" `
     ('^\s*## \[' + [regex]::Escape($ExpectedVersion) + '\]')
 
-$ReleaseNotes = Join-Path $DocsRoot "RELEASE-NOTES-v$ExpectedVersion.md"
+$ReleaseNotes = Join-Path $DocsRoot "history/RELEASE-NOTES-v$ExpectedVersion.md"
 if (-not (Test-Path -LiteralPath $ReleaseNotes)) {
     Add-Issue "missing $ReleaseNotes"
 }
@@ -69,7 +69,7 @@ else {
         ('v' + [regex]::Escape($ExpectedVersion))
 }
 
-$CheatSheet = Join-Path $DocsRoot 'CHEATSHEET.md'
+$CheatSheet = Join-Path $DocsRoot 'start/cheat-sheet.md'
 Test-Match $CheatSheet 'generated cheat sheet does not report the expected package version' `
     ('Package version: `' + [regex]::Escape($ExpectedVersion) + '`')
 

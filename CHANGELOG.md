@@ -1,6 +1,6 @@
 # Changelog
 
-[Project README](README.md) · [Documentation home](docs/README.md) ·
+[Project README](README.md) · [Documentation home](docs/start/index.md) ·
 [Roadmap](ROADMAP.md)
 
 All notable changes to ThreadSafeCollections-FP will be documented in this file.
