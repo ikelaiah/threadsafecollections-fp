@@ -355,6 +355,22 @@ blockquote p, .admonition p { margin: 0; }
 .home-card p { margin: 0.35rem 0 0; color: var(--text-muted); font-size: 0.86rem; }
 .homepage > h2 { margin-top: 2.5rem; }
 
+.homepage-banner {
+  max-width: min(var(--reading-width), 52rem);
+  margin: 0 0 2.5rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.homepage-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .external-link::after { margin-left: 0.18em; font-size: 0.72em; content: "↗"; }
 
 @media (max-width: 78rem) {
