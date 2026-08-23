@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "current": "0.8.8",
+  "site_url": "https://ikelaiah.github.io/threadsafecollections-fp",
+  "repository_url": "https://github.com/ikelaiah/threadsafecollections-fp",
+  "versions": [
+    {
+      "release": "0.8.8",
+      "source_ref": "v0.8.8"
+    }
+  ]
+}

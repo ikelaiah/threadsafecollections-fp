@@ -8,7 +8,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent $ScriptDir
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
-  $OutputPath = Join-Path $RepoRoot 'docs/CHEATSHEET.md'
+  $OutputPath = Join-Path $RepoRoot 'docs/start/cheat-sheet.md'
 }
 elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
   $OutputPath = Join-Path $RepoRoot $OutputPath
@@ -284,7 +284,7 @@ $sourceFiles = @(
 $lines = New-Object System.Collections.Generic.List[string]
 $lines.Add('# ThreadSafeCollections-FP Cheat Sheet')
 $lines.Add('')
-$lines.Add('[Documentation home](README.md) · [Project README](../README.md) · [Build and verify](BUILDING.md)')
+$lines.Add('[Documentation home](../index.md) · [Project README](../../README.md) · [Build and verify](../project/building.md)')
 $lines.Add('')
 $lines.Add('**Audience:** developers who need a generated, compact reference to the current public API and source complexity annotations.')
 $lines.Add('')

@@ -176,3 +176,12 @@ jobs:
       - name: Check links, fences, example paths, and stale cheat sheet
         shell: pwsh
         run: pwsh -NoProfile -File ./tools/check-docs.ps1
+
+      - name: Run documentation tooling tests
+        shell: pwsh
+        run: |
+          python tools/test_build_docs.py
+          python tools/test_build_all_docs.py
+          python tools/test_check_built_docs.py
+          python tools/test_check_docs.py
+          python tools/check_docs.py

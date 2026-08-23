@@ -1,0 +1,125 @@
+{
+  "schema_version": 2,
+  "release": "0.8.8",
+  "site_title": "ThreadSafeCollections-FP documentation",
+  "description": "Practical ThreadSafeCollections-FP documentation for concurrent Free Pascal collections.",
+  "required_pages": [
+    "index.md",
+    "start/index.md",
+    "start/installation.md",
+    "start/quick-start.md",
+    "start/learning-path.md",
+    "start/cheat-sheet.md",
+    "guides/list.md",
+    "guides/deque.md",
+    "guides/dictionary.md",
+    "guides/hash-set.md",
+    "guides/lock-tokens.md",
+    "guides/thread-safety-and-iteration.md",
+    "guides/hashing.md",
+    "guides/recipes.md",
+    "reference/api-overview.md",
+    "reference/config.md",
+    "reference/contracts-and-limitations.md",
+    "reference/feature-matrix.md",
+    "project/building.md",
+    "history/RELEASE-NOTES-v0.8.0.md",
+    "history/RELEASE-NOTES-v0.8.1.md",
+    "history/RELEASE-NOTES-v0.8.2.md",
+    "history/RELEASE-NOTES-v0.8.3.md",
+    "history/RELEASE-NOTES-v0.8.4.md",
+    "history/RELEASE-NOTES-v0.8.5.md",
+    "history/RELEASE-NOTES-v0.8.6.md",
+    "history/RELEASE-NOTES-v0.8.7.md",
+    "history/RELEASE-NOTES-v0.8.8.md",
+    "history/PR_v0.8.1.md",
+    "history/PR_v0.8.5.md",
+    "history/PR_v0.8.6.md",
+    "history/PR_v0.8.7.md",
+    "history/PR_v0.8.8.md",
+    "history/HashSet-Constructor-Evolution.md",
+    "history/Debugging-Tale.md",
+    "history/MAINTAINABILITY_IMPROVEMENTS.md"
+  ],
+  "navigation": [
+    {
+      "title": "Getting Started",
+      "pages": [
+        { "path": "index.md", "title": "Introduction" },
+        { "path": "start/index.md", "title": "Start Here" },
+        { "path": "start/installation.md", "title": "Installation" },
+        { "path": "start/quick-start.md", "title": "Quick Start" },
+        { "path": "start/learning-path.md", "title": "Learning Path" },
+        { "path": "start/cheat-sheet.md", "title": "Cheat Sheet" }
+      ]
+    },
+    {
+      "title": "Guides",
+      "pages": [
+        { "path": "guides/list.md", "title": "List" },
+        { "path": "guides/deque.md", "title": "Deque" },
+        { "path": "guides/dictionary.md", "title": "Dictionary" },
+        { "path": "guides/hash-set.md", "title": "Hash Set" },
+        { "path": "guides/lock-tokens.md", "title": "Lock Tokens (RAII)" },
+        { "path": "guides/hashing.md", "title": "Hashing" },
+        { "path": "guides/thread-safety-and-iteration.md", "title": "Thread-Safety & Iteration" },
+        { "path": "guides/recipes.md", "title": "Recipes" },
+        { "path": "project/building.md", "title": "Building & Verification" }
+      ]
+    },
+    {
+      "title": "Reference",
+      "pages": [
+        { "path": "reference/api-overview.md", "title": "API Overview" },
+        { "path": "reference/config.md", "title": "Configuration" },
+        { "path": "reference/contracts-and-limitations.md", "title": "Contracts & Limitations" },
+        { "path": "reference/feature-matrix.md", "title": "Feature Matrix" }
+      ]
+    }
+  ],
+  "hidden_pages": [
+    "history/RELEASE-NOTES-v0.8.0.md",
+    "history/RELEASE-NOTES-v0.8.1.md",
+    "history/RELEASE-NOTES-v0.8.2.md",
+    "history/RELEASE-NOTES-v0.8.3.md",
+    "history/RELEASE-NOTES-v0.8.4.md",
+    "history/RELEASE-NOTES-v0.8.5.md",
+    "history/RELEASE-NOTES-v0.8.6.md",
+    "history/RELEASE-NOTES-v0.8.7.md",
+    "history/RELEASE-NOTES-v0.8.8.md",
+    "history/PR_v0.8.1.md",
+    "history/PR_v0.8.5.md",
+    "history/PR_v0.8.6.md",
+    "history/PR_v0.8.7.md",
+    "history/PR_v0.8.8.md",
+    "history/HashSet-Constructor-Evolution.md",
+    "history/Debugging-Tale.md",
+    "history/MAINTAINABILITY_IMPROVEMENTS.md"
+  ],
+  "project": [
+    { "title": "GitHub repository", "url": "https://github.com/ikelaiah/threadsafecollections-fp" },
+    { "title": "Changelog", "project_path": "CHANGELOG.md" },
+    { "title": "Roadmap", "project_path": "ROADMAP.md" },
+    { "title": "Contributing", "project_path": "CONTRIBUTING.md" }
+  ],
+  "homepage": {
+    "tagline": "Thread-safe generic lists, deques, dictionaries, and hash sets for Free Pascal.",
+    "banner": {
+      "project_path": "docs/assets/threadsafe-collections-fp-logo.svg",
+      "alt": "ThreadSafeCollections-FP concurrent collections for Free Pascal banner"
+    },
+    "actions": [
+      { "label": "Get Started", "path": "start/quick-start.md" },
+      { "label": "Browse Recipes", "path": "guides/recipes.md" },
+      { "label": "API Reference", "path": "reference/api-overview.md" }
+    ],
+    "cards": [
+      { "eyebrow": "Getting Started", "title": "Quick Start", "description": "Compile a first thread-safe list in five minutes.", "path": "start/quick-start.md" },
+      { "eyebrow": "Collections", "title": "List", "description": "Indexed storage with sorting, searching, and range operations.", "path": "guides/list.md" },
+      { "eyebrow": "Collections", "title": "Deque", "description": "Queue and stack behaviour at both ends.", "path": "guides/deque.md" },
+      { "eyebrow": "Collections", "title": "Dictionary", "description": "Locking key/value lookup with snapshot iteration.", "path": "guides/dictionary.md" },
+      { "eyebrow": "Collections", "title": "Hash Set", "description": "Unique values with set algebra and specialized types.", "path": "guides/hash-set.md" },
+      { "eyebrow": "Patterns", "title": "Lock Tokens", "description": "RAII-style locking through interface counting.", "path": "guides/lock-tokens.md" }
+    ]
+  }
+}
