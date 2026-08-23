@@ -108,6 +108,10 @@ class BuildDocsTests(unittest.TestCase):
             self.assertTrue((output / "search-index.json").is_file())
             self.assertTrue((output / "search-index.js").is_file())
             self.assertIn(':root[data-theme="dark"]', (output / "assets" / "site.css").read_text(encoding="utf-8"))
+            self.assertIn(
+                "max-width: min(var(--reading-width), 52rem);",
+                (output / "assets" / "site.css").read_text(encoding="utf-8"),
+            )
             self.assertIn("ThreadSafeSearchIndex", (output / "assets" / "site.js").read_text(encoding="utf-8"))
             self.assertEqual("Getting Started", json.loads((output / "search-index.json").read_text(encoding="utf-8"))[1]["section"])
             self.assertIn("ThreadSafeCollections-FP documentation", landing)
