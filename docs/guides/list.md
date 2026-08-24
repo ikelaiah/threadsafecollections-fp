@@ -135,7 +135,7 @@ Several private helpers operate without locking and must only be called while th
 
 These helpers avoid re-acquiring the same lock from an already locked public method.
 
-Manual `Lock()` is advanced usage. Do not hold a token and then call public methods on the same list, because those methods try to acquire the same critical section again.
+Manual `Lock()` is safe to combine with public methods: since v0.8.9 the lock is re-entrant for the owning thread, so a sequence such as check-then-add made while holding a token is atomic with respect to other threads.
 
 ## Iteration
 

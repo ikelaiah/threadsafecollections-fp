@@ -1,7 +1,7 @@
 # Start Here
 
-This is the documentation home for ThreadSafeCollections-FP 0.8.8, released on
-2026-08-17.
+This is the documentation home for ThreadSafeCollections-FP 0.8.9, released on
+2026-08-24.
 
 [Project README](../../README.md) · [Quick Start](quick-start.md) ·
 [API cheat sheet](cheat-sheet.md) · [Roadmap](../../ROADMAP.md) ·
@@ -74,6 +74,7 @@ Release notes:
 - [v0.8.6](../history/RELEASE-NOTES-v0.8.6.md)
 - [v0.8.7](../history/RELEASE-NOTES-v0.8.7.md)
 - [v0.8.8](../history/RELEASE-NOTES-v0.8.8.md)
+- [v0.8.9](../history/RELEASE-NOTES-v0.8.9.md)
 
 Development and design records:
 
@@ -82,6 +83,7 @@ Development and design records:
 - [v0.8.6 pull-request summary](../history/PR_v0.8.6.md)
 - [v0.8.7 pull-request summary](../history/PR_v0.8.7.md)
 - [v0.8.8 pull-request summary](../history/PR_v0.8.8.md)
+- [v0.8.9 pull-request summary](../history/PR_v0.8.9.md)
 - [Maintainability improvements](../history/MAINTAINABILITY_IMPROVEMENTS.md)
 - [Debugging tale](../history/Debugging-Tale.md)
 - [Hash-set constructor evolution](../history/HashSet-Constructor-Evolution.md)

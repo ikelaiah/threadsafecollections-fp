@@ -36,6 +36,9 @@ type
     procedure Clear;
 
     /// <summary>Acquires a lock token for thread-safe multi-operation sequences</summary>
+    /// <remarks>Re-entrant for the calling thread: public methods may be called
+    /// while the token is held, and nested tokens nest rather than deadlock.
+    /// Other threads are excluded for the whole sequence.</remarks>
     /// <complexity>O(1)</complexity>
     function Lock: ILockToken;
 
@@ -282,6 +285,37 @@ type
     property Count: Integer read GetCount;
   end;
 
+  { TRecursiveCriticalSection
+    A critical section that is re-entrant for the thread that currently owns it.
+
+    Free Pascal's TCriticalSection is recursive on Windows but not on POSIX.
+    Every collection method acquires the collection lock, and a caller holding
+    a manual Lock() token may call those methods on the same collection. To make
+    that pattern safe on every platform, this wrapper tracks the owning thread
+    and only acquires the underlying TCriticalSection once per thread; nested
+    acquires from the same thread increment a depth counter instead.
+
+    Safety notes:
+    - Other threads are still fully excluded while the owning thread holds the
+      lock, regardless of nesting depth.
+    - Acquire/Release must be balanced (use try/finally in the caller).
+    - A zero FOwnerThread value (TThreadID classes can recycle IDs) is only a
+      hint: because the underlying section is only released while held by the
+      owning thread, a stale owner value can never grant re-entry to a
+      different thread.
+  }
+  TRecursiveCriticalSection = class
+  private
+    FSection: TCriticalSection;
+    FOwnerThread: TThreadID;
+    FDepth: Integer;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Acquire;
+    procedure Release;
+  end;
+
   { TLockToken - Basic implementation of ILockToken
     This class provides a simple mechanism to manage the lifecycle of a lock (critical section).
     When an instance is created, it acquires the provided critical section.
@@ -290,16 +324,16 @@ type
   }
   TLockToken = class(TInterfacedObject, ILockToken)
   private
-    FLock: TCriticalSection; // The critical section being managed
+    FLock: TRecursiveCriticalSection; // The critical section being managed
   public
     { 
-      constructor Create(ALock: TCriticalSection);
+      constructor Create(ALock: TRecursiveCriticalSection);
         // Initializes the TLockToken with a given critical section.
         // Acquires the critical section to ensure exclusive access.
         // Parameters:
         //   ALock - The critical section to manage.
     }
-    constructor Create(ALock: TCriticalSection);
+    constructor Create(ALock: TRecursiveCriticalSection);
     
     { 
       destructor Destroy; override;
@@ -319,9 +353,48 @@ type
 
 implementation
 
+{ TRecursiveCriticalSection }
+
+constructor TRecursiveCriticalSection.Create;
+begin
+  inherited Create;
+  FSection := TCriticalSection.Create;
+  FOwnerThread := 0;
+  FDepth := 0;
+end;
+
+destructor TRecursiveCriticalSection.Destroy;
+begin
+  FSection.Free;
+  inherited Destroy;
+end;
+
+procedure TRecursiveCriticalSection.Acquire;
+var
+  CurrentThread: TThreadID;
+begin
+  CurrentThread := GetCurrentThreadID;
+  if FOwnerThread <> CurrentThread then
+  begin
+    FSection.Acquire;
+    FOwnerThread := CurrentThread;
+  end;
+  Inc(FDepth);
+end;
+
+procedure TRecursiveCriticalSection.Release;
+begin
+  Dec(FDepth);
+  if FDepth = 0 then
+  begin
+    FOwnerThread := 0;
+    FSection.Release;
+  end;
+end;
+
 { TLockToken }
 
-constructor TLockToken.Create(ALock: TCriticalSection);
+constructor TLockToken.Create(ALock: TRecursiveCriticalSection);
 begin
   inherited Create;
   FLock := ALock;

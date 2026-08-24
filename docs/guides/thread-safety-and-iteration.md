@@ -65,10 +65,9 @@ bounded.
   every other thread on that collection.
 - Do not start new threads from inside a lock-holding loop and wait for them
   inside the loop; that can deadlock when the new thread needs the collection.
-- Do not call public methods of the same collection from inside a
-  lock-holding loop. On POSIX `TCriticalSection` is not re-entrant, so the
-  nested call deadlocks; on Windows re-entry happens to work and must not be
-  relied on.
+- Calling public methods of the same collection from inside a lock-holding
+  loop is safe since v0.8.9 (the lock is re-entrant for the calling thread),
+  but keep it purposeful: it keeps the collection locked for other threads.
 - Do not hand an enumerator to another thread. `for..in` manages the
   enumerator on the calling thread.
 - The collection must outlive every enumerator; finish all loops before
@@ -77,8 +76,11 @@ bounded.
 ## Manual lock tokens
 
 `Lock` returns an `ILockToken` that releases the collection lock when the
-token leaves scope or is set to `nil`. Valid uses are short, self-contained
-regions that only need the lock held:
+token leaves scope or is set to `nil`.
+
+Since v0.8.9 the collection lock is re-entrant for the owning thread, so a
+token may be used to make a sequence of public calls atomic for the calling
+thread:
 
 ```pascal
 var
@@ -86,19 +88,23 @@ var
 begin
   Token := List.Lock;
   try
-    // Any public call here is unsafe on POSIX and is not portable.
+    // Public calls here are safe and atomic with respect to other threads.
+    if not List.Contains(5) then
+      List.Add(5);
   finally
     Token := nil;
   end;
 end.
 ```
 
-Holding a token and then calling a public method of the same collection is
-**not supported**: Free Pascal's `TCriticalSection` is not re-entrant on
-POSIX platforms, so the nested lock attempt deadlocks. On Windows the same
-sequence happens to complete, and the regression suite records that platform
-difference rather than endorsing it. Redesigning or deprecating `Lock` is
-scheduled for v0.8.9.
+Nested `Lock()` calls from the same thread simply increase the nesting depth
+and are released in matching order. Other threads remain blocked until the last
+token is released. The lock is **not** re-entrant across threads: a token must
+not be passed to another thread.
+
+`Lock()` is the coordinated multi-operation mechanism for v1.0. The planned
+v1.1 atomic-workflow helpers (`GetOrAdd`, `AddOrUpdate`, scoped access) are a
+separate post-1.0 milestone and are intentionally not part of this API.
 
 ## Lifetime rules
 
@@ -121,7 +127,7 @@ scheduled for v0.8.9.
 | Lock-holding versus snapshot iteration | `ThreadSafeCollections.ConcurrencyTests` |
 | Opposite lock order and self-source bulk ops | `ThreadSafeCollections.DeadlockTests` |
 | Bounded completion for enumeration and locks | `ThreadSafeCollections.DeadlockTests` |
-| Manual lock serialization and Windows re-entry | `ThreadSafeCollections.DeadlockTests` |
+| Manual lock serialization, same-thread re-entry, and nested tokens | `ThreadSafeCollections.DeadlockTests`, `ThreadSafeCollections.ApiConsistencyTests` |
 | Destruction after concurrent work | `ThreadSafeCollections.DeadlockTests` |
 | Seeded randomized stress (seed recorded per run) | `ThreadSafeCollections.StressTests` |
 

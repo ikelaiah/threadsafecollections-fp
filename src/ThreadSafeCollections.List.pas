@@ -34,7 +34,7 @@ type
     FList: array of T;                             // Internal dynamic array to store list items
     FCount: Integer;                               // Current number of items in the list
     FCapacity: Integer;                            // Current capacity of the internal array
-    FLock: TCriticalSection;                       // Critical section to manage thread synchronization
+    FLock: TRecursiveCriticalSection;              // Re-entrant lock; see ThreadSafeCollections.Interfaces
     FComparer: specialize TComparer<T>;            // Comparer function to define the sorting logic
     FSorted: Boolean;                              // Indicates whether the list is currently sorted
     FSortAscending: Boolean;                       // Direction represented when FSorted is true
@@ -77,8 +77,8 @@ type
     procedure RaiseIfOutOfBounds(Index: Integer);
 
     // Internal unlocked helpers — must only be called while FLock is already held.
-    // These exist to allow locked public methods to call each other without re-acquiring
-    // the lock (which would deadlock on non-reentrant TCriticalSection on POSIX).
+    // They keep locked public methods independent and avoid nested lock entry,
+    // keeping each method's acquire/release pairing obvious.
     procedure InternalSetCapacity(const Value: Integer);
     procedure InternalDelete(Index: Integer);
     function  InternalIndexOf(const Item: T): Integer;
@@ -171,6 +171,10 @@ type
         FIndex: Integer;                           // Current index in the enumeration
         FCurrent: T;                               // Current element in the enumeration
         FLockToken: ILockToken;                    // Lock token to ensure thread safety during enumeration
+
+        // Retrieves the current element; raises before the first MoveNext,
+        // matching the enumerators of the other collections.
+        function GetCurrent: T;
       public
         // Constructor
         // Initializes the enumerator with a reference to the thread-safe list
@@ -188,7 +192,7 @@ type
         function MoveNext: Boolean;
 
         // Property to access the current element in the enumeration
-        property Current: T read FCurrent;
+        property Current: T read GetCurrent;
       end;
 
     // GetEnumerator method for for-in loops
@@ -196,6 +200,8 @@ type
     function GetEnumerator: TEnumerator;
 
     // Acquires a lock token for thread-safe operations outside the class
+    // Re-entrant for the calling thread: public methods may be called while
+    // the token is held; other threads are excluded for the whole sequence.
     // Returns:
     //   An ILockToken that manages the critical section lock
     function Lock: ILockToken;
@@ -360,7 +366,7 @@ begin
   if not Assigned(AComparer) then
     raise Exception.Create(ERR_COMPARER_REQUIRED);
 
-  FLock := TCriticalSection.Create;      // Initialize the critical section for thread safety
+  FLock := TRecursiveCriticalSection.Create; // Re-entrant lock for this instance
   FComparer := AComparer;                // Assign the comparer function
   FCount := 0;                           // Initialize item count
 
@@ -474,7 +480,7 @@ begin
   FLock.Acquire;                                       // Enter critical section
   try
     if FCount = 0 then
-      raise Exception.Create(ERR_LIST_EMPTY);
+      raise EListError.Create(ERR_LIST_EMPTY);
     Result := FList[0];                                // Return the first item
   finally
     FLock.Release;                                     // Exit critical section
@@ -486,7 +492,7 @@ begin
   FLock.Acquire;                                       // Enter critical section
   try
     if FCount = 0 then
-      raise Exception.Create(ERR_LIST_EMPTY);
+      raise EListError.Create(ERR_LIST_EMPTY);
     Result := FList[FCount - 1];                       // Return the last item
   finally
     FLock.Release;                                     // Exit critical section
@@ -521,7 +527,7 @@ begin
   FLock.Acquire;                                       // Enter critical section
   try
     if (Index < 0) or (Index >= FCount) then
-      raise Exception.Create(ERR_INDEX_OUT_OF_BOUNDS);
+      raise EArgumentOutOfRangeException.Create(ERR_INDEX_OUT_OF_BOUNDS);
     FList[Index] := Item;                              // Replace the item
 
     // Update the sorted flag based on neighboring elements
@@ -552,7 +558,7 @@ begin
   FLock.Acquire;                                       // Enter critical section
   try
     if (Index < 0) or (Index >= FCount) then
-      raise Exception.Create(ERR_INDEX_OUT_OF_BOUNDS);
+      raise EArgumentOutOfRangeException.Create(ERR_INDEX_OUT_OF_BOUNDS);
     Result := FList[Index];                            // Retrieve the item
   finally
     FLock.Release;                                     // Exit critical section
@@ -590,6 +596,13 @@ begin
   end
   else
     Result := False;                                    // No more items
+end;
+
+function TThreadSafeList.TEnumerator.GetCurrent: T;
+begin
+  if FIndex < 0 then
+    raise EInvalidOperation.Create(ERR_INVALID_ENUMERATOR_POSITION);
+  Result := FCurrent;
 end;
 
 function TThreadSafeList.GetEnumerator: TEnumerator;
@@ -666,7 +679,7 @@ var
   I: Integer;
 begin
   if (Index < 0) or (Index >= FCount) then
-    raise Exception.Create(ERR_INDEX_OUT_OF_BOUNDS);
+    raise EArgumentOutOfRangeException.Create(ERR_INDEX_OUT_OF_BOUNDS);
   for I := Index to FCount - 2 do
     FList[I] := FList[I + 1];
   FList[FCount - 1] := Default(T);  // clear last slot to release managed-type references

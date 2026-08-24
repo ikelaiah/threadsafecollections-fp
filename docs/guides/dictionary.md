@@ -113,8 +113,7 @@ function ContainsKey(const Key: TKey): Boolean;
 function GetItem(const Key: TKey): TValue;
 procedure SetItem(const Key: TKey; const Value: TValue);
 procedure Clear;
-function Count: integer;
-function GetCount: Integer;
+property Count: Integer read GetCount;   // property on concrete and interface
 property Items[const Key: TKey]: TValue read GetItem write AddOrSetValue; default;
 ```
 
@@ -165,9 +164,15 @@ equality functions that agree with one another.
 
 Most public operations acquire `FLock` directly and release it in `finally`.
 
-`Lock()` returns an `ILockToken`, but manual use is advanced. Do not hold a token and then call public methods on the same dictionary, because those methods try to acquire the same critical section again.
+`Lock()` returns an `ILockToken`. Since v0.8.9 the lock is re-entrant for the
+owning thread, so holding a token and calling public methods on the same
+dictionary is safe and makes that sequence atomic with respect to other
+threads. See [Lock Tokens (RAII)](lock-tokens.md).
 
-`AddRange(ADictionary)` calls `ADictionary.ToArray` to create a source snapshot, releases the source lock, and then applies that snapshot to the destination. It does not hold a source lock while calling other public source methods, so the collection overload is safe with non-reentrant `TCriticalSection` implementations on POSIX.
+`AddRange(ADictionary)` calls `ADictionary.ToArray` to create a source
+snapshot, releases the source lock, and then applies that snapshot to the
+destination. It does not call other public source methods while holding the
+source lock, so the overload is deadlock-free regardless of lock re-entrancy.
 
 ## Iteration
 
@@ -216,6 +221,12 @@ ENTRY_BLOCK_SIZE = 256;
 `CheckLoadFactor` doubles the bucket array when `FCount / Length(FBuckets)` exceeds `LOAD_FACTOR`.
 
 `ResizeBuckets(NewSize)` is public. It validates that the requested size can hold the current count at the configured load factor, rounds to the next power of two, then resizes.
+
+`ResizeBuckets`, `BucketCount`, `First`, and `Last` are **concrete-only** API
+(not part of `IThreadSafeDictionary`). They are intentional diagnostics and
+advanced tuning members; `First`/`Last` return an implementation-dependent
+pair. Treat them as extras for inspection/performance work, not as v1.0
+interface promises.
 
 `TrimExcess` resizes down to a power-of-two bucket count based on the current item count and load factor, but never below the minimum.
 

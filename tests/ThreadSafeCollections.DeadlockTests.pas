@@ -138,7 +138,7 @@ type
     procedure TestLockHoldingEnumerationBlocksMutationHashSet;
     procedure TestLockHoldingEnumerationBlocksMutationDeque;
     procedure TestManualLockTokenSerialization;
-    procedure TestManualLockTokenWindowsReentrancy;
+    procedure TestManualLockTokenSameThreadReentrancy;
     procedure TestDestructionAfterConcurrentWork;
     procedure TestEnumerationCompletedBeforeDestruction;
   end;
@@ -669,29 +669,29 @@ begin
   end;
 end;
 
-procedure TThreadSafeDeadlockTests.TestManualLockTokenWindowsReentrancy;
+procedure TThreadSafeDeadlockTests.TestManualLockTokenSameThreadReentrancy;
 var
   List: TIntegerList;
   Token: ILockToken;
   StartTick, Elapsed: QWord;
 begin
-{$IFDEF WINDOWS}
+  // v0.8.9: the collection lock is re-entrant for the owning thread, so
+  // calling public methods while holding a Lock token must complete bounded
+  // on every platform (previously only Windows, where TCriticalSection is
+  // recursive, was safe; POSIX could deadlock).
   List := TIntegerList.Create(@IntegerCompare);
   try
     Token := List.Lock;
     StartTick := GetTickCount64;
     List.Add(42);
     Elapsed := GetTickCount64 - StartTick;
-    AssertTrue('Windows TCriticalSection re-entry must complete bounded', Elapsed < 5000);
+    AssertTrue('Same-thread re-entry under a lock token must complete bounded',
+      Elapsed < 5000);
     Token := nil;
     AssertEquals('Re-entrant add must be visible', 1, List.Count);
   finally
     List.Free;
   end;
-{$ELSE}
-  WriteLn('Skipped on non-Windows: TCriticalSection is not re-entrant on POSIX; ' +
-    'calling public methods while holding a Lock token is documented as unsafe there.');
-{$ENDIF}
 end;
 
 procedure TThreadSafeDeadlockTests.TestDestructionAfterConcurrentWork;

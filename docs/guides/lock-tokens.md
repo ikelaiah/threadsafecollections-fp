@@ -6,23 +6,42 @@
 **Audience:** advanced users considering the public `Lock` method and
 contributors reviewing lock-token and iterator lifetime behavior.
 
-This project uses `ILockToken` and `TLockToken` to tie a `TCriticalSection` lock to an interface reference lifetime.
+This project uses `ILockToken` and `TLockToken` to tie a collection lock to an interface reference lifetime.
 
-`TLockToken.Create` acquires the critical section. `TLockToken.Destroy` releases it if it is still held. `Release` can also release it explicitly before the interface reference is destroyed.
+Since v0.8.9 the collection lock is **re-entrant for the owning thread**: it is
+a `TRecursiveCriticalSection` (a small wrapper around `TCriticalSection` that
+tracks the owning thread). The same thread may therefore hold a manual
+`Lock()` token **and** call public collection methods on the same instance;
+other threads remain exclusively blocked for the whole sequence. This removes
+the old POSIX deadlock trap and is pinned by regression tests.
+
+`TLockToken.Create` acquires the lock. `TLockToken.Destroy` releases it if it is still held. `Release` can also release it explicitly before the interface reference is destroyed.
 
 The implementation is in `src/ThreadSafeCollections.Interfaces.pas`:
 
 ```pascal
+TRecursiveCriticalSection = class
+private
+  FSection: TCriticalSection;
+  FOwnerThread: TThreadID;
+  FDepth: Integer;
+public
+  constructor Create;
+  destructor Destroy; override;
+  procedure Acquire;   // re-entrant for the current thread
+  procedure Release;   // released once the last nested acquire is dropped
+end;
+
 TLockToken = class(TInterfacedObject, ILockToken)
 private
-  FLock: TCriticalSection;
+  FLock: TRecursiveCriticalSection;
 public
-  constructor Create(ALock: TCriticalSection);
+  constructor Create(ALock: TRecursiveCriticalSection);
   destructor Destroy; override;
   procedure Release;
 end;
 
-constructor TLockToken.Create(ALock: TCriticalSection);
+constructor TLockToken.Create(ALock: TRecursiveCriticalSection);
 begin
   inherited Create;
   FLock := ALock;
@@ -122,40 +141,57 @@ Consequences:
 
 ## Manual Lock Usage
 
-Use manual `Lock()` with care. Free Pascal's `TCriticalSection` is not re-entrant on POSIX platforms, and the public collection methods already acquire the same lock internally.
-
-Do not acquire a token and then call public methods on the same collection while that token is held:
+Each collection's `Lock()` returns an `ILockToken` that is **re-entrant for the
+calling thread** (v0.8.9). Public methods may be called while the token is held,
+and a token may be nested. Other threads are excluded for the whole sequence,
+so a guarded check-then-update sequence is atomic with respect to other threads:
 
 ```pascal
 Token := List.Lock;
 try
-  // Avoid this pattern: Add also tries to acquire List's lock.
-  List.Add(42);
+  if not List.Contains(5) then
+    List.Add(5);
 finally
   Token := nil;
 end;
 ```
 
-If a local token variable is reused in a loop, release it before the next iteration. Creating a new token while the old token still holds the same lock can deadlock on non-reentrant implementations.
+Two practical rules:
+
+- Release the token before it leaves scope with `Token := nil`, or let the
+  interface reference fall out of scope. Reusing a local token variable in a
+  loop requires the previous token to be released first (a new `Lock()` while
+  the old token is still held just nests, so it will not deadlock, but it will
+  keep the lock held for the whole loop unless you release).
+- Do not hand a token to another thread. A token is owned by the thread that
+  created it; releasing it from a different thread is undefined.
 
 ```pascal
 for I := 1 to Iterations do
 begin
   LockToken := List.Lock;
   try
-    // Work that does not call List's locking public methods.
+    // Work under the lock, including other public List methods.
   finally
     LockToken := nil;
   end;
 end;
 ```
 
-The collections themselves use private unlocked helpers, such as `InternalAdd`, `InternalRemove`, `InternalDelete`, and `InternalSetCapacity`, when a public method already holds the lock. That is how the implementation avoids re-acquiring the same critical section internally.
+The collections still use private unlocked helpers, such as `InternalAdd`,
+`InternalRemove`, `InternalDelete`, and `InternalSetCapacity`, when a public
+method already holds the lock. That keeps each method's acquire/release pairing
+obvious and avoids pointless nested lock entry.
 
 ## What This Pattern Provides
 
 - Exception-safe lock release when the token is released or destroyed.
 - A clean way for enumerators to hold a lock for their lifetime.
 - Consistent exclusive locking across the collections.
+- A safe, re-entrant per-thread lock so that compound public-method sequences
+  can be made atomic while a manual token is held (v0.8.9 lock policy).
 
-It does not provide concurrent reads, lock-free behavior, or safe nested calls into the same collection's public API while a manual token is held.
+It does not provide concurrent reads, lock-free behavior, or cross-thread
+atomicity beyond what a single token owns. It is **not** the v1.1 atomic
+workflow API (`GetOrAdd`, `AddOrUpdate`, scoped access); those remain a
+post-1.0 milestone.

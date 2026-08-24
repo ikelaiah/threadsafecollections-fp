@@ -27,7 +27,7 @@ Optional tools:
 - Bash for `build-examples.sh`
 
 The current documentation revision was verified with FPC 3.2.2 and Lazarus 4.8
-on Win64, including the full 146-test suite, the Lazarus package build, and
+on Win64, including the full 175-test suite, the Lazarus package build, and
 the package smoke consumer. Current CI runs these jobs:
 
 | Job | Platform | Command |
@@ -36,8 +36,8 @@ the package smoke consumer. Current CI runs these jobs:
 | Examples | Windows | `.\build-examples.ps1 -Configuration Release` with the FPC bundled in Lazarus 4.0.0 |
 | Tests | Linux | `./run-tests.sh` with the distribution `fpc` package |
 | Tests | Windows | `.\run-tests.ps1` with the FPC bundled in Lazarus 4.0.0 |
-| Package smoke | Linux | `./smoke-package.sh 0.8.8` with Lazarus and `lazbuild` from `apt` |
-| Documentation checks | Linux | `pwsh -File ./tools/check-docs.ps1` and `pwsh -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.8` |
+| Package smoke | Linux | `./smoke-package.sh 0.8.9` with Lazarus and `lazbuild` from `apt` |
+| Documentation checks | Linux | `pwsh -File ./tools/check-docs.ps1` and `pwsh -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.9` |
 
 On `windows-latest`, CI installs Lazarus 4.0.0 only to obtain its bundled FPC;
 it does not invoke `lazbuild` or build the Lazarus package. The Lazarus package
@@ -146,7 +146,7 @@ lazbuild --build-all package/lazarus/ThreadSafeCollections.lpk
 
 The package points Lazarus at `src`, writes compiled units below
 `package/lazarus/lib/<target-cpu>-<target-os>/`, and declares the standard FCL
-package as a requirement. The package version in the current checkout is 0.8.8.
+package as a requirement. The package version in the current checkout is 0.8.9.
 
 ### Package smoke build
 
@@ -156,11 +156,11 @@ the version, that every unit in `src/` is listed in the package file, that
 a tiny consumer program compiles against the built package and runs.
 
 ```powershell
-.\smoke-package.ps1 -ExpectedVersion 0.8.8
+.\smoke-package.ps1 -ExpectedVersion 0.8.9
 ```
 
 ```bash
-./smoke-package.sh 0.8.8
+./smoke-package.sh 0.8.9
 ```
 
 The consumer program is `tools/package-smoke-consumer.lpr`; its artifacts stay
@@ -306,7 +306,7 @@ caller's current directory. The script creates a missing output directory.
 Two inexpensive checks run in CI and can be run locally with PowerShell 7:
 
 ```powershell
-pwsh -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.8
+pwsh -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.9
 pwsh -File ./tools/check-docs.ps1
 ```
 
@@ -334,7 +334,7 @@ At minimum:
 3. Regenerate `docs/../start/cheat-sheet.md` if source declarations or its generator
    changed.
 4. Run `pwsh -File ./tools/check-docs.ps1` and
-   `pwsh -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.8`.
+   `pwsh -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.9`.
 5. Run `git diff --check`.
 
 Historical results are evidence for that recorded checkout only; they do not

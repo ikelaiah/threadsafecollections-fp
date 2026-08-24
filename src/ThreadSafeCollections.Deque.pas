@@ -32,7 +32,7 @@ type
       GROWTH_FACTOR = 2;              // Growth factor when resizing (double the capacity)
 
   private
-    FLock: TCriticalSection;     // Synchronization object to ensure that deque operations are thread-safe
+    FLock: TRecursiveCriticalSection;  // Re-entrant lock; see ThreadSafeCollections.Interfaces
     FBuffer: array of T;          // v0.8: Circular array buffer for storing elements
     FHead: Integer;               // v0.8: Index of the first element (front)
     FTail: Integer;               // v0.8: Index where next element will be added at back
@@ -185,10 +185,12 @@ type
     function GetEnumerator: TEnumerator;
 
     {
-      Acquires a read lock on the deque to prevent other threads from modifying it.
-      This is useful for performing multiple read operations atomically.
-      The returned ILockToken automatically releases the lock when it goes out of scope,
-      ensuring that locks are properly managed even if exceptions occur.
+      Acquires an exclusive lock on the deque for the calling thread.
+      The lock is re-entrant for the same thread, so public methods may be
+      called while a token is held; other threads are mutually excluded.
+      The returned ILockToken automatically releases the lock when it goes out
+      of scope, ensuring that locks are properly managed even if exceptions
+      occur.
     }
     function Lock: ILockToken;
 
@@ -237,7 +239,7 @@ var
   PowerOfTwo: Integer;
 begin
   inherited Create;
-  FLock := TCriticalSection.Create;
+  FLock := TRecursiveCriticalSection.Create;
 
   // v0.8: Ensure capacity is power of 2 for efficient modulo operations
   PowerOfTwo := MIN_CAPACITY;
@@ -459,7 +461,7 @@ end;
 function TThreadSafeDeque.TEnumerator.GetCurrent: T;
 begin
   if FCurrentIndex < 0 then
-    raise Exception.Create(ERR_INVALID_ENUMERATOR_POSITION);
+    raise EInvalidOperation.Create(ERR_INVALID_ENUMERATOR_POSITION);
   Result := FCurrent;
 end;
 

@@ -25,6 +25,15 @@ if ($null -eq $Lazbuild) {
         throw 'lazbuild was not found on PATH and no default install was found at C:\lazarus\lazbuild.exe.'
     }
 }
+# Get-Command returns a CommandInfo (path in .Source); the C:\lazarus fallback
+# returns a FileInfo (path in .FullName). Normalize to a plain executable path
+# so Set-StrictMode does not trip over the missing .Source member.
+if ($Lazbuild -is [System.Management.Automation.CommandInfo]) {
+    $LazbuildExecutable = $Lazbuild.Source
+}
+else {
+    $LazbuildExecutable = $Lazbuild.FullName
+}
 $Compiler = Get-Command fpc -ErrorAction Stop
 
 [xml]$Package = Get-Content -LiteralPath $PackageFile -Raw
@@ -52,8 +61,8 @@ foreach ($Unit in $SourceUnits) {
 }
 Write-Host "All $($SourceUnits.Count) source units are listed in the package."
 
-Write-Host 'Building the Lazarus package with lazbuild...'
-& $Lazbuild.Source --build-all $PackageFile
+Write-Host "Building the Lazarus package with lazbuild ($LazbuildExecutable)..."
+& $LazbuildExecutable --build-all $PackageFile
 if ($LASTEXITCODE -ne 0) {
     throw 'lazbuild failed while building the Lazarus package.'
 }

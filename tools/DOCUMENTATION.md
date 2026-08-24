@@ -38,23 +38,21 @@ built from the checkout by default; `--released` builds every declared version
 from its immutable `source_ref` tag and is what the release-triggered Pages
 workflow uses.
 
-## Publishing the first version (v0.8.8)
+## Publishing the current version (v0.8.9)
 
-The documentation system starts at **v0.8.8**, released 2026-08-17. Because the
-`v0.8.8` git tag predates the docs-as-code infrastructure (it has no
-`docs/layout.json` or `tools/`), it cannot be built from its tag. Publish it
-with **Actions → Publish documentation → Run workflow** on `main`
-(`workflow_dispatch`), which builds the current release from the checkout.
-
-Future releases tagged from `main` after this system landed carry the
-infrastructure, so they can be published from their `release` event with
-`--released`. When a version's tag predates the infrastructure, it must be
-dropped from `docs/versions.json` before a later immutable build succeeds.
+The documentation system's current version follows the package version
+(`docs/versions.json`, currently **v0.8.9**). The `v0.8.8` git tag predates the
+docs-as-code infrastructure, so its documentation was published from `main`
+while 0.8.8 was current. Starting with v0.8.9, releases are tagged from `main`
+after the documentation infrastructure landed, so the current version can be
+published either from the release event (`--released`) or from `main` via
+`workflow_dispatch`. When a version's tag predates the infrastructure, it must
+be dropped from `docs/versions.json` before a later immutable build succeeds.
 
 ## Local verification
 
 ```text
-pwsh -NoProfile -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.8
+pwsh -NoProfile -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.9
 pwsh -NoProfile -File ./tools/check-docs.ps1
 python tools/test_docs_examples.py
 python tools/test_build_docs.py

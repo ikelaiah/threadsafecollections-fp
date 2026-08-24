@@ -52,7 +52,7 @@ bucket array (rounded up to a power of two).
 ## Hash set: equality and hash
 
 The generic `TThreadSafeHashSet<T>` requires both an equality comparer and a
-hash function:
+hash function — supply both, never nil:
 
 ```pascal
 constructor Create(AEqualityComparer: specialize THashSetEqualityComparer<T>;
@@ -60,36 +60,50 @@ constructor Create(AEqualityComparer: specialize THashSetEqualityComparer<T>;
                    AInitialCapacity: Integer);
 ```
 
+The comparer type is `THashSetEqualityComparer<T>` (a `function(const A, B: T):
+Boolean`). This is the intended 1.0-facing name. The older name
+`TEqualityComparer<T>` (from the HashSet unit) is retained as a source-compatible
+legacy alias with an identical signature; use the unambiguous
+`THashSetEqualityComparer<T>` in new code, especially when a unit also imports
+`Generics.Collections`/`Generics.Defaults`, whose unrelated
+`TEqualityComparer<T>` class can collide during late generic specialization.
+Construction with a nil callback is rejected; note that on FPC 3.2.2 a `nil`
+argument passed directly to these generic function-typed parameters can fault at
+the call boundary before validation runs.
+
 For common element types, prefer the specialized subclasses, which wire the
 matching hash/equality helpers automatically:
 
-| Class | Element | String hash |
+| Class | Element | Hash |
 |---|---|---|
 | `TThreadSafeHashSetInteger` | `Integer` | `MultiplicativeHash` |
 | `TThreadSafeHashSetString` | `string` | `XXHash32` |
-| `TThreadSafeHashSetBoolean` | `Boolean` | — |
+| `TThreadSafeHashSetBoolean` | `Boolean` | derived from the ordinal value |
 | `TThreadSafeHashSetReal` | `Real` | fixed-point `RealHash` |
 
 `TThreadSafeHashSetString` also accepts an alternate hash function, e.g.
 `@FNV1aHash`.
 
-## Capacity and growth
-
-- List and deque start at a small default capacity and grow on demand; the list
-  uses two growth factors (`GROWTH_FACTOR_DOUBLE` for small lists,
-  `GROWTH_FACTOR_LARGE_NUMERATOR`/`.../DENOMINATOR` for large ones).
-- Dictionary and hash set start with `INITIAL_BUCKET_COUNT` buckets, resize at
-  `LOAD_FACTOR`, round bucket counts to powers of two, and never shrink
-  automatically (`TrimExcess` releases spare memory).
-- `SetCapacity`/`Create(InitialCapacity)` cannot shrink below `Count`.
+- Initial-capacity constructor arguments are advisory: negative or zero values
+  are clamped to the minimum (4 elements/buckets), and bucket counts round up
+  to powers of two.
+- `SetCapacity`/`SetCapacity`-style writes cannot shrink below `Count`;
+  `ResizeBuckets` cannot shrink below the current load — both raise
+  `EArgumentOutOfRangeException`.
 
 ## Error handling
 
 Operations that cannot complete raise exceptions whose messages come from
-`ThreadSafeCollections.ErrorMessages` (for example `ERR_ITEM_NOT_FOUND`,
-`ERR_DUPLICATE_KEY`, `ERR_COMPARER_REQUIRED`). Prefer `Try*` variants
-(`TryPopFront`, `TryGetValue`, `TryAdd`) where you want to branch instead of
-catch.
+`ThreadSafeCollections.ErrorMessages`:
+
+- index/range/capacity errors → `EArgumentOutOfRangeException`;
+- empty-list `First`/`Last` and empty-deque `Pop*`/`Peek*` → `EListError`;
+- dictionary missing key → `EKeyNotFoundException`, duplicate key →
+  `EArgumentException`;
+- invalid enumerator position → `EInvalidOperation`.
+
+Prefer `Try*` variants (`TryPopFront`, `TryGetValue`, `TryAdd`) where you want
+to branch instead of catch.
 
 ## Equality semantics
 

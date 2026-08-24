@@ -82,6 +82,7 @@ type
     procedure Test18_SetOperations;         // Set algebra operations
     procedure Test19_TryGetValue;           // Safe value retrieval
     procedure Test20_IntersectWithLargeSnapshot; // Linear snapshot-index intersection
+    procedure Test21_ComparerAliasesSameBehaviour;   // legacy + new-style comparer names
   end;
 
 { Special hash set class that forces collisions for testing }
@@ -1221,6 +1222,29 @@ begin
   end;
 
   Log('Test20_IntersectWithLargeSnapshot completed');
+end;
+
+procedure TThreadSafeHashSetTest.Test21_ComparerAliasesSameBehaviour;
+var
+  SameFunction: specialize THashSetEqualityComparer<Integer>;
+  LegacyComparer: specialize TEqualityComparer<Integer>;
+  LegacySet: specialize TThreadSafeHashSet<Integer>;
+begin
+  // Both the legacy name and the 1.0-facing name denote a function type with
+  // the same signature; each must remain accepted by the generic constructor.
+  SameFunction := @IntegerEquals;
+  LegacyComparer := @IntegerEquals;
+
+  LegacySet := specialize TThreadSafeHashSet<Integer>.Create(
+    LegacyComparer, @IntegerHash);
+  try
+    AssertTrue('Legacy comparer must still construct and add', LegacySet.Add(1));
+    AssertTrue('Legacy comparer must drive membership', LegacySet.Contains(1));
+    AssertTrue('Equality/hash functions must be interchangeable',
+      Assigned(SameFunction));
+  finally
+    LegacySet.Free;
+  end;
 end;
 
 initialization

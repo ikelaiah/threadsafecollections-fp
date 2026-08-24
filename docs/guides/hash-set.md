@@ -37,10 +37,18 @@ generic TEqualityComparer<T> = function(const A, B: T): Boolean;
 generic THashFunction<T> = function(const Value: T): Cardinal;
 ```
 
-`THashSetEqualityComparer<T>` is the constructor's comparer type. The original
-`TEqualityComparer<T>` name remains assignment-compatible for existing source code;
-the distinct internal name avoids a Free Pascal late-specialization collision with
-`Generics.Defaults.TEqualityComparer<T>`.
+`THashSetEqualityComparer<T>` is the constructor's comparer type and the
+**intended 1.0-facing name**. The original `TEqualityComparer<T>` name is
+retained as a legacy alias with the same signature and stays accepted by the
+constructor (kept for source compatibility); the distinct internal name avoids
+a Free Pascal late-specialization collision with `Generics.Defaults.TEqualityComparer<T>`.
+Prefer `THashSetEqualityComparer<T>` in new code, especially in units that also
+import `Generics.Defaults` or `Generics.Collections`.
+
+The generic constructor requires **both** callbacks and rejects nil at
+construction (this is the documented contract; on FPC 3.2.2 a `nil` argument to
+these generic function-typed parameters can fault at the call boundary before
+validation).
 
 Specialized classes:
 
