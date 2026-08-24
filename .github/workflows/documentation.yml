@@ -21,7 +21,12 @@ jobs:
       - name: Check out documentation source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || 'main' }}
+          # The github-pages environment only permits deployments from the
+          # default branch (main). Versioned documentation is still built
+          # immutably from each declared release tag by
+          # `build_all_docs.py --released`, so checking out main here yields
+          # identical content while keeping the Pages deploy ref allowed.
+          ref: main
           fetch-depth: 0
 
       - name: Set up Python
