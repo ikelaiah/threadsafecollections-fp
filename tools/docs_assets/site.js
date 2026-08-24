@@ -39,7 +39,42 @@
   });
   colorPreference.addEventListener?.("change", () => { if (!storedTheme()) updateThemeControl(); });
 
-  versionSelect?.addEventListener("change", () => { window.location.assign(versionSelect.value); });
+  function currentRelease() {
+    const meta = document.querySelector('meta[name="threadsafe-release"]');
+    return meta?.content || "";
+  }
+
+  function pageWithinRelease() {
+    const release = currentRelease();
+    const marker = release ? `/${release}/` : "";
+    const path = window.location.pathname;
+    const index = marker && path.includes(marker) ? path.indexOf(marker) : -1;
+    return index >= 0 ? path.slice(index + marker.length) : "";
+  }
+
+  if (versionSelect) {
+    versionSelect.addEventListener("change", () => {
+      const targetIndex = new URL(versionSelect.value, window.location.href).href;
+      const rest = pageWithinRelease();
+      if (!rest) {
+        window.location.assign(targetIndex);
+        return;
+      }
+      // Prefer keeping the equivalent page in the target version, falling
+      // back to that version's documentation homepage when the page does not
+      // exist there (e.g. legacy releases with a different page layout).
+      const slash = targetIndex.lastIndexOf("/");
+      const targetDir = slash >= 0 ? targetIndex.slice(0, slash) : targetIndex;
+      const targetPage = `${targetDir}/${rest}`;
+      fetch(`${targetDir}/search-index.json`, { method: "GET" })
+        .then((response) => (response.ok ? response.json() : []))
+        .then((index) => {
+          const exists = Array.isArray(index) && index.some((entry) => entry && entry.url === rest);
+          window.location.assign(exists ? targetPage : targetIndex);
+        })
+        .catch(() => { window.location.assign(targetIndex); });
+    });
+  }
 
   function closeResults() {
     if (!results || !search) return;
