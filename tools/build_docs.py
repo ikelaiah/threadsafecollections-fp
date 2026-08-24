@@ -195,25 +195,66 @@ def safe_project_asset_path(value: object, label: str) -> str:
 
 
 def legacy_navigation(source: Path) -> tuple[NavigationSection, ...]:
+    has_index = (source / "index.md").is_file()
     grouped: dict[str, list[NavigationPage]] = {"Getting Started": [], "Guides": [], "Reference": []}
     for document in sorted(source.rglob("*.md")):
         relative = document.relative_to(source).as_posix()
+        nav_path = relative
+        section = "Documentation"
         if relative == "index.md" or relative.startswith("start/"):
             section = "Getting Started"
         elif relative.startswith("guides/"):
             section = "Guides"
         elif relative.startswith("reference/"):
             section = "Reference"
-        else:
-            section = "Documentation"
-            grouped.setdefault(section, [])
+        elif relative == "README.md" and not has_index:
+            # Pre-infrastructure tags use README.md as their home page; it is
+            # rendered as index.html, so navigation links must use the
+            # canonical index path.
+            nav_path = "index.md"
+            section = "Getting Started"
         title = next((title for level, title, _anchor in heading_entries(document.read_text(encoding="utf-8")) if level == 1), document.stem)
-        grouped[section].append(NavigationPage(relative, title, section))
+        grouped.setdefault(section, [])
+        grouped[section].append(NavigationPage(nav_path, title, section))
     return tuple(NavigationSection(title, tuple(pages)) for title, pages in grouped.items() if pages)
+
+
+def home_document(source: Path) -> str | None:
+    """Return the site home document (docs-relative source path), or None.
+
+    Modern documentation trees use ``index.md``. Historical release tags that
+    predate the versioned documentation infrastructure have a flat markdown
+    tree whose home page was ``README.md``; mapping it to ``index.html`` lets
+    those releases be served as legacy documentation so the version selector
+    can reach them.
+    """
+    for name in ("index.md", "README.md"):
+        if (source / name).is_file():
+            return name
+    return None
+
+
+def canonical_home_path(home_doc: str | None) -> str:
+    """Canonical navigation path for the site home (always index.md)."""
+    return "index.md" if home_doc is not None else ""
 
 
 def load_layout(source: Path, config: SiteConfig) -> DocumentationLayout:
     layout_path = source / "layout.json"
+    if not layout_path.is_file():
+        # A documentation source without layout.json is an immutable
+        # historical release tag that predates the versioned documentation
+        # infrastructure. Build a legacy site from its flat markdown tree; the
+        # version selector catalogue still comes from the site-wide
+        # docs/versions.json.
+        return DocumentationLayout(
+            "ThreadSafeCollections-FP documentation",
+            "Historical documentation for ThreadSafeCollections-FP.",
+            legacy_navigation(source),
+            tuple(),
+            {},
+            legacy=True,
+        )
     try:
         data = json.loads(layout_path.read_text(encoding="utf-8"))
         schema = data.get("schema_version")
@@ -357,7 +398,7 @@ def source_url(config: SiteConfig, project_path: str) -> str:
     return f"{config.repository_url}/blob/{quote(config.source_ref, safe='')}/{quote(project_path.replace(os.sep, '/'), safe='/')}"
 
 
-def link_resolver(document: Path, html_page: Path, source: Path, output: Path, project_root: Path, config: SiteConfig):
+def link_resolver(document: Path, html_page: Path, source: Path, output: Path, project_root: Path, config: SiteConfig, home_doc: str | None = None):
     def resolve(raw_target: str) -> str:
         target = raw_target.strip()
         if is_unsafe_url(target):
@@ -367,7 +408,8 @@ def link_resolver(document: Path, html_page: Path, source: Path, output: Path, p
         relative_path, fragment = split_target(target)
         candidate = (document.parent / relative_path).resolve() if relative_path else document.resolve()
         if candidate.suffix.lower() == ".md" and candidate.is_relative_to(source.resolve()):
-            href = relative_url(html_page.parent, output / candidate.relative_to(source).with_suffix(".html"))
+            mapped = "index.html" if candidate.relative_to(source).as_posix() == home_doc else candidate.relative_to(source).with_suffix(".html")
+            href = relative_url(html_page.parent, output / mapped)
         elif candidate == document.resolve() and not relative_path:
             href = ""
         else:
@@ -587,9 +629,9 @@ def remove_first_heading(body: str) -> str:
     return re.sub(r"^<h1\b[^>]*>.*?</h1>\n?", "", body, count=1, flags=re.DOTALL)
 
 
-def page_shell(title: str, rendered: RenderedDocument, config: SiteConfig, layout: DocumentationLayout, current: NavigationPage | None, page: Path, output: Path, relative: str) -> str:
+def page_shell(title: str, rendered: RenderedDocument, config: SiteConfig, layout: DocumentationLayout, current: NavigationPage | None, page: Path, output: Path, relative: str, home: bool = False) -> str:
     stylesheet = relative_url(page.parent, output / "assets" / "site.css"); script = relative_url(page.parent, output / "assets" / "site.js"); search_script = relative_url(page.parent, output / "search-index.js")
-    home = relative == "index.md"; body = remove_first_heading(rendered.body) if home else rendered.body
+    body = remove_first_heading(rendered.body) if home else rendered.body
     if home:
         body = homepage_content(layout, page, output) + body
     navigation, toc = render_navigation(layout, relative, page, output, config), ("" if home else render_toc(rendered.headings))
@@ -667,20 +709,30 @@ def build_site(source: Path, output: Path, site_root: Path, versions_path: Path,
     documents = sorted(source.rglob("*.md"))
     if not documents:
         raise ValueError(f"no Markdown documents found in {source}")
+    documents = sorted(source.rglob("*.md"))
+    if not documents:
+        raise ValueError(f"no Markdown documents found in {source}")
     validate_source_links(source, documents, source.parent); prepare_output(output, config.release); copy_assets(output, source.parent, layout); copy_document_assets(source, output)
+    # The home document (index.md on modern trees, README.md on legacy
+    # pre-infrastructure trees) is rendered to index.html so every version has
+    # a stable entry page and selector target.
+    home_doc = home_document(source)
     search_entries: list[dict[str, object]] = []; by_path = {item.path: item for item in layout.pages}
     for document in documents:
-        relative = document.relative_to(source); relative_path = relative.as_posix(); page = output / relative.with_suffix(".html"); page.parent.mkdir(parents=True, exist_ok=True)
+        relative = document.relative_to(source); relative_path = relative.as_posix()
+        is_home = home_doc is not None and relative_path == home_doc
+        nav_relative = canonical_home_path(home_doc) if is_home else relative_path
+        page = output / ("index.html" if is_home else relative.with_suffix(".html")); page.parent.mkdir(parents=True, exist_ok=True)
         rendered = markdown_to_html(
             document.read_text(encoding="utf-8"),
-            link_resolver(document, page, source, output, source.parent, config),
+            link_resolver(document, page, source, output, source.parent, config, home_doc),
             image_resolver(document, page, source, output),
         )
-        fallback = by_path.get(relative_path, NavigationPage(relative_path, relative.stem, "Documentation"))
+        fallback = by_path.get(nav_relative, NavigationPage(nav_relative, relative.stem, "Documentation"))
         title = next((text for level, text, _identifier in rendered.headings if level == 1), fallback.title)
-        page.write_text(page_shell(title, rendered, config, layout, by_path.get(relative_path), page, output, relative_path), encoding="utf-8")
-        item = by_path.get(relative_path)
-        search_entries.append({"title": title, "section": item.section if item else "Documentation", "headings": [text for level, text, _identifier in rendered.headings if level >= 2], "url": relative.with_suffix(".html").as_posix(), "text": rendered.text})
+        page.write_text(page_shell(title, rendered, config, layout, by_path.get(nav_relative), page, output, nav_relative, home=is_home), encoding="utf-8")
+        item = by_path.get(nav_relative)
+        search_entries.append({"title": title, "section": item.section if item else "Documentation", "headings": [text for level, text, _identifier in rendered.headings if level >= 2], "url": ("index.html" if is_home else relative.with_suffix(".html").as_posix()), "text": rendered.text})
     search_json = json.dumps(search_entries, ensure_ascii=False, separators=(",", ":"))
     (output / "search-index.json").write_text(json.dumps(search_entries, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (output / "search-index.js").write_text("globalThis.ThreadSafeSearchIndex=" + search_json.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026") + ";\n", encoding="utf-8")

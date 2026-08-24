@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -234,6 +235,89 @@ class BuildDocsTests(unittest.TestCase):
                 if path.is_file() and path.suffix in {".css", ".html", ".js", ".json", ".txt"}
             ).lower()
             self.assertNotIn("stringkit", generated)
+
+
+    def test_version_selector_lists_all_versions_with_a_single_current(self) -> None:
+        def options(html: str) -> list[tuple[str, str, str]]:
+            return re.findall(r'<option value="([^"]+)"([^>]*)?>(.*?)</option>', html)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, _output, site_root = self.write_fixture(root)
+            versions = source / "versions.json"
+            metadata = json.loads(versions.read_text(encoding="utf-8"))
+            metadata["versions"].append({"release": "1.9.0", "source_ref": "v1.9.0"})
+            versions.write_text(json.dumps(metadata), encoding="utf-8")
+            output = site_root / "1.9.1"
+
+            build_site(source, output, site_root, versions)
+
+            current_html = (output / "index.html").read_text(encoding="utf-8")
+            current_options = options(current_html)
+            labels = {text for _, _attrs, text in current_options}
+            self.assertEqual({"v1.9.1 (current)", "v1.9.0"}, labels)
+            self.assertNotIn("v1.9.0 (current)", current_html)
+            by_label = {text: (value, attrs) for value, attrs, text in current_options}
+            current_option = by_label["v1.9.1 (current)"]
+            self.assertTrue("selected" in current_option[1], current_options)
+            self.assertEqual("index.html", current_option[0])
+            legacy_option = by_label["v1.9.0"]
+            self.assertTrue("selected" not in legacy_option[1], current_options)
+            self.assertEqual("../1.9.0/index.html", legacy_option[0])
+
+            # v1.9.0 site: same shared catalogue, nothing about 1.9.0 is current.
+            (source / "layout.json").write_text(json.dumps({"schema_version": 1, "release": "1.9.0"}), encoding="utf-8")
+            legacy_output = site_root / "1.9.0"
+            build_site(source, legacy_output, site_root, versions, release="1.9.0")
+
+            legacy_html = (legacy_output / "index.html").read_text(encoding="utf-8")
+            legacy_options = options(legacy_html)
+            legacy_labels = {text for _v, _a, text in legacy_options}
+            self.assertEqual({"v1.9.1 (current)", "v1.9.0"}, legacy_labels)
+            self.assertNotIn("v1.9.0 (current)", legacy_html)
+            legacy_by_label = {text: (value, attrs) for value, attrs, text in legacy_options}
+            self.assertEqual("index.html", legacy_by_label["v1.9.0"][0])
+            self.assertTrue("selected" in legacy_by_label["v1.9.0"][1], legacy_options)
+            self.assertEqual("../1.9.1/index.html", legacy_by_label["v1.9.1 (current)"][0])
+            self.assertTrue("selected" not in legacy_by_label["v1.9.1 (current)"][1], legacy_options)
+
+    def test_builds_legacy_documentation_without_layout_json(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "docs"
+            output = root / "site" / "1.9.1"
+            site_root = output.parent
+            source.mkdir(parents=True)
+            # Historical tag with a flat markdown tree and no documentation
+            # infrastructure (no layout.json): README.md is the site home.
+            (source / "README.md").write_text(
+                "# Legacy documentation\n\nHome page. See [Notes](notes.md).\n",
+                encoding="utf-8",
+            )
+            (source / "notes.md").write_text("# Notes\n\nSome notes.\n", encoding="utf-8")
+            (source / "versions.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "current": "1.9.1",
+                        "site_url": "https://example.invalid/threadsafecollections-fp",
+                        "repository_url": "https://github.com/example/threadsafecollections-fp",
+                        "versions": [{"release": "1.9.1", "source_ref": "v1.9.1"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            build_site(source, output, site_root, source / "versions.json")
+
+            self.assertTrue((output / "index.html").is_file())
+            self.assertTrue((output / "notes.html").is_file())
+            index_html = (output / "index.html").read_text(encoding="utf-8")
+            self.assertIn('href="notes.html"', index_html)
+            self.assertIn('id="version-select"', index_html)
+            self.assertIn('class="doc-sidebar"', index_html)
+            index_entries = json.loads((output / "search-index.json").read_text(encoding="utf-8"))
+            self.assertEqual({"index.html", "notes.html"}, {entry["url"] for entry in index_entries})
 
 
 if __name__ == "__main__":

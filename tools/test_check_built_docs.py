@@ -67,6 +67,40 @@ class CheckBuiltDocsTests(unittest.TestCase):
             self.assertTrue(any("duplicate id" in error for error in errors))
             self.assertTrue(any("unsafe link" in error for error in errors))
 
+    def test_accepts_cross_version_selector_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "docs"
+            source.mkdir()
+            (source / "index.md").write_text("# Index\n\n[Guide](guide.md)\n", encoding="utf-8")
+            (source / "guide.md").write_text("# Guide\n\nAll good.\n", encoding="utf-8")
+            versions = source / "versions.json"
+            versions.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "current": "1.9.1",
+                        "site_url": "https://example.invalid/ThreadSafeCollections-FP",
+                        "repository_url": "https://github.com/example/ThreadSafeCollections-FP",
+                        "versions": [
+                            {"release": "1.9.1", "source_ref": "main"},
+                            {"release": "1.9.0", "source_ref": "v1.9.0"},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (source / "layout.json").write_text(json.dumps({"schema_version": 1, "release": "1.9.1"}), encoding="utf-8")
+            build_site(source, root / "site" / "1.9.1", root / "site", versions)
+            (source / "layout.json").write_text(json.dumps({"schema_version": 1, "release": "1.9.0"}), encoding="utf-8")
+            build_site(source, root / "site" / "1.9.0", root / "site", versions, release="1.9.0")
+
+            site = root / "site"
+            self.assertEqual([], check_site(site))
+            # Each version's page links to the other version's index for the selector.
+            self.assertIn('1.9.0/index.html', (site / "1.9.1" / "index.html").read_text(encoding="utf-8"))
+            self.assertIn('1.9.1/index.html', (site / "1.9.0" / "index.html").read_text(encoding="utf-8"))
+
     def test_requires_the_documentation_assets_and_version_targets(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             site = self.build_fixture(Path(directory))

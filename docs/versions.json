@@ -7,6 +7,10 @@
     {
       "release": "0.8.9",
       "source_ref": "v0.8.9"
+    },
+    {
+      "release": "0.8.8",
+      "source_ref": "v0.8.8"
     }
   ]
 }
