@@ -223,7 +223,7 @@ class BuildDocsTests(unittest.TestCase):
             site_root = Path(directory) / "site"
             build_site(
                 ROOT / "docs",
-                site_root / "0.8.8",
+                site_root / "0.8.9",
                 site_root,
                 ROOT / "docs" / "versions.json",
             )

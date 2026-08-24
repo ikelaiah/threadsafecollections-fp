@@ -10,6 +10,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.9] - 2026-08-24
+
+### Added
+
+- Re-entrant collection lock (`TRecursiveCriticalSection` in
+  `ThreadSafeCollections.Interfaces`). `Lock()` is now safe to combine with
+  public calls on the same collection and to nest from the same thread; other
+  threads remain excluded. The previous POSIX deadlock trap is removed and the
+  previously Windows-only re-entry regression now runs on every platform.
+- `ThreadSafeCollections.ApiConsistencyTests.pas` (27 tests): re-entrant and
+  nested lock tokens, compound check-then-update under a token, lock-holding
+  iteration calling public methods, Dictionary defaults for nil callbacks,
+  capacity rounding/clamping, pinned exception classes, empty/nil/self bulk
+  inputs, callback-failure bulk state, enumerator position guards, and
+  snapshot-vs-mutation iteration.
+- `ThreadSafeCollections.GenericsMixedTests.pas`: proves Dictionary, HashSet,
+  and RTL (`Generics.Collections`/`Generics.Defaults`) generic bindings coexist
+  without the `TEqualityComparer<T>` late-specialization collision.
+- Generic HashSet constructor validation: nil equality/hash callbacks are
+  rejected at construction.
+- Windows CI package-smoke job: builds the Lazarus package and runs
+  `smoke-package.ps1` on `windows-latest`.
+
+### Changed
+
+- Exception contracts normalized to standard FPC classes: invalid
+  index/range/capacity → `EArgumentOutOfRangeException`; empty List
+  `First`/`Last` and empty Deque `Pop*`/`Peek*` → `EListError`; Dictionary
+  duplicate key → `EArgumentException`; invalid enumerator position →
+  `EInvalidOperation` on every enumerator (List `Current` now guards too).
+- Dictionary `Count` is now a read-only property on the concrete class
+  (previously a `function`), matching the other collections and the interface.
+- HashSet comparer surface finalized for 1.0: `THashSetEqualityComparer<T>` is
+  the intended name; the legacy `TEqualityComparer<T>` alias is retained and
+  marked deprecated for new code.
+- Dictionary source header cleaned: removed the stale version string and the
+  "Delphi's TDictionary interface" compatibility claim; iteration and locking
+  doc comments now describe the snapshot and re-entrancy behavior accurately.
+- Post-v0.8.8 documentation work recorded: versioned docs-as-code site and
+  GitHub Pages publishing (`docs/layout.json`, `docs/versions.json`), static
+  site builder and search/theme/version selectors, documentation build and
+  validation tooling and tests, verified recipe examples, and the homepage
+  banner-width fix.
+
+### Testing
+
+- FPCUnit suite grew from 146 to 175 tests and passes with 0 errors, 0
+  failures, and 0 unfreed HeapTrc blocks (Windows x86-64, FPC 3.2.2).
+- All 16 tracked examples compile; documentation tooling tests, docs builder,
+  recipe checks, and release-metadata checks pass.
+
 ## [0.8.8] - 2026-08-17
 
 ### Added

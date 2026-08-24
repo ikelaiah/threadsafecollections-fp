@@ -26,6 +26,8 @@ const
   // Argument errors
   ERR_COMPARER_REQUIRED = 'Comparer must be provided';
   ERR_ARRAY_TOO_SMALL = 'Destination array is too small';
+  ERR_EQUALITY_COMPARER_REQUIRED = 'Equality comparer must be provided';
+  ERR_HASH_FUNCTION_REQUIRED = 'Hash function must be provided';
 
   // Enumerator errors
   ERR_INVALID_ENUMERATOR_POSITION = 'Invalid enumerator position';

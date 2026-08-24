@@ -2,8 +2,7 @@
 {                                                       }
 {       Thread-safe Dictionary Implementation           }
 {                                                       }
-{       Copyright (C) 2024                              }
-{       Version: 0.8.5                                  }
+{       Copyright (C) 2024-2026 ikelaiah               }
 {                                                       }
 {*******************************************************}
 
@@ -14,12 +13,20 @@
   resizing when the load factor threshold is reached.
 
   Features:
-  - Thread-safe operations using critical sections
+  - Thread-safe operations using re-entrant critical sections
   - Separate chaining for collision handling
   - Automatic resizing when load factor exceeds 0.75
   - Support for custom hash functions and equality comparers
-  - Compatible with Delphi's TDictionary interface
+  - Dictionary-shaped API (not a proven drop-in replacement for Delphi's
+    TDictionary; see ROADMAP's compatibility discussion)
   - RAII-style locking mechanism
+
+  Key lookup behaviour:
+  - string keys hash with XXHash32, integer keys with MultiplicativeHash,
+    and every other key type with DefaultHash (FNV-1a over raw bytes)
+    unless a custom hash function is supplied.
+  - nil hash/equality callbacks select these defaults; supplying one
+    callback requires supplying the other.
 
   NOTE: This implementation shares common hash table patterns with ThreadSafeCollections.HashSet.
         Both use: bucket arrays, GetBucketIndex, Resize, CheckLoadFactor, and entry chaining.
@@ -34,8 +41,9 @@
       try
         Dict.Add('one', 1);
         Dict.AddOrSetValue('two', 2);
-        
-        // Using TPair from Generics.Collections
+
+        // Using TPair from Generics.Collections;
+        // dictionary iteration is a snapshot taken at loop start.
         for Pair in Dict do
           WriteLn(Format('%s: %d', [Pair.Key, Pair.Value]));
       finally
@@ -187,7 +195,7 @@ type
       end;
 
   private
-    FLock: TCriticalSection;     // Critical section object to ensure thread safety during operations
+    FLock: TRecursiveCriticalSection;  // Re-entrant lock; see ThreadSafeCollections.Interfaces
     FBuckets: array of PEntry;   // Dynamic array of bucket heads; each bucket is a linked list of entries
     FCount: integer;             // Current number of key-value pairs stored in the dictionary
     FHashFunc: specialize THashFunction<TKey>;             // Custom hash function for hashing keys
@@ -359,7 +367,7 @@ type
         Value: The value to associate with the key
       
       Raises:
-        Exception if the key already exists
+        EArgumentException if the key already exists
       
       Thread Safety:
         Method is thread-safe }
@@ -474,8 +482,9 @@ type
         Method is thread-safe }
     procedure Clear;
 
-    // Returns the number of key-value pairs currently stored in the dictionary
-    function Count: integer; 
+    // Returns the number of key-value pairs currently stored in the dictionary.
+    // Read as a property for consistency with the other collections.
+    property Count: Integer read GetCount; 
 
     { ResizeBuckets
       Manually resizes the internal bucket array
@@ -518,7 +527,9 @@ type
         A new TEnumerator instance
       
       Notes:
-        - Enumerator maintains a lock during iteration
+        - Enumerator snapshots all pairs while briefly locked, then releases
+          the lock; the snapshot is stable for the whole iteration even if the
+          dictionary is modified meanwhile
         - Remember to free the enumerator when done
       
       Thread Safety:
@@ -526,10 +537,18 @@ type
     function GetEnumerator: TEnumerator;
 
     { Lock
-      Acquires a lock on the dictionary using RAII pattern
+      Acquires an exclusive lock on the dictionary for the calling thread
       
       Returns:
         An ILockToken that automatically releases the lock when freed
+      
+      Notes:
+        - The lock is re-entrant for the same thread: public methods can be
+          called while a token is held, and other threads are mutually
+          excluded for the whole sequence. This makes a sequence such as
+          'check then update' atomic when guarded by one token.
+        - It does not add atomic workflow helpers (such as GetOrAdd); those
+          are a post-1.0 milestone.
       
       Usage:
         var
@@ -766,7 +785,7 @@ var
   AdjustedSize:Integer;
 begin
   inherited Create;
-  FLock := TCriticalSection.Create;
+  FLock := TRecursiveCriticalSection.Create;
   FAllocator.Init;
 
   // Store the custom functions or use defaults
@@ -821,7 +840,7 @@ begin
     
     // Ensure new size is adequate
     if NewSize < MinRequired then
-      raise Exception.CreateFmt(
+      raise EArgumentOutOfRangeException.CreateFmt(
         'New size (%d) too small for current item count. Minimum required: %d',
         [NewSize, MinRequired]);
     
@@ -929,7 +948,7 @@ begin
   Hash := GetHashValue(Key);
   BucketIdx := GetBucketIndex(Hash);
   if FindEntry(Key, Hash, BucketIdx) <> nil then
-    raise Exception.Create(ERR_DUPLICATE_KEY);
+    raise EArgumentException.Create(ERR_DUPLICATE_KEY);
   InternalInsertNew(Key, Value, Hash, BucketIdx);
 end;
 
@@ -1085,7 +1104,7 @@ begin
 end;
 
 
-function TThreadSafeDictionary.Count: integer;
+function TThreadSafeDictionary.GetCount: Integer;
 begin
   FLock.Acquire;
   try
@@ -1163,7 +1182,7 @@ end;
 function TThreadSafeDictionary.TEnumerator.GetCurrent: specialize TPair<TKey, TValue>;
 begin
   if (FSnapshotIndex < 0) or (FSnapshotIndex >= Length(FSnapshot)) then
-    raise Exception.Create(ERR_INVALID_ENUMERATOR_POSITION);
+    raise EInvalidOperation.Create(ERR_INVALID_ENUMERATOR_POSITION);
   Result := FSnapshot[FSnapshotIndex];
 end;
 
@@ -1190,16 +1209,6 @@ begin
     Result := FEqualityComparer(Left, Right)
   else
     Result := FDefaultKeyComparer.Equals(Left, Right);
-end;
-
-function TThreadSafeDictionary.GetCount: Integer;
-begin
-  FLock.Acquire;
-  try
-    Result := FCount;
-  finally
-    FLock.Release;
-  end;
 end;
 
 function TThreadSafeDictionary.GetItem(const Key: TKey): TValue;

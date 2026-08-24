@@ -8,7 +8,7 @@
 >
 > Regenerate from the repository root with: `pwsh -File ./tools/generate-cheatsheet.ps1`
 
-Package version: `0.8.8`
+Package version: `0.8.9`
 
 ## Source Inputs
 
@@ -172,7 +172,7 @@ Package version: `0.8.8`
 
 - `function First(out Key: TKey; out Value: TValue): boolean;`
 - `function Last(out Key: TKey; out Value: TValue): boolean;`
-- `function Count: integer;`
+- `property Count: Integer read GetCount;`
 - `procedure ResizeBuckets(NewSize: integer);`
 - `function GetBucketCount: integer;`
 - `property BucketCount: integer read GetBucketCount;`

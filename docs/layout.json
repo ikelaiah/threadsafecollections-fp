@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "release": "0.8.8",
+  "release": "0.8.9",
   "site_title": "ThreadSafeCollections-FP documentation",
   "description": "Practical ThreadSafeCollections-FP documentation for concurrent Free Pascal collections.",
   "required_pages": [
@@ -32,11 +32,13 @@
     "history/RELEASE-NOTES-v0.8.6.md",
     "history/RELEASE-NOTES-v0.8.7.md",
     "history/RELEASE-NOTES-v0.8.8.md",
+    "history/RELEASE-NOTES-v0.8.9.md",
     "history/PR_v0.8.1.md",
     "history/PR_v0.8.5.md",
     "history/PR_v0.8.6.md",
     "history/PR_v0.8.7.md",
     "history/PR_v0.8.8.md",
+    "history/PR_v0.8.9.md",
     "history/HashSet-Constructor-Evolution.md",
     "history/Debugging-Tale.md",
     "history/MAINTAINABILITY_IMPROVEMENTS.md"
@@ -87,11 +89,13 @@
     "history/RELEASE-NOTES-v0.8.6.md",
     "history/RELEASE-NOTES-v0.8.7.md",
     "history/RELEASE-NOTES-v0.8.8.md",
+    "history/RELEASE-NOTES-v0.8.9.md",
     "history/PR_v0.8.1.md",
     "history/PR_v0.8.5.md",
     "history/PR_v0.8.6.md",
     "history/PR_v0.8.7.md",
     "history/PR_v0.8.8.md",
+    "history/PR_v0.8.9.md",
     "history/HashSet-Constructor-Evolution.md",
     "history/Debugging-Tale.md",
     "history/MAINTAINABILITY_IMPROVEMENTS.md"

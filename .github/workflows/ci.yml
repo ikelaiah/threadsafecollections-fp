@@ -158,7 +158,34 @@ jobs:
           sudo apt-get install --yes lazarus fpc
 
       - name: Build the Lazarus package and run the tiny consumer
-        run: bash ./smoke-package.sh 0.8.8
+        run: bash ./smoke-package.sh 0.8.9
+
+  package-smoke-windows:
+    name: Package / Windows / lazbuild
+    runs-on: windows-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Lazarus and Free Pascal
+        shell: pwsh
+        run: choco install lazarus --version 4.0.0 --yes --no-progress
+
+      - name: Add Free Pascal to PATH
+        shell: pwsh
+        run: |
+          $Compiler = Get-ChildItem -LiteralPath 'C:\lazarus\fpc' -Recurse -File -Filter 'fpc.exe' |
+            Select-Object -First 1
+          if (-not $Compiler) {
+            throw 'Could not find fpc.exe after installing Lazarus.'
+          }
+          $Compiler.Directory.FullName | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Build the Lazarus package and run the tiny consumer
+        shell: pwsh
+        run: .\smoke-package.ps1 -ExpectedVersion 0.8.9
 
   docs-checks:
     name: Documentation / Checks
@@ -171,7 +198,7 @@ jobs:
 
       - name: Check release metadata consistency
         shell: pwsh
-        run: pwsh -NoProfile -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.8
+        run: pwsh -NoProfile -File ./tools/check-release-metadata.ps1 -ExpectedVersion 0.8.9
 
       - name: Check links, fences, example paths, and stale cheat sheet
         shell: pwsh

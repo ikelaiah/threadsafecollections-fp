@@ -11,9 +11,14 @@ uses
 
 type
   // Legacy public comparer name retained for source compatibility.
+  // Deprecated for new code: specialize THashSetEqualityComparer<T> is the
+  // intended 1.0-facing name and both names denote the same underlying
+  // function type, so the legacy name remains interchangeable wherever
+  // THashSetEqualityComparer<T> is accepted.
   generic TEqualityComparer<T> = function(const A, B: T): Boolean;
 
-  // Internally use an unambiguous name: Generics.Defaults also exports a
+  // The 1.0-facing public comparer type for TThreadSafeHashSet.
+  // An unambiguous name is used deliberately: Generics.Defaults also exports a
   // TEqualityComparer<T>, and FPC's late generic specialization can otherwise
   // bind HashSet specializations to that class type in mixed-unit programs.
   generic THashSetEqualityComparer<T> = function(const A, B: T): Boolean;
@@ -121,7 +126,7 @@ type
     private
       FBuckets: array of PEntry;   // Dynamic array holding pointers to the head of each bucket's entry chain.
       FCount: Integer;             // Current number of unique items stored in the hash set.
-      FLock: TCriticalSection;     // Critical section to synchronize access and ensure thread safety.
+      FLock: TRecursiveCriticalSection;  // Re-entrant lock; see ThreadSafeCollections.Interfaces
       FEqualityComparer: _TEqualityComparer;  // Delegate for comparing two items for equality.
       FHashFunction: specialize THashFunction<T>;          // Delegate for computing the hash code of an item.
       FAllocator: TEntryAllocator; // Slab allocator for TEntry records
@@ -318,11 +323,14 @@ type
 
     { 
       Lock: 
-        Acquires a lock on the hash set to ensure exclusive access.
+        Acquires an exclusive lock on the hash set for the calling thread.
         
-        This function returns an ILockToken that manages the lifecycle of the lock. When
-        the token is destroyed or released, the lock is automatically released, ensuring
-        that critical sections are properly managed.
+        The lock is re-entrant for the same thread, so public methods may be
+        called while a token is held; other threads are mutually excluded.
+        This function returns an ILockToken that manages the lifecycle of the
+        lock. When the token is destroyed or released, the lock is
+        automatically released, ensuring that critical sections are properly
+        managed.
         
         Returns:
           - An ILockToken instance representing the acquired lock.
@@ -674,8 +682,16 @@ constructor TThreadSafeHashSet.Create(AEqualityComparer: specialize THashSetEqua
                                     AHashFunction: specialize THashFunction<T>;
                                     AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
 begin
+  // Unlike the Dictionary, a generic hash set cannot guess a sensible default
+  // hash/equality pair for an arbitrary T, so both callbacks are required.
+  // Fail fast at construction instead of dereferencing nil on first use.
+  if not Assigned(AEqualityComparer) then
+    raise Exception.Create(ERR_EQUALITY_COMPARER_REQUIRED);
+  if not Assigned(AHashFunction) then
+    raise Exception.Create(ERR_HASH_FUNCTION_REQUIRED);
+
   // Initialize with thread safety and hash functions
-  FLock := TCriticalSection.Create;
+  FLock := TRecursiveCriticalSection.Create;
   FAllocator.Init;
   FEqualityComparer := AEqualityComparer;
   FHashFunction := AHashFunction;
@@ -902,7 +918,7 @@ var
 begin
   EqualityComparer := @IntegerEquals;
   HashFunc := @IntegerHash;
-   inherited Create(EqualityComparer, HashFunc, AInitialCapacity);
+  inherited Create(EqualityComparer, HashFunc, AInitialCapacity);
 end;
 
 constructor TThreadSafeHashSetString.Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
@@ -931,7 +947,7 @@ var
 begin
   EqualityComparer := @BooleanEquals;
   HashFunc := @BooleanHash;
-   inherited Create(EqualityComparer, HashFunc, AInitialCapacity);
+  inherited Create(EqualityComparer, HashFunc, AInitialCapacity);
 end;
 
 constructor TThreadSafeHashSetReal.Create(AInitialCapacity: Integer = INITIAL_BUCKET_COUNT);
@@ -941,7 +957,7 @@ var
 begin
   EqualityComparer := @RealEquals;
   HashFunc := @RealHash;
-   inherited Create(EqualityComparer, HashFunc, AInitialCapacity);
+  inherited Create(EqualityComparer, HashFunc, AInitialCapacity);
 end;
 
 function TThreadSafeHashSet.GetCount: Integer;

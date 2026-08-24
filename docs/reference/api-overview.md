@@ -46,15 +46,28 @@ parameters).
 
 ## Support types
 
-- `ILockToken` — an interface whose reference lifetime bounds a held lock.
-  See [Lock Tokens (RAII)](../guides/lock-tokens.md).
+- `ILockToken` — an interface whose reference lifetime bounds a held lock; the
+  underlying lock is re-entrant for the owning thread (v0.8.9). See
+  [Lock Tokens (RAII)](../guides/lock-tokens.md).
 - Array views for dictionary snapshots (declared in
   `ThreadSafeCollections.Interfaces`):
   - `TKeyArray<T>`, `TValueArray<T>`, `TPairArray<TKey, TValue>`.
 - Hash/equality callbacks:
   - Dictionary: `THashFunction<T>`, `TEqualityComparison<T>`.
-  - Hash set: `THashSetEqualityComparer<T>`, `THashFunction<T>`.
+  - Hash set: `THashSetEqualityComparer<T>` (the 1.0-facing name; the legacy
+    `TEqualityComparer<T>` alias from the HashSet unit remains accepted and is
+    interchangeable, but can collide with `Generics.Defaults` in mixed programs),
+    `THashFunction<T>`.
   - List: `specialize TComparer<T>` from `Generics.Defaults`.
+
+## Dictionary surface
+
+`IThreadSafeDictionary<TKey, TValue>` and the concrete class expose the same
+members; `Count` is a read-only property on both (v0.8.9 unified it with the
+other collections). Concrete-only diagnostic/advanced members that are **not**
+part of the interface surface: `First`, `Last`, `BucketCount`,
+`ResizeBuckets`. These are documented intentional extras, not v1.0 interface
+promises (see [Contracts & Limitations](contracts-and-limitations.md)).
 
 ## Built-in helpers
 

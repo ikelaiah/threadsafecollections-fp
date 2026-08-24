@@ -151,37 +151,45 @@ Deque, and HashSet; and snapshot enumeration for Dictionary.
 - package metadata was brought to 0.8.7 and the misdated v0.8.6 release
   record was corrected.
 
-## Current baseline — 0.8.8
+## Current baseline — 0.8.9
 
-0.8.8 delivered the concurrency hardening milestone. The FPCUnit suite grew
-from 118 to 146 tests:
+0.8.9 delivered the API consistency and 1.0 preparation milestone. The FPCUnit
+suite grew from 146 to 175 tests:
 
-- deterministic, event-coordinated concurrency tests cover concurrent add,
-  remove, lookup, resize, bulk, collision, enumeration, interface, and
-  callback workloads for all four collection families, with exact final-state
-  verification;
-- bounded-completion deadlock regressions cover opposite lock order,
-  self-source bulk operations, lock-holding enumeration with concurrent
-  mutation, manual lock token serialization, the Windows-only `Lock()`
-  re-entry behavior, and lifetime/destruction boundaries; a regression that
-  does not complete within its bound fails the runner instead of hanging it;
-- seeded randomized stress tests cover add, remove, contains, clear, resize,
-  enumeration, ranges, and poor hashes, recording seed, thread count,
-  iterations, collection, and operation mix for reproduction; and
-- the lock-holding versus snapshot iterator difference was decided to be
-  intentional and is documented with its trade-offs in
-  [Thread-safety, iteration, and lock policy](docs/guides/thread-safety-and-iteration.md);
-  the tests now enforce both behaviors.
+- `Lock()` is finalized: every collection uses a re-entrant lock
+  (`TRecursiveCriticalSection`), so the owning thread can safely combine a
+  manual token with public calls and nest tokens, while other threads remain
+  excluded. The previously Windows-only re-entry regression now runs on every
+  platform, and new tests cover re-entrant public calls, nested tokens,
+  compound check-then-update, and lock-holding iteration with public calls.
+- Exception contracts are normalized to standard FPC classes
+  (`EArgumentOutOfRangeException`, `EListError`, `EKeyNotFoundException`,
+  `EArgumentException`, `EInvalidOperation`) and pinned by regression tests.
+- Construction is normalized and documented: generic HashSet construction
+  rejects nil callbacks, Dictionary nil callbacks keep their built-in defaults,
+  capacity clamps/rounding are tested, and Dictionary `Count` is a read-only
+  property like the other collections.
+- The HashSet comparer surface for 1.0 is `THashSetEqualityComparer<T>`; the
+  legacy `TEqualityComparer<T>` alias is retained and deprecated for new code,
+  and mixed-generics tests prove the RTL and both collection units coexist.
+- Dictionary concrete-only members (`First`, `Last`, `BucketCount`,
+  `ResizeBuckets`) are documented as intentional diagnostics/advanced API that
+  are not part of the interface surface.
+- Stale version strings and the "Delphi's TDictionary interface" claim were
+  removed from the Dictionary source header and doc comments corrected.
+- The docs-as-code site, versioned GitHub Pages publishing, documentation
+  build/validation tooling, verified recipe examples, and the homepage-banner
+  fix are recorded in the changelog and release notes.
+- Windows CI now runs the Lazarus package-smoke job (`smoke-package.ps1`);
+  examples and FPCUnit suites remain automatically verified on Windows and
+  Linux.
 
 Remaining weaknesses, addressed by later milestones:
 
-- Windows package smoke verification is documented locally (Lazarus 4.8) but
-  not automated in Windows CI;
 - benchmarks remain local-only and point-in-time rather than
-  regression-controlled;
-- `Lock()` re-entry limitations remain and its final safe-use design is
-  deferred to 0.8.9;
-- comparer, hashing, and construction defaults are not fully uniform; and
+  regression-controlled (candidates for the 1.0 release gates);
+- the v1.1 atomic-workflow surface (get-or-add, add-or-update, scoped access)
+  remains post-1.0; and
 - macOS and other targets are out of scope for now; the maintained focus is
   Windows x86-64 and Linux.
 
@@ -191,7 +199,8 @@ Remaining weaknesses, addressed by later milestones:
 |---|---|---|
 | 0.8.7 | CI and verification | Existing correctness claims become automated checks |
 | 0.8.8 | Concurrency hardening | Races, deadlocks, iteration, resize, and lifetime behavior are exercised |
-| 0.8.9 | API consistency and 1.0 preparation | Pre-1.0 inconsistencies resolved and core frozen |
+| 0.8.9 | API consistency and 1.0 preparation | **Delivered** (2026-08-24); pre-1.0 inconsistencies resolved, `Lock()` finalized, contracts documented |
+| 1.0.0 | Stable native core | **Next milestone** — four well-tested collection families with documented, frozen contracts |
 | 1.0.0 | Stable native core | Four well-tested collection families with documented contracts |
 | 1.1.0 | Atomic concurrent workflows | Compound operations eliminate common check-then-act races |
 | 1.2.0 | Read scalability | Measured parallel-read and contention improvements |
@@ -228,7 +237,7 @@ Remaining weaknesses, addressed by later milestones:
 ## 0.8.8 — Concurrency hardening
 
 > **Delivered in v0.8.8 (2026-08-17).** See the
-> [current baseline](#current-baseline--088) and the
+> [current baseline](#current-baseline--089) and the
 > [v0.8.8 release notes](docs/history/RELEASE-NOTES-v0.8.8.md) for what was hardened.
 
 - Add deterministic, barrier/event-coordinated tests for List, Deque,
@@ -254,6 +263,11 @@ Remaining weaknesses, addressed by later milestones:
 - No known high-severity race, deadlock, corruption, or managed-memory defect remains open.
 
 ## 0.8.9 — API consistency and 1.0 preparation
+
+> **Delivered in v0.8.9 (2026-08-24).** See the
+> [current baseline](#current-baseline--089) and the
+> [v0.8.9 release notes](docs/history/RELEASE-NOTES-v0.8.9.md) for what was
+> finalized.
 
 - Normalize or deliberately document default construction, custom comparers,
   equality/hash functions, built-in specializations, and invalid callback behavior.

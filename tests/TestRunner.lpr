@@ -13,7 +13,9 @@ uses
   , ThreadSafeDequeTests
   , ThreadSafeCollections.ConcurrencyTests
   , ThreadSafeCollections.DeadlockTests
-  , ThreadSafeCollections.StressTests;
+  , ThreadSafeCollections.StressTests
+  , ThreadSafeCollections.ApiConsistencyTests
+  , ThreadSafeCollections.GenericsMixedTests;
 
 type
 
